@@ -2,6 +2,230 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    /* Modern blue/slate theme for OS management system */
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    
+    /* OS System specific colors */
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 26 83.3% 14.1%;
+    --info: 217.2 91.2% 59.8%;
+    --info-foreground: 210 40% 98%;
+    
+    /* Status colors for OS */
+    --status-aberta: 47.9 95.8% 53.1%;
+    --status-em-andamento: 217.2 91.2% 59.8%;
+    --status-pausada: 25 95% 53%;
+    --status-finalizada: 142.1 76.2% 36.3%;
+    --status-cancelada: 0 84.2% 60.2%;
+    
+    /* Priority colors */
+    --priority-baixa: 142.1 76.2% 36.3%;
+    --priority-normal: 217.2 91.2% 59.8%;
+    --priority-alta: 25 95% 53%;
+    --priority-urgente: 0 84.2% 60.2%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(221.2 83.2% 63.3%));
+    --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(142.1 76.2% 46.3%));
+    --gradient-card: linear-gradient(145deg, hsl(var(--card)), hsl(210 40% 99%));
+    
+    /* Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(var(--primary) / 0.1);
+    --shadow-medium: 0 4px 16px -4px hsl(var(--primary) / 0.15);
+    --shadow-large: 0 8px 32px -8px hsl(var(--primary) / 0.2);
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+    
+    /* OS System specific colors - dark mode */
+    --success: 142.1 70.6% 45.3%;
+    --warning: 47.9 95.8% 53.1%;
+    --info: 217.2 91.2% 59.8%;
+    
+    /* Status colors for OS - dark mode */
+    --status-aberta: 47.9 95.8% 53.1%;
+    --status-em-andamento: 217.2 91.2% 59.8%;
+    --status-pausada: 25 95% 53%;
+    --status-finalizada: 142.1 70.6% 45.3%;
+    --status-cancelada: 0 62.8% 30.6%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  /* Modern card styles */
+  .card-modern {
+    @apply bg-gradient-to-br from-card to-card/95 backdrop-blur-sm border border-border/50 shadow-soft rounded-lg;
+  }
+  
+  .card-elevated {
+    @apply bg-gradient-to-br from-card to-card/95 backdrop-blur-sm border border-border/50 shadow-medium rounded-lg;
+  }
+  
+  /* Status badge styles */
+  .status-aberta {
+    @apply bg-status-aberta/10 text-status-aberta border border-status-aberta/20;
+  }
+  
+  .status-em-andamento {
+    @apply bg-status-em-andamento/10 text-status-em-andamento border border-status-em-andamento/20;
+  }
+  
+  .status-pausada {
+    @apply bg-status-pausada/10 text-status-pausada border border-status-pausada/20;
+  }
+  
+  .status-finalizada {
+    @apply bg-status-finalizada/10 text-status-finalizada border border-status-finalizada/20;
+  }
+  
+  .status-cancelada {
+    @apply bg-status-cancelada/10 text-status-cancelada border border-status-cancelada/20;
+  }
+  
+  /* Priority badge styles */
+  .priority-baixa {
+    @apply bg-priority-baixa/10 text-priority-baixa border border-priority-baixa/20;
+  }
+  
+  .priority-normal {
+    @apply bg-priority-normal/10 text-priority-normal border border-priority-normal/20;
+  }
+  
+  .priority-alta {
+    @apply bg-priority-alta/10 text-priority-alta border border-priority-alta/20;
+  }
+  
+  .priority-urgente {
+    @apply bg-priority-urgente/10 text-priority-urgente border border-priority-urgente/20;
+  }
+  
+  /* Modern input styles */
+  .input-modern {
+    @apply bg-background/50 backdrop-blur-sm border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200;
+  }
+  
+  /* Navigation styles */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-200;
+  }
+  
+  .nav-item.active {
+    @apply text-primary bg-primary/10 border border-primary/20;
+  }
+  
+  /* Button gradient styles */
+  .btn-gradient {
+    @apply bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-soft hover:shadow-medium transition-all duration-200;
+  }
+  
+  .btn-success {
+    @apply bg-gradient-to-r from-success to-success/90 hover:from-success/90 hover:to-success text-success-foreground;
+  }
+  
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

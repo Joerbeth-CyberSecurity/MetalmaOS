@@ -1,73 +1,188 @@
-# Welcome to your Lovable project
+# 🏭 Metalma OS - Sistema de Ordens de Serviço
 
-## Project info
+Sistema completo para gerenciamento de ordens de serviço da Metalma, desenvolvido com tecnologias modernas e interface intuitiva.
 
-**URL**: https://lovable.dev/projects/f443a6bf-51ee-429f-8fbc-eb2f04f41b2d
+## 🚀 Tecnologias
 
-## How can I edit this code?
+- **React18lioteca JavaScript para interfaces
+- **TypeScript** - Tipagem estática para JavaScript
+- **Vite** - Build tool e dev server
+- **Tailwind CSS** - Framework CSS utilitário
+- **Supabase** - Backend como serviço (BaaS)
+- **shadcn/ui** - Componentes de UI modernos
+- **React Router** - Roteamento da aplicação
+- **React Hook Form** - Gerenciamento de formulários
+- **Zod** - Validação de esquemas
 
-There are several ways of editing your application.
+## 📋 Funcionalidades
 
-**Use Lovable**
+### ✅ Gestão de Clientes
+- Cadastro completo de clientes
+- Edição e exclusão de registros
+- Busca e filtros
+- Validação de dados
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f443a6bf-51ee-429f-8fbc-eb2f04f41b2d) and start prompting.
+### ✅ Gestão de Colaboradores
+- Controle de funcionários
+- Perfis e permissões
+- Histórico de atividades
 
-Changes made via Lovable will be committed automatically to this repo.
+### ✅ Gestão de Produtos
+- Catálogo de produtos
+- Controle de estoque
+- Preços e especificações
 
-**Use your preferred IDE**
+### ✅ Ordens de Serviço
+- Criação de OS
+- Acompanhamento de status
+- Relatórios detalhados
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### ✅ Relatórios
+- Relatórios gerenciais
+- Exportação de dados
+- Gráficos e estatísticas
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### ✅ Configurações
+- Configurações do sistema
+- Perfis de usuário
+- Backup e restauração
 
-Follow these steps:
+## 📦 Instalação
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Pré-requisitos
+- Node.js 18+ 
+- npm ou yarn
+- Conta no Supabase
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Passos
 
-# Step 3: Install the necessary dependencies.
-npm i
+1. **Clone o repositório**
+```bash
+git clone https://github.com/SEU_USUARIO/metalma-os.git
+cd metalma-os
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+2. **Instale as dependências**
+```bash
+npm install
+```
+3*Configure as variáveis de ambiente**
+```bash
+cp env.example .env
+```
+
+Edite o arquivo `.env` com suas configurações do Supabase:
+```env
+VITE_SUPABASE_URL=sua_url_do_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
+```
+
+4. **Execute o projeto**
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+O projeto estará disponível em: http://localhost:880 🔧 Scripts Disponíveis
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+# Desenvolvimento
+npm run dev          # Inicia o servidor de desenvolvimento
+npm run build        # Gera build de produção
+npm run build:dev    # Gera build de desenvolvimento
+npm run preview      # Preview do build
 
-**Use GitHub Codespaces**
+# Qualidade de código
+npm run lint         # Executa o linter
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📁 Estrutura do Projeto
 
-## What technologies are used for this project?
+```
+src/
+├── components/          # Componentes reutilizáveis
+│   ├── ui/             # Componentes de UI (shadcn/ui)
+│   ├── AppSidebar.tsx  # Sidebar da aplicação
+│   ├── Layout.tsx      # Layout principal
+│   └── ProtectedRoute.tsx # Rota protegida
+├── hooks/              # Custom hooks
+│   ├── useAuth.ts      # Hook de autenticação
+│   └── use-mobile.tsx  # Hook para mobile
+├── integrations/       # Integrações externas
+│   └── supabase/       # Configuração do Supabase
+├── lib/                # Utilitários
+│   └── utils.ts        # Funções utilitárias
+├── pages/              # Páginas da aplicação
+│   ├── Auth.tsx        # Página de autenticação
+│   ├── Dashboard.tsx   # Dashboard principal
+│   ├── Index.tsx       # Página inicial
+│   └── NotFound.tsx    # Página 404
+└── main.tsx           # Ponto de entrada
+```
 
-This project is built with:
+## 🌐 Deploy
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Vercel (Recomendado)1Acesse [vercel.com](https://vercel.com)
+2. Conecte sua conta GitHub
+3. Importe o repositório `metalma-os`
+4. Configure as variáveis de ambiente
+5. Deploy automático a cada push
 
-## How can I deploy this project?
+### GitHub Pages
+1. Configure GitHub Actions
+2. Build automático na branch main
+3. Deploy na branch gh-pages
 
-Simply open [Lovable](https://lovable.dev/projects/f443a6bf-51ee-429f-8fbc-eb2f04f41b2d) and click on Share -> Publish.
+## 🔐 Variáveis de Ambiente
 
-## Can I connect a custom domain to my Lovable project?
+| Variável | Descrição | Obrigatório |
+|----------|-----------|-------------|
+| `VITE_SUPABASE_URL` | URL do projeto Supabase | ✅ |
+| `VITE_SUPABASE_ANON_KEY` | Chave anônima do Supabase | ✅ |
+| `VITE_APP_NAME` | Nome da aplicação | ❌ |
+| `VITE_APP_VERSION` | Versão da aplicação | ❌ |
 
-Yes, you can!
+## 🎨 Interface
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+O sistema utiliza uma interface moderna e responsiva com:
+- Design system consistente
+- Componentes acessíveis
+- Tema escuro/claro
+- Layout responsivo
+- Navegação intuitiva
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 🔄 Desenvolvimento
+
+### Adicionando novas funcionalidades
+1. Crie uma nova branch: `git checkout -b feature/nova-funcionalidade`
+2. Desenvolva a funcionalidade
+3. Teste localmente4 Faça commit: `git commit -m "feat: nova funcionalidade"`
+5: `git push origin feature/nova-funcionalidade`
+6. Crie um Pull Request
+
+### Padrões de código
+- TypeScript para tipagem
+- ESLint para qualidade
+- Prettier para formatação
+- Conventional Commits
+
+## 📄 Licença
+
+MIT License - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 🤝 Contribuição
+
+1. Fork o projeto
+2ie uma branch para sua feature
+3mmit suas mudanças
+4. Push para a branch
+5. Abra um Pull Request
+
+## 📞 Suporte
+
+Para suporte e dúvidas:
+- Abra uma [Issue](https://github.com/SEU_USUARIO/metalma-os/issues)
+- Entre em contato: [seu-email@exemplo.com]
+
+---
+
+**🎉 Sistema Metalma OS - Gerenciando ordens de serviço com excelência!**

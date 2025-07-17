@@ -1,12 +1,12 @@
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Layout } from '@/components/Layout';
-import Dashboard from './Dashboard';
+import { Outlet } from 'react-router-dom';
 
 const Index = () => {
   return (
     <ProtectedRoute>
       <Layout>
-        <Dashboard />
+        <Outlet />
       </Layout>
     </ProtectedRoute>
   );

@@ -41,6 +41,7 @@ CREATE TABLE public.colaboradores (
     salario DECIMAL(10,2),
     horas_trabalhadas DECIMAL(8,2) DEFAULT 0,
     meta_hora DECIMAL(8,2) DEFAULT 0,
+    paradas_material INTEGER DEFAULT 0,
     ativo BOOLEAN DEFAULT true,
     data_admissao DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
@@ -69,16 +70,18 @@ CREATE TABLE public.ordens_servico (
     descricao TEXT NOT NULL,
     valor_total DECIMAL(10,2),
     custo_producao DECIMAL(10,2),
-    status VARCHAR(20) DEFAULT 'aberta' CHECK (status IN ('aberta', 'em_andamento', 'pausada', 'finalizada', 'cancelada')),
+    status VARCHAR(20) DEFAULT 'aberta' CHECK (status IN ('aberta', 'em_andamento', 'pausada', 'finalizada', 'cancelada', 'falta_material')),
     data_abertura TIMESTAMP WITH TIME ZONE DEFAULT now(),
     data_inicio TIMESTAMP WITH TIME ZONE,
     data_fim TIMESTAMP WITH TIME ZONE,
     tempo_execucao_previsto DECIMAL(8,2),
     tempo_execucao_real DECIMAL(8,2) DEFAULT 0,
-    tempo_parada DECIMAL(8,2) DEFAULT 0,
+    tempo_pausa DECIMAL(8,2) DEFAULT 0,
+    tempo_falta_material DECIMAL(8,2) DEFAULT 0,
     motivo_parada TEXT,
     prioridade VARCHAR(10) DEFAULT 'normal' CHECK (prioridade IN ('baixa', 'normal', 'alta', 'urgente')),
     observacoes TEXT,
+    meta_hora DECIMAL(10,2),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -194,6 +197,28 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Create function to increment tempo_falta_material
+CREATE OR REPLACE FUNCTION public.increment_tempo_falta_material(os_id UUID)
+RETURNS numeric AS $$
+BEGIN
+    UPDATE public.ordens_servico
+    SET tempo_falta_material = COALESCE(tempo_falta_material, 0) + 1
+    WHERE id = os_id;
+    RETURN COALESCE((SELECT tempo_falta_material FROM public.ordens_servico WHERE id = os_id), 0);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create function to increment paradas_material
+CREATE OR REPLACE FUNCTION public.increment_paradas_material(colaborador_id UUID)
+RETURNS integer AS $$
+BEGIN
+    UPDATE public.colaboradores
+    SET paradas_material = COALESCE(paradas_material, 0) + 1
+    WHERE id = colaborador_id;
+    RETURN COALESCE((SELECT paradas_material FROM public.colaboradores WHERE id = colaborador_id), 0);
+END;
+$$ LANGUAGE plpgsql;
+
 -- Create triggers for automatic timestamp updates
 CREATE TRIGGER update_admins_updated_at
     BEFORE UPDATE ON public.admins
@@ -238,6 +263,7 @@ DECLARE
     prefixo TEXT;
     proximo_numero INTEGER;
     numero_completo TEXT;
+    ano_atual TEXT;
 BEGIN
     -- Get prefix from configurations
     SELECT valor INTO prefixo FROM public.configuracoes WHERE chave = 'prefixo_os';
@@ -245,23 +271,30 @@ BEGIN
         prefixo := 'OS';
     END IF;
     
-    -- Get next number
-    SELECT COALESCE(MAX(CAST(SUBSTRING(numero_os FROM LENGTH(prefixo) + 1) AS INTEGER)), 0) + 1
+    -- Get current year
+    ano_atual := TO_CHAR(CURRENT_DATE, 'YYYY');
+    
+    -- Get next number for the current year
+    SELECT COALESCE(MAX(CAST(SUBSTRING(numero_os FROM LENGTH(prefixo) + 1 FOR POSITION('/' IN numero_os) - LENGTH(prefixo) - 1) AS INTEGER)), 0) + 1
     INTO proximo_numero
     FROM public.ordens_servico
-    WHERE numero_os ~ ('^' || prefixo || '[0-9]+$');
+    WHERE numero_os LIKE prefixo || '%/' || ano_atual;
     
-    -- Generate complete number
-    numero_completo := prefixo || LPAD(proximo_numero::TEXT, 6, '0');
+    -- Format: OS0001/2024
+    numero_completo := prefixo || LPAD(proximo_numero::TEXT, 4, '0') || '/' || ano_atual;
     
+    -- Set the generated number
     NEW.numero_os := numero_completo;
+    
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Drop existing trigger if exists
+DROP TRIGGER IF EXISTS generate_os_number_trigger ON public.ordens_servico;
 
 -- Create trigger for automatic OS number generation
 CREATE TRIGGER generate_os_number_trigger
     BEFORE INSERT ON public.ordens_servico
     FOR EACH ROW
-    WHEN (NEW.numero_os IS NULL OR NEW.numero_os = '')
     EXECUTE FUNCTION public.generate_os_number();

@@ -48,13 +48,77 @@ import {
 } from "@/components/ui/form"
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/components/ui/use-toast"
+// Remover import do ReportTemplate se não for mais usado
+// import { ReportTemplate } from '@/components/ui/ReportTemplate';
+
+// Função para aplicar máscara de CPF
+function maskCPF(value: string) {
+  return value
+    .replace(/\D/g, '')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    .slice(0, 14);
+}
+// Função para aplicar máscara de CNPJ
+function maskCNPJ(value: string) {
+  return value
+    .replace(/\D/g, '')
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+    .slice(0, 18);
+}
+// Função para validar CPF
+function isValidCPF(cpf: string) {
+  cpf = cpf.replace(/\D/g, '');
+  if (cpf.length !== 11 || /^([0-9])\1+$/.test(cpf)) return false;
+  let sum = 0, rest;
+  for (let i = 1; i <= 9; i++) sum += parseInt(cpf.substring(i-1, i)) * (11 - i);
+  rest = (sum * 10) % 11;
+  if ((rest === 10) || (rest === 11)) rest = 0;
+  if (rest !== parseInt(cpf.substring(9, 10))) return false;
+  sum = 0;
+  for (let i = 1; i <= 10; i++) sum += parseInt(cpf.substring(i-1, i)) * (12 - i);
+  rest = (sum * 10) % 11;
+  if ((rest === 10) || (rest === 11)) rest = 0;
+  if (rest !== parseInt(cpf.substring(10, 11))) return false;
+  return true;
+}
+// Função para validar CNPJ
+function isValidCNPJ(cnpj: string) {
+  cnpj = cnpj.replace(/\D/g, '');
+  if (cnpj.length !== 14) return false;
+  if (/^([0-9])\1+$/.test(cnpj)) return false;
+  let t = cnpj.length - 2, d = cnpj.substring(t), d1 = parseInt(d.charAt(0)), d2 = parseInt(d.charAt(1)), calc = x => {
+    let n = cnpj.substring(0, x), y = x - 7, s = 0, r = 2;
+    for (let i = x; i >= 1; i--) {
+      s += n.charAt(x - i) * r++;
+      if (r > 9) r = 2;
+    }
+    return s;
+  };
+  let dg1 = calc(t), dg2 = calc(t + 1);
+  dg1 = 11 - (dg1 % 11); if (dg1 >= 10) dg1 = 0;
+  dg2 = 11 - (dg2 % 11); if (dg2 >= 10) dg2 = 0;
+  return dg1 === d1 && dg2 === d2;
+}
 
 // Esquema de validação para o formulário de cliente
 const clienteSchema = z.object({
   nome: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
+  telefone: z.string().min(8, { message: 'O telefone é obrigatório.' }),
+  cpf_cnpj: z.string().min(11, { message: 'O CPF/CNPJ é obrigatório.' }).refine(
+    (val) => {
+      const num = val.replace(/\D/g, '');
+      if (num.length === 11) return isValidCPF(val);
+      if (num.length === 14) return isValidCNPJ(val);
+      return false;
+    },
+    { message: 'CPF/CNPJ inválido.' }
+  ),
   email: z.string().email({ message: 'E-mail inválido.' }).optional().or(z.literal('')),
-  telefone: z.string().optional(),
-  cpf_cnpj: z.string().optional(),
   endereco: z.string().optional(),
   cidade: z.string().optional(),
   estado: z.string().optional(),
@@ -157,9 +221,13 @@ export default function Clientes() {
       : await supabase.from('clientes').insert([values]);
 
     if (error) {
+      let msg = error.message;
+      if (msg && msg.includes('clientes_cpf_cnpj_key')) {
+        msg = 'Já existe um cliente cadastrado com este CPF/CNPJ.';
+      }
       toast({
         title: `Erro ao ${selectedCliente ? 'atualizar' : 'salvar'} cliente`,
-        description: error.message,
+        description: msg,
         variant: "destructive",
       });
     } else {
@@ -199,21 +267,23 @@ export default function Clientes() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
           <p className="text-muted-foreground">
             Gerencie os clientes da sua empresa.
           </p>
         </div>
-        <Button onClick={handleAddNew}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Adicionar Cliente
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleAddNew} type="button">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Adicionar Cliente
+          </Button>
+          <Button onClick={() => window.print()} type="button" className="bg-primary text-white font-semibold shadow-soft hover:bg-primary/80 transition">
+            Imprimir / Exportar PDF
+          </Button>
+        </div>
       </div>
-
-      {/* Tabela de Clientes */}
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
@@ -283,7 +353,6 @@ export default function Clientes() {
           </TableBody>
         </Table>
       </div>
-
       {/* Painel Lateral (Sheet) para Adicionar/Editar Cliente */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="sm:max-w-lg">
@@ -300,7 +369,7 @@ export default function Clientes() {
                 name="nome"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nome</FormLabel>
+                    <FormLabel>Nome*</FormLabel>
                     <FormControl>
                       <Input placeholder="Nome completo do cliente" {...field} />
                     </FormControl>
@@ -326,7 +395,7 @@ export default function Clientes() {
                 name="telefone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Telefone</FormLabel>
+                    <FormLabel>Telefone*</FormLabel>
                     <FormControl>
                       <Input placeholder="(99) 99999-9999" {...field} />
                     </FormControl>
@@ -339,9 +408,18 @@ export default function Clientes() {
                 name="cpf_cnpj"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>CPF/CNPJ</FormLabel>
+                    <FormLabel>CPF/CNPJ*</FormLabel>
                     <FormControl>
-                      <Input placeholder="00.000.000/0000-00" {...field} />
+                      <Input
+                        placeholder="00.000.000/0000-00"
+                        {...field}
+                        maxLength={18}
+                        onChange={e => {
+                          const v = e.target.value.replace(/\D/g, '');
+                          if (v.length <= 11) field.onChange(maskCPF(e.target.value));
+                          else field.onChange(maskCNPJ(e.target.value));
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

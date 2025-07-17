@@ -49,17 +49,46 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/components/ui/use-toast"
 
+// Função para aplicar máscara de CPF
+function maskCPF(value: string) {
+  return value
+    .replace(/\D/g, '')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    .slice(0, 14);
+}
+// Função para validar CPF
+function isValidCPF(cpf: string) {
+  cpf = cpf.replace(/\D/g, '');
+  if (cpf.length !== 11 || /^([0-9])\1+$/.test(cpf)) return false;
+  let sum = 0, rest;
+  for (let i = 1; i <= 9; i++) sum += parseInt(cpf.substring(i-1, i)) * (11 - i);
+  rest = (sum * 10) % 11;
+  if ((rest === 10) || (rest === 11)) rest = 0;
+  if (rest !== parseInt(cpf.substring(9, 10))) return false;
+  sum = 0;
+  for (let i = 1; i <= 10; i++) sum += parseInt(cpf.substring(i-1, i)) * (12 - i);
+  rest = (sum * 10) % 11;
+  if ((rest === 10) || (rest === 11)) rest = 0;
+  if (rest !== parseInt(cpf.substring(10, 11))) return false;
+  return true;
+}
+
 // Esquema de validação para o formulário de colaborador
 const colaboradorSchema = z.object({
-  nome: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
+  nome: z.string().min(3, { message: 'O nome é obrigatório.' }),
+  cargo: z.string().min(2, { message: 'O cargo é obrigatório.' }),
+  salario: z.number({ required_error: 'O salário é obrigatório.' }),
+  data_admissao: z.string().min(4, { message: 'A data de admissão é obrigatória.' }),
   email: z.string().email({ message: 'E-mail inválido.' }).optional().or(z.literal('')),
   telefone: z.string().optional(),
-  cpf: z.string().optional(),
+  cpf: z.string().optional().refine(
+    (val) => !val || isValidCPF(val),
+    { message: 'CPF inválido.' }
+  ),
   endereco: z.string().optional(),
-  cargo: z.string().optional(),
-  salario: z.number().optional(),
   meta_hora: z.number().optional(),
-  data_admissao: z.string().optional(),
 });
 
 type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
@@ -152,8 +181,9 @@ export default function Colaboradores() {
     const dataToSave = {
       ...values,
       salario: values.salario || null,
-      meta_hora: values.meta_hora || null,
+      meta_hora: values.meta_hora ?? 8,
       data_admissao: values.data_admissao || null,
+      cpf: values.cpf && values.cpf.trim() !== '' ? values.cpf : null, // CPF null se vazio
     };
 
     const { error } = selectedColaborador
@@ -161,9 +191,19 @@ export default function Colaboradores() {
       : await supabase.from('colaboradores').insert([dataToSave]);
 
     if (error) {
-      toast({ title: `Erro ao ${selectedColaborador ? 'atualizar' : 'salvar'} colaborador`, description: error.message, variant: "destructive" });
+      let msg = error.message;
+      if (msg && msg.includes('colaboradores_cpf_key')) {
+        msg = 'Já existe um colaborador cadastrado com este CPF.';
+      }
+      toast({
+        title: `Erro ao ${selectedColaborador ? 'atualizar' : 'salvar'} colaborador`,
+        description: msg,
+        variant: 'destructive',
+      });
     } else {
-      toast({ title: `Colaborador ${selectedColaborador ? 'atualizado' : 'salvo'} com sucesso!` });
+      toast({
+        title: `Colaborador ${selectedColaborador ? 'atualizado' : 'salvo'} com sucesso!`,
+      });
       setSheetOpen(false);
       fetchColaboradores();
     }
@@ -285,7 +325,7 @@ export default function Colaboradores() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
               <FormField name="nome" control={form.control} render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nome</FormLabel>
+                  <FormLabel>Nome*</FormLabel>
                   <FormControl><Input placeholder="Nome completo" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -307,13 +347,17 @@ export default function Colaboradores() {
               <FormField name="cpf" control={form.control} render={({ field }) => (
                 <FormItem>
                   <FormLabel>CPF</FormLabel>
-                  <FormControl><Input placeholder="000.000.000-00" {...field} /></FormControl>
+                  <FormControl>
+                    <Input placeholder="000.000.000-00" {...field} maxLength={14}
+                      onChange={e => field.onChange(maskCPF(e.target.value))}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField name="cargo" control={form.control} render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cargo</FormLabel>
+                  <FormLabel>Cargo*</FormLabel>
                   <FormControl><Input placeholder="Ex: Desenvolvedor" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -321,7 +365,7 @@ export default function Colaboradores() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField name="salario" control={form.control} render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Salário</FormLabel>
+                    <FormLabel>Salário*</FormLabel>
                     <FormControl><Input type="number" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -329,14 +373,16 @@ export default function Colaboradores() {
                 <FormField name="meta_hora" control={form.control} render={({ field }) => (
                   <FormItem>
                     <FormLabel>Meta de Horas</FormLabel>
-                    <FormControl><Input type="number" {...field} onChange={e => field.onChange(e.target.valueAsNumber)}/></FormControl>
+                    <FormControl>
+                      <Input type="number" {...field} value={field.value ?? 8} onChange={e => field.onChange(e.target.valueAsNumber)} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
               </div>
               <FormField name="data_admissao" control={form.control} render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Data de Admissão</FormLabel>
+                  <FormLabel>Data de Admissão*</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

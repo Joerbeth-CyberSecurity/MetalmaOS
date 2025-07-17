@@ -4,6 +4,8 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { User, Bell } from 'lucide-react';
+import { Logo } from '@/components/ui/Logo';
+import { DarkModeToggle } from '@/components/ui/DarkModeToggle';
 
 interface LayoutProps {
   children: ReactNode;
@@ -22,6 +24,7 @@ export function Layout({ children }: LayoutProps) {
           <header className="h-14 border-b border-border/60 bg-card/50 backdrop-blur-sm flex items-center justify-between px-4">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="hover:bg-secondary/50" />
+              <Logo width={110} height={32} />
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-foreground">
                   Sistema de Controle de OS
@@ -36,6 +39,7 @@ export function Layout({ children }: LayoutProps) {
               <Button variant="ghost" size="sm" className="hover:bg-secondary/50">
                 <Bell className="h-4 w-4" />
               </Button>
+              <DarkModeToggle />
               <Button variant="ghost" size="sm" className="hover:bg-secondary/50">
                 <User className="h-4 w-4" />
                 <span className="ml-2 text-sm">

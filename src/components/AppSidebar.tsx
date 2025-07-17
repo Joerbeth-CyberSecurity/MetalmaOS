@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/ui/Logo';
 
 const items = [
   { title: 'Dashboard', url: '/', icon: BarChart3 },
@@ -57,8 +58,8 @@ export function AppSidebar() {
         {/* Header */}
         <div className="p-4 border-b border-border/60">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-primary p-2 rounded-lg shadow-soft">
-              <Building2 className="h-5 w-5 text-primary-foreground" />
+            <div className="flex items-center justify-center bg-transparent">
+              <Logo width={collapsed ? 32 : 64} height={collapsed ? 32 : 40} />
             </div>
             {!collapsed && (
               <div>

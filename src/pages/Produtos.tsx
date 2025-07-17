@@ -49,6 +49,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/components/ui/use-toast"
+// Remover import do ReportTemplate se não for mais usado
+// import { ReportTemplate } from '@/components/ui/ReportTemplate';
 
 // Esquema de validação Zod
 const produtoSchema = z.object({
@@ -184,17 +186,21 @@ export default function Produtos() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Produtos</h1>
           <p className="text-muted-foreground">Gerencie os produtos e o estoque da sua empresa.</p>
         </div>
-        <Button onClick={handleAddNew}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Adicionar Produto
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleAddNew} type="button">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Adicionar Produto
+          </Button>
+          <Button onClick={() => window.print()} type="button" className="bg-primary text-white font-semibold shadow-soft hover:bg-primary/80 transition">
+            Imprimir / Exportar PDF
+          </Button>
+        </div>
       </div>
-
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
@@ -231,7 +237,7 @@ export default function Produtos() {
           </TableBody>
         </Table>
       </div>
-
+      {/* Painel Lateral (Sheet) para Adicionar/Editar Produto */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="sm:max-w-lg overflow-y-auto">
           <SheetHeader>

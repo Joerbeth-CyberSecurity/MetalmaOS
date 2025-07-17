@@ -35,6 +35,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { Database } from '@/integrations/supabase/types';
 import { Checkbox } from '@/components/ui/checkbox';
+// Remover import do ReportTemplate se não for mais usado
+// import { ReportTemplate } from '@/components/ui/ReportTemplate';
 
 // Tipos baseados no schema do Supabase (types.ts)
 type ClienteRow = Database['public']['Tables']['clientes']['Row'];
@@ -242,7 +244,7 @@ export default function OrdensServico() {
           status: values.status,
           valor_total: valorTotalOS,
           tempo_execucao_previsto: values.tempo_execucao_previsto,
-          meta_hora: values.meta_hora,
+          // meta_hora removido do envio ao banco
         };
 
       console.log('Atualizando OS:', osDataToUpdate);
@@ -293,7 +295,7 @@ export default function OrdensServico() {
           status: values.status,
           valor_total: valorTotalOS,
           tempo_execucao_previsto: values.tempo_execucao_previsto,
-          meta_hora: values.meta_hora,
+          // meta_hora removido do envio ao banco
           numero_os: 'Gerando...',
           data_abertura: new Date().toISOString()
         })
@@ -326,9 +328,17 @@ export default function OrdensServico() {
     }
   } catch (error) {
     console.error('Erro ao salvar OS:', error);
+    let msg = 'Erro ao salvar OS. Verifique os campos obrigatórios e tente novamente.';
+    if (error && typeof error === 'object') {
+      if ('message' in error && error.message) {
+        msg += `\n${error.message}`;
+      } else if ('toString' in error) {
+        msg += `\n${error.toString()}`;
+      }
+    }
     toast({ 
       title: "Erro ao salvar OS", 
-      description: error instanceof Error ? error.message : 'Erro desconhecido', 
+      description: msg, 
       variant: "destructive" 
     });
   } finally {
@@ -543,14 +553,21 @@ export default function OrdensServico() {
   
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Ordens de Serviço</h1>
           <p className="text-muted-foreground">Crie e gerencie as ordens de serviço.</p>
         </div>
-        <Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" />Nova Ordem de Serviço</Button>
+        <div className="flex gap-2">
+          <Button onClick={handleAddNew} type="button">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Nova Ordem de Serviço
+          </Button>
+          <Button onClick={() => window.print()} type="button" className="bg-primary text-white font-semibold shadow-soft hover:bg-primary/80 transition">
+            Imprimir / Exportar PDF
+          </Button>
+        </div>
       </div>
-  
       <div className="border rounded-lg">
         <Table>
           <TableHeader>

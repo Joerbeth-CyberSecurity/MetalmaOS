@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Building2 } from 'lucide-react';
+import { Logo } from '@/components/ui/Logo';
 
 export default function Auth() {
   const { user, loading, signIn, signUp } = useAuth();
@@ -55,9 +56,7 @@ export default function Auth() {
       <div className="w-full max-w-md animate-fade-in">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <div className="bg-gradient-primary p-3 rounded-xl shadow-soft">
-              <Building2 className="h-8 w-8 text-primary-foreground" />
-            </div>
+            <Logo width={180} height={60} />
           </div>
           <h1 className="text-3xl font-bold text-foreground">Sistema Metalma</h1>
           <p className="text-muted-foreground mt-2">Controle de Ordens de Serviço</p>

@@ -120,6 +120,8 @@ export default function OrdensServico() {
   const [isFinishing, setIsFinishing] = useState(false);
   const [showParadaDialog, setShowParadaDialog] = useState(false);
   const [motivoParada, setMotivoParada] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [produtoSearch, setProdutoSearch] = useState('');
 
   const form = useForm<OsFormData>({
     resolver: zodResolver(osSchema),
@@ -373,14 +375,27 @@ export default function OrdensServico() {
 
       if (osError) throw osError;
 
-      // Registrar início no os_tempo
+      // Buscar colaboradores ativos na OS
+      const { data: colaboradoresOS, error: colabError } = await supabase
+        .from('os_colaboradores')
+        .select('colaborador_id')
+        .eq('os_id', os.id)
+        .eq('ativo', true);
+
+      if (colabError) throw colabError;
+      if (!colaboradoresOS || colaboradoresOS.length === 0) throw new Error('Nenhum colaborador ativo na OS.');
+
+      // Registrar início no os_tempo para cada colaborador
+      const registrosTempo = colaboradoresOS.map(({ colaborador_id }) => ({
+        os_id: os.id,
+        colaborador_id,
+        tipo: 'trabalho',
+        data_inicio: new Date().toISOString(),
+      }));
+
       const { error: tempoError } = await supabase
         .from('os_tempo')
-        .insert({
-          os_id: os.id,
-          tipo: 'trabalho',
-          data_inicio: new Date().toISOString(),
-        });
+        .insert(registrosTempo);
 
       if (tempoError) throw tempoError;
 
@@ -418,30 +433,6 @@ export default function OrdensServico() {
         if (updateError) throw updateError;
       }
 
-      // Registrar a parada
-      const { error: pausaError } = await supabase
-        .from('os_tempo')
-        .insert({
-          os_id: os.id,
-          tipo: tipo,
-          data_inicio: new Date().toISOString(),
-          motivo: tipo === 'parada_material' ? motivoParada : null
-        });
-
-      if (pausaError) throw pausaError;
-
-      // Atualizar status da OS
-      const { error: osError } = await supabase
-        .from('ordens_servico')
-        .update({ 
-          status: tipo === 'parada_material' ? 'falta_material' : 'pausada',
-          tempo_falta_material: tipo === 'parada_material' ? supabase.rpc('increment_tempo_falta_material', { os_id: os.id }) : undefined
-        })
-        .eq('id', os.id);
-
-      if (osError) throw osError;
-
-      // Se for parada por falta de material, atualizar o contador do colaborador
       if (tipo === 'parada_material') {
         // Buscar colaboradores ativos na OS
         const { data: colaboradoresOS, error: colabError } = await supabase
@@ -451,13 +442,64 @@ export default function OrdensServico() {
           .eq('ativo', true);
 
         if (colabError) throw colabError;
+        if (!colaboradoresOS || colaboradoresOS.length === 0) throw new Error('Nenhum colaborador ativo na OS.');
 
+        // Inserir um registro de parada para cada colaborador
+        const registrosParada = colaboradoresOS.map(({ colaborador_id }) => ({
+          os_id: os.id,
+          colaborador_id,
+          tipo: 'parada_material',
+          data_inicio: new Date().toISOString(),
+          motivo: motivoParada
+        }));
+        const { error: pausaError } = await supabase
+          .from('os_tempo')
+          .insert(registrosParada);
+        if (pausaError) throw pausaError;
+      } else {
+        // Registrar pausa normal para todos os colaboradores ativos
+        const { data: colaboradoresOS, error: colabError } = await supabase
+          .from('os_colaboradores')
+          .select('colaborador_id')
+          .eq('os_id', os.id)
+          .eq('ativo', true);
+
+        if (colabError) throw colabError;
         if (colaboradoresOS && colaboradoresOS.length > 0) {
-          // Atualizar contador de paradas para cada colaborador
+          const registrosPausa = colaboradoresOS.map(({ colaborador_id }) => ({
+            os_id: os.id,
+            colaborador_id,
+            tipo: tipo,
+            data_inicio: new Date().toISOString(),
+            motivo: null
+          }));
+          const { error: pausaError } = await supabase
+            .from('os_tempo')
+            .insert(registrosPausa);
+          if (pausaError) throw pausaError;
+        }
+      }
+
+      // Atualizar status da OS
+      const { error: osError } = await supabase
+        .from('ordens_servico')
+        .update({ 
+          status: 'pausada'
+        })
+        .eq('id', os.id);
+      if (osError) throw osError;
+
+      // Atualizar contador de paradas para cada colaborador (se for parada_material)
+      if (tipo === 'parada_material') {
+        const { data: colaboradoresOS } = await supabase
+          .from('os_colaboradores')
+          .select('colaborador_id')
+          .eq('os_id', os.id)
+          .eq('ativo', true);
+        if (colaboradoresOS && colaboradoresOS.length > 0) {
           const updatePromises = colaboradoresOS.map(({ colaborador_id }) =>
             supabase.rpc('increment_paradas_material', { colaborador_id })
           );
-
           await Promise.all(updatePromises);
         }
       }
@@ -468,9 +510,19 @@ export default function OrdensServico() {
       });
       fetchOrdensServico();
     } catch (error) {
+      let msg = '';
+      if (error && typeof error === 'object') {
+        if ('message' in error && error.message) msg += error.message + '\n';
+        if ('details' in error && error.details) msg += error.details + '\n';
+        if ('hint' in error && error.hint) msg += error.hint + '\n';
+        if ('code' in error && error.code) msg += 'Código: ' + error.code + '\n';
+        if (!msg && error.toString) msg += error.toString();
+      } else {
+        msg = String(error);
+      }
       toast({ 
         title: "Erro ao pausar OS", 
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        description: msg || 'Erro desconhecido',
         variant: "destructive" 
       });
     } finally {
@@ -551,6 +603,8 @@ export default function OrdensServico() {
     }
   };
   
+  const filteredOrdens = statusFilter ? ordens.filter(os => os.status === statusFilter) : ordens;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
@@ -567,6 +621,18 @@ export default function OrdensServico() {
             Imprimir / Exportar PDF
           </Button>
         </div>
+      </div>
+      <div className="flex items-center gap-2 mb-2">
+        <label>Status:</label>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border rounded px-2 py-1">
+          <option value="">Todos</option>
+          <option value="aberta">Aberta</option>
+          <option value="em_andamento">Em andamento</option>
+          <option value="finalizada">Finalizada</option>
+          <option value="cancelada">Cancelada</option>
+          <option value="pausada">Pausada</option>
+          <option value="falta_material">Falta de material</option>
+        </select>
       </div>
       <div className="border rounded-lg">
         <Table>
@@ -590,18 +656,15 @@ export default function OrdensServico() {
                 </TableCell>
               </TableRow>
             ) : (
-              ordens.map((os) => (
+              filteredOrdens.map((os) => (
                 <TableRow key={os.id}>
                   <TableCell className="font-medium">{os.numero_os}</TableCell>
                   <TableCell>{os.clientes?.nome || 'N/A'}</TableCell>
                   <TableCell className="truncate max-w-xs">{os.descricao}</TableCell>
                   <TableCell>
-                    <Badge 
-                      variant={getStatusVariant(os.status)} 
-                      className={os.status === 'finalizada' ? 'bg-green-600 text-white' : ''}
-                    >
+                    <span className={`status-${os.status?.replace('_', '-')} px-2 py-1 rounded text-xs font-semibold border`}>
                       {os.status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                    </Badge>
+                    </span>
                   </TableCell>
                   <TableCell>{formatCurrency(os.valor_total)}</TableCell>
                   <TableCell>{formatDate(os.data_abertura)}</TableCell>
@@ -681,13 +744,13 @@ export default function OrdensServico() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{selectedOs ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}</DialogTitle>
             <DialogDescription>{selectedOs ? 'Altere os dados da OS.' : 'Preencha os dados da nova OS.'}</DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex-grow overflow-hidden flex flex-col space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex-grow overflow-y-auto flex flex-col space-y-4 pb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField name="cliente_id" control={form.control} render={({ field }) => (
                   <FormItem className="flex flex-col">
@@ -787,7 +850,7 @@ export default function OrdensServico() {
                       <CommandList>
                         <CommandGroup>
                           {produtos.map((p) => (
-                            <CommandItem value={p.id} key={p.id} onSelect={() => handleAddProduct(p)}>
+                            <CommandItem value={p.nome} key={p.id} onSelect={() => handleAddProduct(p)}>
                               {p.nome} - {formatCurrency(p.preco_unitario)}
                             </CommandItem>
                           ))}
@@ -854,17 +917,17 @@ export default function OrdensServico() {
                 <p className="text-muted-foreground">Valor Total:</p>
                 <p className="text-2xl font-bold">{formatCurrency(valorTotalOS)}</p>
               </div>
-
-              <DialogFooter className="pt-4">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancelar</Button>
-                </DialogClose>
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isSaving ? 'Salvando...' : 'Salvar OS'}
-                </Button>
-              </DialogFooter>
             </form>
+            
+            <DialogFooter className="pt-4 border-t">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancelar</Button>
+              </DialogClose>
+              <Button type="submit" disabled={isSaving} onClick={form.handleSubmit(onSubmit)}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSaving ? 'Salvando...' : 'Salvar OS'}
+              </Button>
+            </DialogFooter>
           </Form>
         </DialogContent>
       </Dialog>
@@ -915,26 +978,23 @@ export default function OrdensServico() {
             <DialogTitle>Parada por Falta de Material</DialogTitle>
             <DialogDescription>Informe o motivo da parada.</DialogDescription>
           </DialogHeader>
-          
           <div className="space-y-4">
-            <FormItem>
-              <FormLabel>Motivo</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Descreva o motivo da parada..."
-                  value={motivoParada}
-                  onChange={(e) => setMotivoParada(e.target.value)}
-                />
-              </FormControl>
-            </FormItem>
+            <div>
+              <label className="block text-sm font-medium mb-1">Motivo</label>
+              <textarea
+                className="w-full border rounded px-3 py-2 min-h-[80px]"
+                placeholder="Descreva o motivo da parada..."
+                value={motivoParada}
+                onChange={(e) => setMotivoParada(e.target.value)}
+              />
+            </div>
           </div>
-
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowParadaDialog(false)}>Cancelar</Button>
             <Button 
               variant="destructive" 
-              onClick={() => handlePauseOS(selectedOs!, 'parada_material')}
-              disabled={!motivoParada.trim()}
+              onClick={() => selectedOs && handlePauseOS(selectedOs, 'parada_material')}
+              disabled={!motivoParada.trim() || !selectedOs}
             >
               Confirmar Parada
             </Button>

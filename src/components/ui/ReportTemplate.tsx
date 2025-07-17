@@ -21,7 +21,7 @@ export const ReportTemplate: React.FC<ReportTemplateProps> = ({ children }) => (
     }}
     className="report-a4"
   >
-    {/* Cabeçalho com logo */}
+    {/* Cabeçalho com logo - só exibe no print */}
     <header style={{ textAlign: 'center', marginBottom: 32 }}>
       <Logo width={220} height={60} />
     </header>
@@ -54,6 +54,10 @@ export const ReportTemplate: React.FC<ReportTemplateProps> = ({ children }) => (
           background: none !important;
           box-shadow: none !important;
         }
+        .hidden-print { display: block !important; }
+      }
+      @media screen {
+        .hidden-print { display: none !important; }
       }
     `}</style>
   </div>

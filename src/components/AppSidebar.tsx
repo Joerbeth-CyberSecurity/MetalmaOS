@@ -21,7 +21,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth.jsx';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
 
@@ -51,7 +51,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar
-      className={`${collapsed ? 'w-14' : 'w-64'} border-r border-border/60 bg-card/50 backdrop-blur-sm`}
+      className={`${collapsed ? 'w-14' : 'w-64'} border-r border-border/60 bg-card/90 dark:bg-gray-900/90 backdrop-blur-sm`}
       collapsible="icon"
     >
       <SidebarContent>

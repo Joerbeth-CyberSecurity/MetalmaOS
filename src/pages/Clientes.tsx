@@ -48,8 +48,8 @@ import {
 } from "@/components/ui/form"
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/components/ui/use-toast"
-// Remover import do ReportTemplate se não for mais usado
-// import { ReportTemplate } from '@/components/ui/ReportTemplate';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { ReportTemplate } from '@/components/ui/ReportTemplate';
 
 // Função para aplicar máscara de CPF
 function maskCPF(value: string) {
@@ -150,6 +150,7 @@ export default function Clientes() {
   const [clienteToDelete, setClienteToDelete] = useState<Cliente | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
+  const [exportOpen, setExportOpen] = useState(false);
 
   const form = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema),
@@ -279,7 +280,7 @@ export default function Clientes() {
             <PlusCircle className="mr-2 h-4 w-4" />
             Adicionar Cliente
           </Button>
-          <Button onClick={() => window.print()} type="button" className="bg-primary text-white font-semibold shadow-soft hover:bg-primary/80 transition">
+          <Button onClick={() => setExportOpen(true)} type="button" className="bg-primary text-white font-semibold shadow-soft hover:bg-primary/80 transition">
             Imprimir / Exportar PDF
           </Button>
         </div>
@@ -353,6 +354,48 @@ export default function Clientes() {
           </TableBody>
         </Table>
       </div>
+      {/* Modal de exportação */}
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent className="max-w-3xl p-0">
+          <DialogHeader>
+            <DialogTitle>Relatório de Clientes</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto max-h-[70vh]">
+            <ReportTemplate>
+              <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 24 }}>Lista de Clientes</h2>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 8 }}>Nome</th>
+                    <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 8 }}>Contato</th>
+                    <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 8 }}>Localização</th>
+                    <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 8 }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientes.map((cliente) => (
+                    <tr key={cliente.id}>
+                      <td style={{ padding: 8 }}>{cliente.nome}</td>
+                      <td style={{ padding: 8 }}>
+                        <div>{cliente.email}</div>
+                        <div style={{ fontSize: 13, color: '#888' }}>{cliente.telefone}</div>
+                      </td>
+                      <td style={{ padding: 8 }}>{cliente.cidade && cliente.estado ? `${cliente.cidade}, ${cliente.estado}` : 'N/A'}</td>
+                      <td style={{ padding: 8 }}>{cliente.ativo ? 'Ativo' : 'Inativo'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </ReportTemplate>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => window.print()} className="bg-primary text-white">Imprimir / Salvar PDF</Button>
+            <DialogClose asChild>
+              <Button variant="outline">Fechar</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Painel Lateral (Sheet) para Adicionar/Editar Cliente */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="sm:max-w-lg">

@@ -141,6 +141,49 @@
     @apply bg-status-cancelada/10 text-status-cancelada border border-status-cancelada/20;
   }
   
+  .status-falta-material {
+    background-color: hsl(25 95% 53% / 0.1) !important;
+    color: hsl(25 95% 53%) !important;
+    border: 1px solid hsl(25 95% 53% / 0.2) !important;
+  }
+  
+  /* Status badge styles for dark mode */
+  .dark .status-aberta {
+    background-color: hsl(47.9 95.8% 53.1% / 0.2) !important;
+    color: hsl(47.9 95.8% 53.1%) !important;
+    border: 1px solid hsl(47.9 95.8% 53.1% / 0.3) !important;
+  }
+  
+  .dark .status-em-andamento {
+    background-color: hsl(217.2 91.2% 59.8% / 0.2) !important;
+    color: hsl(217.2 91.2% 59.8%) !important;
+    border: 1px solid hsl(217.2 91.2% 59.8% / 0.3) !important;
+  }
+  
+  .dark .status-pausada {
+    background-color: hsl(0 75% 55% / 0.2) !important;
+    color: hsl(0 75% 55%) !important;
+    border: 1px solid hsl(0 75% 55% / 0.3) !important;
+  }
+  
+  .dark .status-finalizada {
+    background-color: hsl(142.1 70.6% 45.3% / 0.2) !important;
+    color: hsl(142.1 70.6% 45.3%) !important;
+    border: 1px solid hsl(142.1 70.6% 45.3% / 0.3) !important;
+  }
+  
+  .dark .status-cancelada {
+    background-color: hsl(0 62.8% 30.6% / 0.2) !important;
+    color: hsl(0 62.8% 30.6%) !important;
+    border: 1px solid hsl(0 62.8% 30.6% / 0.3) !important;
+  }
+  
+  .dark .status-falta-material {
+    background-color: hsl(25 95% 53% / 0.2) !important;
+    color: hsl(25 95% 53%) !important;
+    border: 1px solid hsl(25 95% 53% / 0.3) !important;
+  }
+  
   /* Priority badge styles */
   .priority-baixa {
     @apply bg-priority-baixa/10 text-priority-baixa border border-priority-baixa/20;
@@ -179,6 +222,58 @@
   
   .btn-success {
     @apply bg-gradient-to-r from-success to-success/90 hover:from-success/90 hover:to-success text-success-foreground;
+  }
+  
+  /* Select styles for dark mode compatibility */
+  select {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+  }
+  
+  select:focus {
+    outline: none;
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
+  }
+  
+  select option {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+  
+  /* Dark mode specific select styles */
+  .dark select {
+    background-color: hsl(0 0% 12%);
+    color: hsl(0 0% 100%);
+    border-color: hsl(0 0% 20%);
+  }
+  
+  .dark select:focus {
+    border-color: hsl(120 80% 40%);
+    box-shadow: 0 0 0 2px hsl(120 80% 40% / 0.2);
+  }
+  
+  .dark select option {
+    background-color: hsl(0 0% 12%);
+    color: hsl(0 0% 100%);
+  }
+  
+  /* Header button hover styles */
+  .hover\:bg-muted\/30:hover {
+    background-color: hsl(var(--muted) / 0.3) !important;
+  }
+  
+  .dark .hover\:bg-muted\/30:hover {
+    background-color: hsl(220 13% 20% / 0.3) !important;
+  }
+  
+  .hover\:text-foreground:hover {
+    color: hsl(var(--foreground)) !important;
+  }
+  
+  .dark .hover\:text-foreground:hover {
+    color: hsl(0 0% 100%) !important;
   }
   
   /* Animation utilities */
@@ -264,9 +359,9 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 10%;
+    --sidebar-background: 0 0% 98%;
 
-    --sidebar-foreground: 0 0% 100%;
+    --sidebar-foreground: 220 13% 18%;
 
     --sidebar-primary: 120 80% 40%;
 
@@ -276,7 +371,7 @@ All colors MUST be HSL.
 
     --sidebar-accent-foreground: 0 0% 100%;
 
-    --sidebar-border: 0 0% 20%;
+    --sidebar-border: 220 13% 85%;
 
     --sidebar-ring: 120 80% 40%;
   }

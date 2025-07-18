@@ -23,7 +23,7 @@ export function Layout({ children }: LayoutProps) {
           {/* Header */}
           <header className="h-14 border-b border-border/60 bg-card/50 backdrop-blur-sm flex items-center justify-between px-4">
             <div className="flex items-center gap-4">
-              <SidebarTrigger className="hover:bg-secondary/50" />
+              <SidebarTrigger className="hover:bg-muted/30 hover:text-foreground transition-colors" />
               <Logo width={110} height={32} />
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-foreground">
@@ -36,11 +36,11 @@ export function Layout({ children }: LayoutProps) {
             </div>
             
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="hover:bg-secondary/50">
+              <Button variant="ghost" size="sm" className="hover:bg-muted/30 hover:text-foreground transition-colors">
                 <Bell className="h-4 w-4" />
               </Button>
               <DarkModeToggle />
-              <Button variant="ghost" size="sm" className="hover:bg-secondary/50">
+              <Button variant="ghost" size="sm" className="hover:bg-muted/30 hover:text-foreground transition-colors">
                 <User className="h-4 w-4" />
                 <span className="ml-2 text-sm">
                   {user?.user_metadata?.nome || user?.email}

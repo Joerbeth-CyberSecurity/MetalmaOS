@@ -623,8 +623,12 @@ export default function OrdensServico() {
         </div>
       </div>
       <div className="flex items-center gap-2 mb-2">
-        <label>Status:</label>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border rounded px-2 py-1">
+        <label className="text-foreground">Status:</label>
+        <select 
+          value={statusFilter} 
+          onChange={e => setStatusFilter(e.target.value)} 
+          className="border border-border rounded px-2 py-1 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+        >
           <option value="">Todos</option>
           <option value="aberta">Aberta</option>
           <option value="em_andamento">Em andamento</option>

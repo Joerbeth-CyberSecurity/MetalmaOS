@@ -30,11 +30,11 @@ const items = [
   { title: 'Ordens de Serviço', url: '/ordens-servico', icon: ClipboardList },
   { title: 'Clientes', url: '/clientes', icon: Users },
   { title: 'Colaboradores', url: '/colaboradores', icon: UserCheck },
+  { title: 'Produtos', url: '/produtos', icon: Package },
   { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
 ];
 
 const adminItems = [
-  { title: 'Produtos', url: '/produtos', icon: Package },
   { title: 'Configurações', url: '/configuracoes', icon: Settings },
 ];
 
@@ -47,32 +47,26 @@ export function AppSidebar() {
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? 'bg-primary/10 text-primary border border-primary/20' : 'hover:bg-secondary/50';
+    isActive 
+      ? 'bg-sidebar-primary/10 text-sidebar-primary border border-sidebar-primary/20' 
+      : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-foreground/10';
 
   return (
     <Sidebar
-      className={`${collapsed ? 'w-14' : 'w-64'} border-r border-border/60 bg-card/90 dark:bg-gray-900/90 backdrop-blur-sm`}
+      className={`${collapsed ? 'w-14' : 'w-64'} border-r border-border/60 bg-sidebar backdrop-blur-sm`}
       collapsible="icon"
     >
       <SidebarContent>
         {/* Header */}
-        <div className="p-4 border-b border-border/60">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center bg-transparent">
-              <Logo width={collapsed ? 32 : 64} height={collapsed ? 32 : 40} />
-            </div>
-            {!collapsed && (
-              <div>
-                <h2 className="font-semibold text-foreground">Metalma</h2>
-                <p className="text-xs text-muted-foreground">Sistema OS</p>
-              </div>
-            )}
+        <div className="p-4 border-b border-sidebar-border">
+          <div className="flex items-center justify-center w-full">
+            <Logo width={collapsed ? 32 : 120} height={collapsed ? 32 : 50} className="object-contain" />
           </div>
         </div>
 
         {/* Main Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/70">Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
@@ -91,7 +85,7 @@ export function AppSidebar() {
 
         {/* Admin Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel>Administração</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/70">Administração</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {adminItems.map((item) => (
@@ -109,11 +103,11 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Logout Button */}
-        <div className="mt-auto p-4 border-t border-border/60">
+        <div className="mt-auto p-4 border-t border-sidebar-border">
           <Button
             onClick={signOut}
             variant="ghost"
-            className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            className="w-full justify-start text-sidebar-foreground/80 hover:text-destructive hover:bg-destructive/10"
           >
             <LogOut className="h-4 w-4" />
             {!collapsed && <span className="ml-2">Sair</span>}

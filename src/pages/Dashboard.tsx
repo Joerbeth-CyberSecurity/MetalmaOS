@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -26,6 +27,7 @@ interface DashboardStats {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalOS: 0,
     osAbertas: 0,
@@ -91,6 +93,12 @@ export default function Dashboard() {
   const progressPercent = stats.metaHoraMedia > 0 
     ? Math.min((stats.horasTrabalhadasMes / (stats.metaHoraMedia * stats.totalColaboradores)) * 100, 100)
     : 0;
+
+  // Funções de navegação para ações rápidas
+  const handleNovaOS = () => navigate('/ordens-servico');
+  const handleNovoCliente = () => navigate('/clientes');
+  const handleNovoColaborador = () => navigate('/colaboradores');
+  const handleRelatorios = () => navigate('/relatorios');
 
   if (loading) {
     return (
@@ -266,19 +274,31 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <div className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+          <div 
+            onClick={handleNovaOS}
+            className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+          >
             <ClipboardList className="h-8 w-8 text-primary mb-2" />
             <span className="text-sm font-medium">Nova OS</span>
           </div>
-          <div className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+          <div 
+            onClick={handleNovoCliente}
+            className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+          >
             <Users className="h-8 w-8 text-info mb-2" />
             <span className="text-sm font-medium">Novo Cliente</span>
           </div>
-          <div className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+          <div 
+            onClick={handleNovoColaborador}
+            className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+          >
             <UserCheck className="h-8 w-8 text-success mb-2" />
             <span className="text-sm font-medium">Novo Colaborador</span>
           </div>
-          <div className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer">
+          <div 
+            onClick={handleRelatorios}
+            className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+          >
             <TrendingUp className="h-8 w-8 text-warning mb-2" />
             <span className="text-sm font-medium">Relatórios</span>
           </div>

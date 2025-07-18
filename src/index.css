@@ -276,6 +276,53 @@
     color: hsl(0 0% 100%) !important;
   }
   
+  /* Print styles for reports */
+  @media print {
+    body {
+      background: white !important;
+      color: black !important;
+    }
+    
+    .print-container {
+      background: white !important;
+      color: black !important;
+      margin: 0 !important;
+      padding: 20px !important;
+      font-size: 12px !important;
+      line-height: 1.4 !important;
+    }
+    
+    .print-container table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      margin: 20px 0 !important;
+    }
+    
+    .print-container th,
+    .print-container td {
+      border: 1px solid #ddd !important;
+      padding: 8px !important;
+      text-align: left !important;
+    }
+    
+    .print-container th {
+      background-color: #f8f9fa !important;
+      font-weight: bold !important;
+    }
+    
+    .print-container .badge {
+      padding: 4px 8px !important;
+      border-radius: 4px !important;
+      font-size: 11px !important;
+      font-weight: bold !important;
+    }
+    
+    /* Hide elements that shouldn't be printed */
+    .no-print {
+      display: none !important;
+    }
+  }
+  
   /* Animation utilities */
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;

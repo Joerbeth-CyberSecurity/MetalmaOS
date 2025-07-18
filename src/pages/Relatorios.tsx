@@ -19,7 +19,7 @@ type OsStatusData = {
 type TimeControlData = {
   os_numero: string;
   tempo_execucao_real: number;
-  tempo_pausa: number;
+  tempo_parada: number;
   tempo_falta_material: number;
   meta_hora: number;
   status: string;
@@ -110,7 +110,7 @@ export default function Relatorios() {
       const { start, end } = getDateRange();
       const { data: timeData, error: timeError } = await supabase
         .from('ordens_servico')
-        .select(`numero_os, tempo_execucao_real, tempo_pausa, tempo_falta_material, meta_hora, status, created_at`)
+        .select(`numero_os, tempo_execucao_real, tempo_parada, status, created_at`)
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false })
@@ -119,9 +119,9 @@ export default function Relatorios() {
       setTimeControlData((timeData as any[]).map(os => ({
         os_numero: os.numero_os,
         tempo_execucao_real: os.tempo_execucao_real || 0,
-        tempo_pausa: os.tempo_pausa || 0,
-        tempo_falta_material: os.tempo_falta_material || 0,
-        meta_hora: os.meta_hora || 0,
+        tempo_parada: os.tempo_parada || 0,
+        tempo_falta_material: 0, // Não existe na tabela atual
+        meta_hora: 0, // Não existe na tabela atual
         status: os.status,
       })));
 
@@ -275,6 +275,18 @@ export default function Relatorios() {
     if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
     if (reportType === 'produtividade') {
       const data = colabFilter ? collaboratorData.filter(c => c.nome === colabFilter) : collaboratorData;
+      
+      if (data.length === 0) {
+        return (
+          <div>
+            <h2 className="text-xl font-bold mb-2">Produtividade de Colaboradores</h2>
+            <div className="text-center py-8 text-gray-500">
+              Nenhum colaborador encontrado no período selecionado.
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div>
           <h2 className="text-xl font-bold mb-2">Produtividade de Colaboradores</h2>
@@ -304,9 +316,20 @@ export default function Relatorios() {
       );
     }
     if (reportType === 'paradas') {
-      // Buscar detalhamento de paradas por colaborador
-      // (usar fetchColabDetail se colabFilter, senão mostrar todas)
-      // Aqui, para simplificação, mostrar tabela geral
+      // Filtrar apenas colaboradores que têm paradas de material
+      const colaboradoresComParadas = collaboratorData.filter(c => c.paradas_material > 0);
+      
+      if (colaboradoresComParadas.length === 0) {
+        return (
+          <div>
+            <h2 className="text-xl font-bold mb-2">Paradas por Falta de Material</h2>
+            <div className="text-center py-8 text-gray-500">
+              Nenhuma parada por falta de material registrada no período.
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div>
           <h2 className="text-xl font-bold mb-2">Paradas por Falta de Material</h2>
@@ -314,23 +337,21 @@ export default function Relatorios() {
             <thead>
               <tr>
                 <th className="border px-2 py-1">Colaborador</th>
-                <th className="border px-2 py-1">OS</th>
-                <th className="border px-2 py-1">Motivo</th>
-                <th className="border px-2 py-1">Data/Hora</th>
+                <th className="border px-2 py-1">Total de Paradas</th>
+                <th className="border px-2 py-1">Período</th>
               </tr>
             </thead>
             <tbody>
-              {collaboratorData.map((c, i) => (
-                <React.Fragment key={i}>
-                  {/* Buscar paradas detalhadas desse colaborador no período */}
-                  {/* Aqui, para simplificação, mostrar apenas o total */}
-                  <tr>
-                    <td className="border px-2 py-1">{c.nome}</td>
-                    <td className="border px-2 py-1">-</td>
-                    <td className="border px-2 py-1">(ver detalhamento)</td>
-                    <td className="border px-2 py-1">-</td>
-                  </tr>
-                </React.Fragment>
+              {colaboradoresComParadas.map((c, i) => (
+                <tr key={i}>
+                  <td className="border px-2 py-1">{c.nome}</td>
+                  <td className="border px-2 py-1">{c.paradas_material}</td>
+                  <td className="border px-2 py-1">
+                    {period === 'mes' ? 'Mês atual' : 
+                     period === 'semana' ? 'Semana atual' : 
+                     'Período personalizado'}
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -361,6 +382,17 @@ export default function Relatorios() {
       );
     }
     if (reportType === 'tempo') {
+      if (timeControlData.length === 0) {
+        return (
+          <div>
+            <h2 className="text-xl font-bold mb-2">Controle de Tempo</h2>
+            <div className="text-center py-8 text-gray-500">
+              Nenhuma OS encontrada no período selecionado.
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div>
           <h2 className="text-xl font-bold mb-2">Controle de Tempo</h2>
@@ -369,7 +401,7 @@ export default function Relatorios() {
               <tr>
                 <th className="border px-2 py-1">OS</th>
                 <th className="border px-2 py-1">Tempo Execução</th>
-                <th className="border px-2 py-1">Tempo Pausa</th>
+                <th className="border px-2 py-1">Tempo Parada</th>
                 <th className="border px-2 py-1">Tempo Falta Material</th>
                 <th className="border px-2 py-1">Meta (h)</th>
                 <th className="border px-2 py-1">Status</th>
@@ -380,7 +412,7 @@ export default function Relatorios() {
                 <tr key={i}>
                   <td className="border px-2 py-1">{t.os_numero}</td>
                   <td className="border px-2 py-1">{t.tempo_execucao_real}</td>
-                  <td className="border px-2 py-1">{t.tempo_pausa}</td>
+                  <td className="border px-2 py-1">{t.tempo_parada}</td>
                   <td className="border px-2 py-1">{t.tempo_falta_material}</td>
                   <td className="border px-2 py-1">{t.meta_hora}</td>
                   <td className="border px-2 py-1">{t.status}</td>

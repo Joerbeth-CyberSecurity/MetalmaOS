@@ -283,38 +283,94 @@
       color: black !important;
     }
     
-    .print-container {
+    /* Hide all elements except the report */
+    * {
+      display: none !important;
+    }
+    
+    .relatorio-impressao,
+    .relatorio-impressao * {
+      display: block !important;
+    }
+    
+    .relatorio-impressao {
       background: white !important;
       color: black !important;
       margin: 0 !important;
       padding: 20px !important;
+      font-family: Arial, sans-serif !important;
       font-size: 12px !important;
       line-height: 1.4 !important;
+      width: 100% !important;
+      height: 100% !important;
     }
     
-    .print-container table {
-      width: 100% !important;
-      border-collapse: collapse !important;
+    .relatorio-cabecalho {
+      text-align: center !important;
+      margin-bottom: 30px !important;
+      border-bottom: 2px solid #333 !important;
+      padding-bottom: 20px !important;
+    }
+    
+    .relatorio-logo {
+      width: 120px !important;
+      height: auto !important;
+      margin: 0 auto 15px auto !important;
+      display: block !important;
+    }
+    
+    .relatorio-empresa {
+      font-size: 18px !important;
+      font-weight: bold !important;
+      margin: 0 0 5px 0 !important;
+      color: #333 !important;
+    }
+    
+    .relatorio-titulo {
+      font-size: 16px !important;
+      font-weight: bold !important;
+      margin: 0 0 10px 0 !important;
+      color: #333 !important;
+      text-transform: uppercase !important;
+    }
+    
+    .relatorio-info {
+      font-size: 11px !important;
+      color: #666 !important;
+      margin: 0 !important;
+    }
+    
+    .relatorio-tabela {
       margin: 20px 0 !important;
     }
     
-    .print-container th,
-    .print-container td {
-      border: 1px solid #ddd !important;
+    .relatorio-tabela table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      margin: 0 !important;
+    }
+    
+    .relatorio-tabela th,
+    .relatorio-tabela td {
+      border: 1px solid #333 !important;
       padding: 8px !important;
       text-align: left !important;
-    }
-    
-    .print-container th {
-      background-color: #f8f9fa !important;
-      font-weight: bold !important;
-    }
-    
-    .print-container .badge {
-      padding: 4px 8px !important;
-      border-radius: 4px !important;
       font-size: 11px !important;
+    }
+    
+    .relatorio-tabela th {
+      background-color: #f0f0f0 !important;
       font-weight: bold !important;
+      color: #333 !important;
+    }
+    
+    .relatorio-rodape {
+      text-align: center !important;
+      margin-top: 30px !important;
+      padding-top: 20px !important;
+      border-top: 1px solid #ccc !important;
+      font-size: 10px !important;
+      color: #666 !important;
     }
     
     /* Hide elements that shouldn't be printed */

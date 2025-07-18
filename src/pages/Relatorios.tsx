@@ -10,6 +10,8 @@ import { Loader2, FileText, Download, Printer, Users, BarChart3, Clock, AlertTri
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import logo from '../assets/logo.png';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 export default function Relatorios() {
   const [selectedReport, setSelectedReport] = useState('produtividade');
@@ -353,26 +355,270 @@ export default function Relatorios() {
     }
   };
 
-  const handlePreview = () => {
-    if (reportData) {
-      alert('Preview do relatório: ' + reportData.type);
+
+
+  // Função para obter título do relatório
+  const getReportTitle = (type) => {
+    switch (type) {
+      case 'produtividade': return 'RELATÓRIO DE PRODUTIVIDADE';
+      case 'paradas': return 'RELATÓRIO DE PARADAS POR FALTA DE MATERIAL';
+      case 'os_status': return 'RELATÓRIO DE STATUS DAS ORDENS DE SERVIÇO';
+      case 'tempo': return 'RELATÓRIO DE CONTROLE DE TEMPO';
+      default: return 'RELATÓRIO';
     }
   };
 
   // Função para imprimir
   const handlePrint = () => {
-    window.print();
+    if (reportData) {
+      // Criar elemento de impressão
+      const printWindow = window.open('', '_blank');
+      const reportTitle = getReportTitle(reportData.type);
+      
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${reportTitle}</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding: 20px; 
+              background: white; 
+              color: black; 
+            }
+            .relatorio-impressao { 
+              max-width: 800px; 
+              margin: 0 auto; 
+            }
+            .relatorio-cabecalho { 
+              text-align: center; 
+              margin-bottom: 30px; 
+              border-bottom: 2px solid #333; 
+              padding-bottom: 20px; 
+            }
+            .relatorio-logo { 
+              width: 120px; 
+              height: auto; 
+              margin: 0 auto 15px auto; 
+              display: block; 
+            }
+            .relatorio-empresa { 
+              font-size: 18px; 
+              font-weight: bold; 
+              margin: 0 0 5px 0; 
+              color: #333; 
+            }
+            .relatorio-titulo { 
+              font-size: 16px; 
+              font-weight: bold; 
+              margin: 0 0 10px 0; 
+              color: #333; 
+              text-transform: uppercase; 
+            }
+            .relatorio-info { 
+              font-size: 11px; 
+              color: #666; 
+              margin: 0; 
+            }
+            .relatorio-tabela { 
+              margin: 20px 0; 
+            }
+            .relatorio-tabela table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin: 0; 
+            }
+            .relatorio-tabela th, .relatorio-tabela td { 
+              border: 1px solid #333; 
+              padding: 8px; 
+              text-align: left; 
+              font-size: 11px; 
+            }
+            .relatorio-tabela th { 
+              background-color: #f0f0f0; 
+              font-weight: bold; 
+              color: #333; 
+            }
+            .relatorio-rodape { 
+              text-align: center; 
+              margin-top: 30px; 
+              padding-top: 20px; 
+              border-top: 1px solid #ccc; 
+              font-size: 10px; 
+              color: #666; 
+            }
+            @media print {
+              body { margin: 0; padding: 15px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="relatorio-impressao">
+            <div class="relatorio-cabecalho">
+              <img src="${logo}" alt="Logo Metalma" class="relatorio-logo" />
+              <div class="relatorio-empresa">METALMA INOX & CIA</div>
+              <div class="relatorio-titulo">${reportTitle}</div>
+              <div class="relatorio-info">
+                Período: ${formatDate(reportData.period.start)} a ${formatDate(reportData.period.end)}<br/>
+                Gerado em: ${formatDate(new Date().toISOString())}
+              </div>
+            </div>
+            <div class="relatorio-tabela">
+              <table>
+                <thead>
+                  <tr>
+                    ${renderTableContent()}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${renderTableRows()}
+                </tbody>
+              </table>
+            </div>
+            <div class="relatorio-rodape">
+              Metalma Inox & Cia - Sistema de Controle de OS
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }
   };
 
-  // Função para exportar PDF
+    // Função para exportar PDF
   const handleExportPDF = () => {
-    window.print();
+    console.log('Botão Exportar PDF clicado');
+    console.log('reportData:', reportData);
+    
+    if (reportData) {
+      try {
+        const reportTitle = getReportTitle(reportData.type);
+        console.log('Gerando PDF para:', reportTitle);
+        
+        // Teste simples primeiro
+        const doc = new jsPDF();
+        doc.text('Teste PDF - Metalma', 20, 20);
+        doc.text(`Relatório: ${reportTitle}`, 20, 30);
+        doc.text(`Data: ${formatDate(new Date().toISOString())}`, 20, 40);
+        
+        const fileName = `teste_${reportTitle.toLowerCase().replace(/\s+/g, '_')}.pdf`;
+        doc.save(fileName);
+        console.log('PDF de teste salvo como:', fileName);
+        
+        alert('PDF gerado com sucesso! Verifique a pasta de downloads.');
+        
+      } catch (error) {
+        console.error('Erro ao gerar PDF:', error);
+        alert('Erro ao gerar PDF: ' + error.message);
+      }
+    } else {
+      console.log('Nenhum dado de relatório disponível');
+      alert('Gere um relatório primeiro antes de exportar o PDF.');
+    }
   };
 
   const formatHours = (hours) => `${hours.toFixed(1)}h`;
   const formatDate = (dateString) => format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
 
   const renderTableContent = () => {
+    if (!reportData) return '';
+
+    switch (reportData.type) {
+      case 'produtividade':
+        return `
+          <th>Colaborador</th>
+          <th>Horas Trabalhadas</th>
+          <th>Meta (h)</th>
+          <th>Eficiência (%)</th>
+          <th>Paradas Material</th>
+        `;
+      case 'paradas':
+        return `
+          <th>OS</th>
+          <th>Colaborador</th>
+          <th>Motivo</th>
+          <th>Data Início</th>
+          <th>Duração (h)</th>
+        `;
+      case 'os_status':
+        return `
+          <th>Status</th>
+          <th>Quantidade</th>
+          <th>Percentual</th>
+        `;
+      case 'tempo':
+        return `
+          <th>OS</th>
+          <th>Cliente</th>
+          <th>Tempo Real</th>
+          <th>Tempo Parada</th>
+          <th>Tempo Previsto</th>
+          <th>Eficiência (%)</th>
+          <th>Status</th>
+        `;
+      default:
+        return '';
+    }
+  };
+
+  const renderTableRows = () => {
+    if (!reportData) return '';
+
+    switch (reportData.type) {
+      case 'produtividade':
+        return reportData.data.map((colab, index) => `
+          <tr>
+            <td style="font-weight: bold;">${colab.nome}</td>
+            <td>${formatHours(colab.horas_trabalhadas)}</td>
+            <td>${formatHours(colab.meta_hora)}</td>
+            <td>${colab.eficiencia.toFixed(1)}%</td>
+            <td>${colab.paradas_material}</td>
+          </tr>
+        `).join('');
+      case 'paradas':
+        return reportData.data.map((parada, index) => `
+          <tr>
+            <td style="font-weight: bold;">${parada.os_numero}</td>
+            <td>${parada.colaborador}</td>
+            <td>${parada.motivo}</td>
+            <td>${formatDate(parada.data_inicio)}</td>
+            <td>${formatHours(parada.duracao)}</td>
+          </tr>
+        `).join('');
+      case 'os_status':
+        return reportData.data.map((status, index) => `
+          <tr>
+            <td style="font-weight: bold;">${status.status}</td>
+            <td>${status.quantidade}</td>
+            <td>${status.percentual.toFixed(1)}%</td>
+          </tr>
+        `).join('');
+      case 'tempo':
+        return reportData.data.map((tempo, index) => `
+          <tr>
+            <td style="font-weight: bold;">${tempo.os_numero}</td>
+            <td>${tempo.cliente}</td>
+            <td>${formatHours(tempo.tempo_execucao_real)}</td>
+            <td>${formatHours(tempo.tempo_parada)}</td>
+            <td>${formatHours(tempo.tempo_previsto)}</td>
+            <td>${tempo.eficiencia.toFixed(1)}%</td>
+            <td>${tempo.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
+          </tr>
+        `).join('');
+      default:
+        return '';
+    }
+  };
+
+  // Funções JSX para renderizar na tela
+  const renderTableContentJSX = () => {
     if (!reportData) return null;
 
     switch (reportData.type) {
@@ -421,7 +667,7 @@ export default function Relatorios() {
     }
   };
 
-  const renderTableRows = () => {
+  const renderTableRowsJSX = () => {
     if (!reportData) return null;
 
     switch (reportData.type) {
@@ -595,20 +841,15 @@ export default function Relatorios() {
             </Button>
             
             {reportData && (
-              <>
-                <Button variant="outline" onClick={handlePreview}>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Visualizar
-                </Button>
-                <Button variant="outline" onClick={handlePrint}>
-                  <Printer className="mr-2 h-4 w-4" />
-                  Imprimir
-                </Button>
-                <Button variant="outline" onClick={handleExportPDF}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar PDF
-                </Button>
-              </>
+              <Button variant="outline" onClick={handlePrint}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir
+              </Button>
+            )}
+            {!reportData && (
+              <div className="text-sm text-muted-foreground">
+                Gere um relatório primeiro para poder imprimir
+              </div>
             )}
           </div>
         </CardContent>
@@ -624,11 +865,11 @@ export default function Relatorios() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {renderTableContent()}
+                  {renderTableContentJSX()}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {renderTableRows()}
+                {renderTableRowsJSX()}
               </TableBody>
             </Table>
           </CardContent>

@@ -24,7 +24,7 @@ export function Layout({ children }: LayoutProps) {
           <header className="h-14 border-b border-border/60 bg-card/50 backdrop-blur-sm flex items-center justify-between px-4">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="hover:bg-muted/30 hover:text-foreground transition-colors" />
-              <Logo width={110} height={32} />
+              {/* <Logo width={110} height={32} /> */}
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-foreground">
                   Sistema de Controle de OS

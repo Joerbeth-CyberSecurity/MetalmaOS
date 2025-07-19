@@ -53,7 +53,7 @@ export function Layout({ children }: LayoutProps) {
               >
                 <User className="h-4 w-4" />
                 <span className="ml-2 text-sm">
-                  {userProfile?.nome || user?.user_metadata?.nome || user?.email}
+                  {userProfile?.nome || user?.email || 'Usuário'}
                 </span>
               </Button>
             </div>

@@ -8,12 +8,15 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
+  const [userPermissions, setUserPermissions] = useState([]);
 
   // Função para buscar dados do usuário na tabela admins
   const fetchUserProfile = async (userId) => {
     if (!userId) return null;
     
     try {
+      console.log('Buscando perfil para usuário:', userId);
+      
       // Timeout de 5 segundos para evitar travamento
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Timeout')), 5000)
@@ -21,7 +24,17 @@ export function AuthProvider({ children }) {
       
       const fetchPromise = supabase
         .from('admins')
-        .select('nome, email, tipo_usuario, ativo')
+        .select(`
+          nome, 
+          email, 
+          tipo_usuario, 
+          ativo,
+          nivel_id,
+          niveis_acesso (
+            nome,
+            descricao
+          )
+        `)
         .eq('user_id', userId)
         .single();
       
@@ -32,10 +45,40 @@ export function AuthProvider({ children }) {
         return null;
       }
       
+      console.log('Perfil encontrado:', data);
       return data;
     } catch (error) {
       console.error('Erro ao buscar perfil do usuário:', error);
       return null;
+    }
+  };
+
+  // Função para buscar permissões do usuário
+  const fetchUserPermissions = async (nivelId) => {
+    if (!nivelId) return [];
+    
+    try {
+      const { data, error } = await supabase
+        .from('nivel_permissoes')
+        .select(`
+          permissao_id,
+          permissoes (
+            nome,
+            modulo,
+            acao
+          )
+        `)
+        .eq('nivel_id', nivelId);
+      
+      if (error) {
+        console.error('Erro ao buscar permissões:', error);
+        return [];
+      }
+      
+      return data.map(item => item.permissoes.nome);
+    } catch (error) {
+      console.error('Erro ao buscar permissões:', error);
+      return [];
     }
   };
 
@@ -51,16 +94,26 @@ export function AuthProvider({ children }) {
             try {
               const profile = await fetchUserProfile(session.user.id);
               setUserProfile(profile);
+              
+              // Buscar permissões se tiver nível de acesso
+              if (profile?.nivel_id) {
+                const permissions = await fetchUserPermissions(profile.nivel_id);
+                setUserPermissions(permissions);
+                console.log('Permissões carregadas:', permissions);
+              }
             } catch (error) {
               console.error('Erro ao buscar perfil:', error);
               setUserProfile(null);
+              setUserPermissions([]);
             }
           } else {
             setUserProfile(null);
+            setUserPermissions([]);
           }
         } catch (error) {
           console.error('Erro no onAuthStateChange:', error);
           setUserProfile(null);
+          setUserPermissions([]);
         } finally {
           setLoading(false);
         }
@@ -77,14 +130,23 @@ export function AuthProvider({ children }) {
           try {
             const profile = await fetchUserProfile(session.user.id);
             setUserProfile(profile);
+            
+            // Buscar permissões se tiver nível de acesso
+            if (profile?.nivel_id) {
+              const permissions = await fetchUserPermissions(profile.nivel_id);
+              setUserPermissions(permissions);
+              console.log('Permissões carregadas:', permissions);
+            }
           } catch (error) {
             console.error('Erro ao buscar perfil:', error);
             setUserProfile(null);
+            setUserPermissions([]);
           }
         }
       } catch (error) {
         console.error('Erro no getSession:', error);
         setUserProfile(null);
+        setUserPermissions([]);
       } finally {
         setLoading(false);
       }
@@ -98,6 +160,7 @@ export function AuthProvider({ children }) {
     
     // Limpar dados anteriores
     setUserProfile(null);
+    setUserPermissions([]);
     
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     
@@ -114,6 +177,12 @@ export function AuthProvider({ children }) {
         if (session?.user?.id) {
           const profile = await fetchUserProfile(session.user.id);
           setUserProfile(profile);
+          
+          // Buscar permissões se tiver nível de acesso
+          if (profile?.nivel_id) {
+            const permissions = await fetchUserPermissions(profile.nivel_id);
+            setUserPermissions(permissions);
+          }
         }
       } catch (error) {
         console.error('Erro ao buscar perfil após login:', error);
@@ -149,6 +218,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setSession(null);
     setUserProfile(null);
+    setUserPermissions([]);
     
     const { error } = await supabase.auth.signOut();
     setLoading(false);
@@ -167,6 +237,13 @@ export function AuthProvider({ children }) {
       try {
         const profile = await fetchUserProfile(user.id);
         setUserProfile(profile);
+        
+        // Buscar permissões se tiver nível de acesso
+        if (profile?.nivel_id) {
+          const permissions = await fetchUserPermissions(profile.nivel_id);
+          setUserPermissions(permissions);
+        }
+        
         return profile;
       } catch (error) {
         console.error('Erro ao atualizar perfil:', error);
@@ -174,6 +251,11 @@ export function AuthProvider({ children }) {
       }
     }
     return null;
+  };
+
+  // Função para verificar se o usuário tem uma permissão específica
+  const hasPermission = (permissionName) => {
+    return userPermissions.includes(permissionName);
   };
 
   return (
@@ -185,7 +267,9 @@ export function AuthProvider({ children }) {
       signUp, 
       signOut, 
       userProfile,
-      refreshUserProfile 
+      userPermissions,
+      refreshUserProfile,
+      hasPermission
     }}>
       {children}
     </AuthContext.Provider>

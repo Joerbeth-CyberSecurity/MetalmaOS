@@ -26,22 +26,22 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
 
 const items = [
-  { title: 'Dashboard', url: '/', icon: BarChart3 },
-  { title: 'Ordens de Serviço', url: '/ordens-servico', icon: ClipboardList },
-  { title: 'Clientes', url: '/clientes', icon: Users },
-  { title: 'Colaboradores', url: '/colaboradores', icon: UserCheck },
-  { title: 'Produtos', url: '/produtos', icon: Package },
-  { title: 'Relatórios', url: '/relatorios', icon: BarChart3 },
+  { title: 'Dashboard', url: '/', icon: BarChart3, permission: null }, // Sempre visível
+  { title: 'Ordens de Serviço', url: '/ordens-servico', icon: ClipboardList, permission: 'os_visualizar' },
+  { title: 'Clientes', url: '/clientes', icon: Users, permission: 'clientes_visualizar' },
+  { title: 'Colaboradores', url: '/colaboradores', icon: UserCheck, permission: 'colaboradores_visualizar' },
+  { title: 'Produtos', url: '/produtos', icon: Package, permission: 'produtos_visualizar' },
+  { title: 'Relatórios', url: '/relatorios', icon: BarChart3, permission: 'relatorios_visualizar' },
 ];
 
 const adminItems = [
-  { title: 'Configurações', url: '/configuracoes', icon: Settings },
+  { title: 'Configurações', url: '/configuracoes', icon: Settings, permission: 'configuracoes_visualizar' },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, hasPermission } = useAuth();
   const currentPath = location.pathname;
   const collapsed = state === 'collapsed';
 
@@ -50,6 +50,15 @@ export function AppSidebar() {
     isActive 
       ? 'bg-sidebar-primary/10 text-sidebar-primary border border-sidebar-primary/20' 
       : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-foreground/10';
+
+  // Filtrar itens baseado nas permissões
+  const filteredItems = items.filter(item => 
+    item.permission === null || hasPermission(item.permission)
+  );
+
+  const filteredAdminItems = adminItems.filter(item => 
+    hasPermission(item.permission)
+  );
 
   return (
     <Sidebar
@@ -69,7 +78,7 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-sidebar-foreground/70">Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavCls}>
@@ -83,24 +92,26 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Admin Navigation */}
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/70">Administração</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end className={getNavCls}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {/* Admin Navigation - Só mostra se tiver itens */}
+        {filteredAdminItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-sidebar-foreground/70">Administração</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {filteredAdminItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url} end className={getNavCls}>
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Logout Button */}
         <div className="mt-auto p-4 border-t border-sidebar-border">

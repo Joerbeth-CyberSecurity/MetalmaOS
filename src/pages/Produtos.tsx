@@ -55,11 +55,11 @@ import { useToast } from "@/components/ui/use-toast"
 // Esquema de validação Zod
 const produtoSchema = z.object({
   nome: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
-  descricao: z.string().optional(),
+  descricao: z.string().nullable().optional(),
   preco_unitario: z.number().min(0, { message: 'O preço não pode ser negativo.' }),
-  estoque: z.number().optional(),
-  unidade: z.string().optional(),
-  percentual_global: z.number().optional(),
+  estoque: z.number().nullable().optional(),
+  unidade: z.string().nullable().optional(),
+  percentual_global: z.number().nullable().optional(),
 });
 
 type ProdutoFormData = z.infer<typeof produtoSchema>;
@@ -83,12 +83,14 @@ const formatCurrency = (value: number) => {
 
 export default function Produtos() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [produtosFiltrados, setProdutosFiltrados] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedProduto, setSelectedProduto] = useState<Produto | null>(null);
   const [produtoToDelete, setProdutoToDelete] = useState<Produto | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [termoPesquisa, setTermoPesquisa] = useState('');
   const { toast } = useToast();
 
   const form = useForm<ProdutoFormData>({
@@ -107,13 +109,27 @@ export default function Produtos() {
     fetchProdutos();
   }, []);
 
+  // Filtrar produtos baseado no termo de pesquisa
+  useEffect(() => {
+    if (termoPesquisa.trim() === '') {
+      setProdutosFiltrados(produtos);
+    } else {
+      const filtrados = produtos.filter(produto =>
+        produto.nome.toLowerCase().includes(termoPesquisa.toLowerCase())
+      );
+      setProdutosFiltrados(filtrados);
+    }
+  }, [produtos, termoPesquisa]);
+
   useEffect(() => {
     if (selectedProduto) {
       form.reset({
         ...selectedProduto,
+        descricao: selectedProduto.descricao || '',
         preco_unitario: selectedProduto.preco_unitario || 0,
-        estoque: selectedProduto.estoque || undefined,
-        percentual_global: selectedProduto.percentual_global || undefined,
+        estoque: selectedProduto.estoque || 0,
+        unidade: selectedProduto.unidade || 'UN',
+        percentual_global: selectedProduto.percentual_global || 0,
       });
     } else {
       form.reset({
@@ -134,6 +150,7 @@ export default function Produtos() {
       toast({ title: "Erro ao buscar produtos", description: error.message, variant: "destructive" });
     } else {
       setProdutos(data);
+      setProdutosFiltrados(data); // Inicializar produtos filtrados
     }
     setLoading(false);
   };
@@ -152,7 +169,9 @@ export default function Produtos() {
     setIsSaving(true);
     const dataToSave = {
       ...values,
+      descricao: values.descricao || null,
       estoque: values.estoque || null,
+      unidade: values.unidade || null,
       percentual_global: values.percentual_global || null,
     };
 
@@ -201,6 +220,21 @@ export default function Produtos() {
           </Button>
         </div>
       </div>
+      {/* Campo de pesquisa */}
+      <div className="mb-4">
+        <Input
+          placeholder="Pesquisar produtos por nome..."
+          value={termoPesquisa}
+          onChange={(e) => setTermoPesquisa(e.target.value)}
+          className="max-w-md"
+        />
+        {termoPesquisa && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {produtosFiltrados.length} produto(s) encontrado(s)
+          </p>
+        )}
+      </div>
+
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
@@ -216,7 +250,7 @@ export default function Produtos() {
             {loading ? (
               <TableRow><TableCell colSpan={5} className="text-center py-10"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></TableCell></TableRow>
             ) : (
-              produtos.map((produto) => (
+              produtosFiltrados.map((produto) => (
                 <TableRow key={produto.id}>
                   <TableCell className="font-medium">{produto.nome}</TableCell>
                   <TableCell>{formatCurrency(produto.preco_unitario)}</TableCell>

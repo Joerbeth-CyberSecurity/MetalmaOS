@@ -414,7 +414,13 @@ export default function Clientes() {
                   <FormItem>
                     <FormLabel>Nome*</FormLabel>
                     <FormControl>
-                      <Input placeholder="Nome completo do cliente" {...field} />
+                      <Input 
+                        placeholder="Nome completo do cliente" 
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -427,7 +433,13 @@ export default function Clientes() {
                   <FormItem>
                     <FormLabel>E-mail</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@exemplo.com" {...field} />
+                      <Input 
+                        placeholder="email@exemplo.com" 
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -440,7 +452,13 @@ export default function Clientes() {
                   <FormItem>
                     <FormLabel>Telefone*</FormLabel>
                     <FormControl>
-                      <Input placeholder="(99) 99999-9999" {...field} />
+                      <Input 
+                        placeholder="(99) 99999-9999" 
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -455,13 +473,15 @@ export default function Clientes() {
                     <FormControl>
                       <Input
                         placeholder="00.000.000/0000-00"
-                        {...field}
+                        value={field.value || ''} 
                         maxLength={18}
                         onChange={e => {
                           const v = e.target.value.replace(/\D/g, '');
                           if (v.length <= 11) field.onChange(maskCPF(e.target.value));
                           else field.onChange(maskCNPJ(e.target.value));
                         }}
+                        onBlur={field.onBlur}
+                        name={field.name}
                       />
                     </FormControl>
                     <FormMessage />
@@ -476,7 +496,12 @@ export default function Clientes() {
                     <FormItem>
                       <FormLabel>Cidade</FormLabel>
                       <FormControl>
-                        <Input {...field} />
+                        <Input 
+                          value={field.value || ''} 
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -489,7 +514,13 @@ export default function Clientes() {
                     <FormItem>
                       <FormLabel>Estado</FormLabel>
                       <FormControl>
-                        <Input placeholder="UF" {...field} />
+                        <Input 
+                          placeholder="UF" 
+                          value={field.value || ''} 
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

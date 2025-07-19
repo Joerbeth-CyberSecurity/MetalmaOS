@@ -281,25 +281,123 @@ export default function Produtos() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
               <FormField name="nome" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>Nome</FormLabel><FormControl><Input placeholder="Nome do produto" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Nome</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Nome do produto" 
+                      value={field.value || ''} 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField name="descricao" control={form.control} render={({ field }) => (
-                <FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea placeholder="Descrição detalhada do produto" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Descrição</FormLabel>
+                  <FormControl>
+                    <Textarea 
+                      placeholder="Descrição detalhada do produto" 
+                      value={field.value || ''} 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
               <div className="grid grid-cols-2 gap-4">
                 <FormField name="preco_unitario" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Preço Unitário</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>Preço Unitário</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        value={field.value || ''} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            field.onChange(0);
+                          } else {
+                            const numValue = parseFloat(value);
+                            field.onChange(isNaN(numValue) ? 0 : numValue);
+                          }
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField name="percentual_global" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>% Global</FormLabel><FormControl><Input type="number" step="0.01" {...field} onChange={e => field.onChange(e.target.valueAsNumber)}/></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>% Global</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        value={field.value || ''} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            field.onChange(0);
+                          } else {
+                            const numValue = parseFloat(value);
+                            field.onChange(isNaN(numValue) ? 0 : numValue);
+                          }
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField name="estoque" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Estoque</FormLabel><FormControl><Input type="number" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>Estoque</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        value={field.value || ''} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            field.onChange(0);
+                          } else {
+                            const numValue = parseInt(value);
+                            field.onChange(isNaN(numValue) ? 0 : numValue);
+                          }
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField name="unidade" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Unidade</FormLabel><FormControl><Input placeholder="UN, KG, L" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>Unidade</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="UN, KG, L" 
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               </div>
               <div className="pt-6 flex justify-end">

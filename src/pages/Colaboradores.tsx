@@ -79,8 +79,8 @@ function isValidCPF(cpf: string) {
 const colaboradorSchema = z.object({
   nome: z.string().min(3, { message: 'O nome é obrigatório.' }),
   cargo: z.string().min(2, { message: 'O cargo é obrigatório.' }),
-  salario: z.number({ required_error: 'O salário é obrigatório.' }),
-  data_admissao: z.string().min(4, { message: 'A data de admissão é obrigatória.' }),
+  salario: z.number().min(0, { message: 'O salário deve ser um número válido.' }),
+  data_admissao: z.string().min(1, { message: 'A data de admissão é obrigatória.' }),
   email: z.string().email({ message: 'E-mail inválido.' }).optional().or(z.literal('')),
   telefone: z.string().optional(),
   cpf: z.string().optional().refine(
@@ -88,7 +88,7 @@ const colaboradorSchema = z.object({
     { message: 'CPF inválido.' }
   ),
   endereco: z.string().optional(),
-  meta_hora: z.number().optional(),
+  meta_hora: z.number().min(0, { message: 'A meta de horas deve ser um número válido.' }).optional(),
 });
 
 type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
@@ -127,6 +127,9 @@ export default function Colaboradores() {
       cpf: '',
       endereco: '',
       cargo: '',
+      salario: 0,
+      meta_hora: 8,
+      data_admissao: '',
     },
   });
 
@@ -138,13 +141,21 @@ export default function Colaboradores() {
     if (selectedColaborador) {
       form.reset({
         ...selectedColaborador,
-        salario: selectedColaborador.salario || undefined,
-        meta_hora: selectedColaborador.meta_hora || undefined,
+        salario: selectedColaborador.salario || 0,
+        meta_hora: selectedColaborador.meta_hora || 8,
+        data_admissao: selectedColaborador.data_admissao || '',
       });
     } else {
       form.reset({
-        nome: '', email: '', telefone: '', cpf: '', endereco: '', cargo: '',
-        salario: undefined, meta_hora: undefined, data_admissao: undefined,
+        nome: '', 
+        email: '', 
+        telefone: '', 
+        cpf: '', 
+        endereco: '', 
+        cargo: '',
+        salario: 0, 
+        meta_hora: 8, 
+        data_admissao: '',
       });
     }
   }, [selectedColaborador, sheetOpen, form]);
@@ -326,21 +337,45 @@ export default function Colaboradores() {
               <FormField name="nome" control={form.control} render={({ field }) => (
                 <FormItem>
                   <FormLabel>Nome*</FormLabel>
-                  <FormControl><Input placeholder="Nome completo" {...field} /></FormControl>
+                  <FormControl>
+                    <Input 
+                      placeholder="Nome completo" 
+                      value={field.value || ''} 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField name="email" control={form.control} render={({ field }) => (
                 <FormItem>
                   <FormLabel>E-mail</FormLabel>
-                  <FormControl><Input placeholder="email@exemplo.com" {...field} /></FormControl>
+                  <FormControl>
+                    <Input 
+                      placeholder="email@exemplo.com" 
+                      value={field.value || ''} 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField name="telefone" control={form.control} render={({ field }) => (
                 <FormItem>
                   <FormLabel>Telefone</FormLabel>
-                  <FormControl><Input placeholder="(99) 99999-9999" {...field} /></FormControl>
+                  <FormControl>
+                    <Input 
+                      placeholder="(99) 99999-9999" 
+                      value={field.value || ''} 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -348,8 +383,13 @@ export default function Colaboradores() {
                 <FormItem>
                   <FormLabel>CPF</FormLabel>
                   <FormControl>
-                    <Input placeholder="000.000.000-00" {...field} maxLength={14}
+                    <Input 
+                      placeholder="000.000.000-00" 
+                      value={field.value || ''} 
+                      maxLength={14}
                       onChange={e => field.onChange(maskCPF(e.target.value))}
+                      onBlur={field.onBlur}
+                      name={field.name}
                     />
                   </FormControl>
                   <FormMessage />
@@ -358,7 +398,15 @@ export default function Colaboradores() {
               <FormField name="cargo" control={form.control} render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cargo*</FormLabel>
-                  <FormControl><Input placeholder="Ex: Desenvolvedor" {...field} /></FormControl>
+                  <FormControl>
+                    <Input 
+                      placeholder="Ex: Desenvolvedor" 
+                      value={field.value || ''} 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -366,7 +414,24 @@ export default function Colaboradores() {
                 <FormField name="salario" control={form.control} render={({ field }) => (
                   <FormItem>
                     <FormLabel>Salário*</FormLabel>
-                    <FormControl><Input type="number" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        value={field.value || ''} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            field.onChange(0);
+                          } else {
+                            const numValue = parseFloat(value);
+                            field.onChange(isNaN(numValue) ? 0 : numValue);
+                          }
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -374,7 +439,21 @@ export default function Colaboradores() {
                   <FormItem>
                     <FormLabel>Meta de Horas</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} value={field.value ?? 8} onChange={e => field.onChange(e.target.valueAsNumber)} />
+                      <Input 
+                        type="number" 
+                        value={field.value || 8} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            field.onChange(8);
+                          } else {
+                            const numValue = parseInt(value);
+                            field.onChange(isNaN(numValue) ? 8 : numValue);
+                          }
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -383,7 +462,15 @@ export default function Colaboradores() {
               <FormField name="data_admissao" control={form.control} render={({ field }) => (
                 <FormItem>
                   <FormLabel>Data de Admissão*</FormLabel>
-                  <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormControl>
+                    <Input 
+                      type="date" 
+                      value={field.value || ''} 
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />

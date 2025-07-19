@@ -294,6 +294,7 @@ export default function Configuracoes() {
   async function fetchUsuarios() {
     console.log('Buscando usuários da tabela admins...');
     try {
+      // Primeiro, buscar apenas os campos básicos para evitar conflitos
       const { data, error } = await supabase
         .from('admins')
         .select('id, nome, email, tipo_usuario, ativo, user_id, created_at, nivel_id');
@@ -301,20 +302,16 @@ export default function Configuracoes() {
       console.log('Resultado da busca:', { data, error });
       if (error) {
         console.error('Erro ao buscar usuários:', error);
-        // Se for erro de relação, buscar apenas os campos básicos
-        if (error.message.includes('relationship')) {
-          const { data: basicData, error: basicError } = await supabase
-            .from('admins')
-            .select('id, nome, email, tipo_usuario, ativo, user_id, created_at');
-          
-          if (basicError) {
-            toast({ title: 'Erro ao buscar usuários', description: basicError.message, variant: 'destructive' });
-          } else {
-            console.log('Usuários encontrados (sem nível):', basicData);
-            setUsuarios(basicData || []);
-          }
+        // Se houver erro, tentar buscar sem nivel_id
+        const { data: basicData, error: basicError } = await supabase
+          .from('admins')
+          .select('id, nome, email, tipo_usuario, ativo, user_id, created_at');
+        
+        if (basicError) {
+          toast({ title: 'Erro ao buscar usuários', description: basicError.message, variant: 'destructive' });
         } else {
-          toast({ title: 'Erro ao buscar usuários', description: error.message, variant: 'destructive' });
+          console.log('Usuários encontrados (sem nível):', basicData);
+          setUsuarios(basicData || []);
         }
       } else {
         console.log('Usuários encontrados:', data);
@@ -583,14 +580,48 @@ export default function Configuracoes() {
                   <FormField control={form.control} name="percentual_global_produtos" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Percentual Global de Produtos (%)</FormLabel>
-                      <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          value={field.value || ''} 
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              field.onChange(0);
+                            } else {
+                              const numValue = parseFloat(value);
+                              field.onChange(isNaN(numValue) ? 0 : numValue);
+                            }
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="meta_hora_padrao" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Meta de Horas Padrão (por colaborador)</FormLabel>
-                      <FormControl><Input type="number" step="0.1" {...field} /></FormControl>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.1" 
+                          value={field.value || ''} 
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              field.onChange(0);
+                            } else {
+                              const numValue = parseFloat(value);
+                              field.onChange(isNaN(numValue) ? 0 : numValue);
+                            }
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -598,7 +629,14 @@ export default function Configuracoes() {
                 <FormField control={form.control} name="prefixo_os" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Prefixo para Ordens de Serviço</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
+                    <FormControl>
+                      <Input 
+                        value={field.value || ''} 
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

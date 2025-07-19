@@ -5,7 +5,8 @@ import { Toaster } from './components/ui/toaster';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Loader2 } from 'lucide-react';
-import { ThemeProvider } from './components/ThemeProvider'; 
+import { ThemeProvider } from './components/ThemeProvider';
+import { SecurityProvider } from './components/SecurityProvider'; 
 
 // Importações de páginas
 import Auth from './pages/Auth';
@@ -22,9 +23,10 @@ import ResetPassword from './pages/ResetPassword';
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-      <AuthProvider>
-        <Toaster />
-        <Router>
+      <SecurityProvider>
+        <AuthProvider>
+          <Toaster />
+          <Router>
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -48,7 +50,8 @@ function App() {
             }/>
           </Routes>
         </Router>
-      </AuthProvider>
+        </AuthProvider>
+      </SecurityProvider>
     </ThemeProvider>
   );
 }

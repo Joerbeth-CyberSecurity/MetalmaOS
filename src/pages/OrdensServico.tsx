@@ -816,8 +816,18 @@ export default function OrdensServico() {
                       <Input 
                         type="number" 
                         step="0.5"
-                        {...field}
-                        onChange={e => field.onChange(e.target.valueAsNumber)}
+                        value={field.value || ''} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            field.onChange(0);
+                          } else {
+                            const numValue = parseFloat(value);
+                            field.onChange(isNaN(numValue) ? 0 : numValue);
+                          }
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
                       />
                     </FormControl>
                     <FormMessage />
@@ -830,8 +840,18 @@ export default function OrdensServico() {
                       <Input 
                         type="number" 
                         step="0.01"
-                        {...field}
-                        onChange={e => field.onChange(e.target.valueAsNumber)}
+                        value={field.value || ''} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            field.onChange(0);
+                          } else {
+                            const numValue = parseFloat(value);
+                            field.onChange(isNaN(numValue) ? 0 : numValue);
+                          }
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
                       />
                     </FormControl>
                     <FormMessage />
@@ -889,9 +909,18 @@ export default function OrdensServico() {
                             <TableCell>
                               <Input 
                                 type="number" 
-                                {...form.register(`produtos.${index}.quantidade`, { valueAsNumber: true })} 
+                                value={form.watch(`produtos.${index}.quantidade`) || 1}
                                 min={1} 
                                 className="h-8"
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (value === '') {
+                                    form.setValue(`produtos.${index}.quantidade`, 1);
+                                  } else {
+                                    const numValue = parseInt(value);
+                                    form.setValue(`produtos.${index}.quantidade`, isNaN(numValue) ? 1 : numValue);
+                                  }
+                                }}
                               />
                             </TableCell>
                             <TableCell>{formatCurrency(field.preco_unitario)}</TableCell>

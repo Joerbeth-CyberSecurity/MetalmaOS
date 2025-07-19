@@ -94,7 +94,12 @@ export function AuthProvider({ children }) {
           email_usuario: user.email,
           tipo_evento: 'login',
           ip_address: null, // Será capturado pelo backend se necessário
-          user_agent: navigator.userAgent
+          user_agent: navigator.userAgent,
+          event_details: {
+            action: 'login',
+            timestamp: new Date().toISOString(),
+            success: true
+          }
         });
       
       if (error) {
@@ -119,7 +124,12 @@ export function AuthProvider({ children }) {
           email_usuario: user?.email,
           tipo_evento: 'logout',
           ip_address: null,
-          user_agent: navigator.userAgent
+          user_agent: navigator.userAgent,
+          event_details: {
+            action: 'logout',
+            timestamp: new Date().toISOString(),
+            success: true
+          }
         });
       
       if (error) {

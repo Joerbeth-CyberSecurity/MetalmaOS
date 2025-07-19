@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 // Esquema de validação
 const configSchema = z.object({
@@ -619,14 +621,14 @@ export default function Configuracoes() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Tipo</label>
-                <select className="w-full border rounded px-2 py-1" value={userForm.tipo_usuario} onChange={e => setUserForm(f => ({ ...f, tipo_usuario: e.target.value }))}>
+                <select className="w-full border rounded px-2 py-1 bg-background text-foreground border-border" value={userForm.tipo_usuario} onChange={e => setUserForm(f => ({ ...f, tipo_usuario: e.target.value }))}>
                   <option value="admin">Administrador</option>
                   <option value="colaborador">Usuário</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Nível de Acesso</label>
-                <select className="w-full border rounded px-2 py-1" value={userForm.nivel_id} onChange={e => setUserForm(f => ({ ...f, nivel_id: e.target.value }))}>
+                <select className="w-full border rounded px-2 py-1 bg-background text-foreground border-border" value={userForm.nivel_id} onChange={e => setUserForm(f => ({ ...f, nivel_id: e.target.value }))}>
                   <option value="">Selecione um nível</option>
                   {niveis.map(nivel => (
                     <option key={nivel.id} value={nivel.id}>{nivel.nome}</option>
@@ -683,8 +685,8 @@ export default function Configuracoes() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Descrição</label>
-                <textarea 
-                  className="w-full border rounded px-2 py-1 h-20"
+                <Textarea 
+                  className="h-20"
                   value={nivelForm.descricao} 
                   onChange={e => setNivelForm(f => ({ ...f, descricao: e.target.value }))}
                 />

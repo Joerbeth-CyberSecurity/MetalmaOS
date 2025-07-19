@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   Building2, 
@@ -60,6 +61,31 @@ export function AppSidebar() {
     hasPermission(item.permission)
   );
 
+  // --- Sessão do usuário ---
+  const [logonTime, setLogonTime] = useState(() => {
+    const stored = sessionStorage.getItem('logonTime');
+    if (stored) return new Date(stored);
+    const now = new Date();
+    sessionStorage.setItem('logonTime', now.toISOString());
+    return now;
+  });
+  const [now, setNow] = useState(new Date());
+  const [elapsed, setElapsed] = useState('');
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(new Date());
+      const diff = Math.floor((Date.now() - logonTime.getTime()) / 1000);
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      setElapsed(
+        `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`
+      );
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [logonTime]);
+
   return (
     <Sidebar
       className={`${collapsed ? 'w-14' : 'w-64'} border-r border-border/60 bg-sidebar backdrop-blur-sm`}
@@ -115,6 +141,15 @@ export function AppSidebar() {
 
         {/* Logout Button */}
         <div className="mt-auto p-4 border-t border-sidebar-border">
+          {/* Sessão do usuário */}
+          <div className="mb-3">
+            <div className="rounded-md bg-muted/60 p-3 text-xs text-muted-foreground flex flex-col gap-1">
+              <div><span className="font-medium">Logon:</span> {logonTime.toLocaleTimeString()}</div>
+              <div><span className="font-medium">Tempo conectado:</span> {elapsed}</div>
+              <div><span className="font-medium">Agora:</span> {now.toLocaleString()}</div>
+            </div>
+          </div>
+
           <Button
             onClick={signOut}
             variant="ghost"

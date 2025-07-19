@@ -136,25 +136,25 @@ export default function ResetPassword() {
               className="h-16 w-auto object-contain"
             />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Sistema Metalma
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+            Sistema de Controle de Ordens de Serviço
           </h1>
-          <p className="text-gray-600">
-            Redefinição de Senha
+          <p className="text-muted-foreground">
+            Metalma Inox & Cia - Gestão Moderna e Eficiente
           </p>
         </div>
 
         {/* Card Principal */}
-        <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
+        <Card className="shadow-xl border-0 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center pb-4">
-            <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <Lock className="h-6 w-6 text-blue-600" />
+            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+              <Lock className="h-6 w-6 text-primary" />
             </div>
-            <CardTitle className="text-xl font-semibold text-gray-900">
+            <CardTitle className="text-xl font-semibold text-foreground">
               Nova Senha
             </CardTitle>
-            <CardDescription className="text-gray-600">
-              Digite sua nova senha para acessar o sistema
+            <CardDescription className="text-muted-foreground">
+              Digite sua nova senha abaixo.
             </CardDescription>
           </CardHeader>
           
@@ -174,7 +174,7 @@ export default function ResetPassword() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Campo Nova Senha */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-foreground">
                     Nova Senha
                   </label>
                   <div className="relative">
@@ -190,19 +190,19 @@ export default function ResetPassword() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    Mínimo 6 caracteres
+                  <p className="text-xs text-muted-foreground">
+                    A senha deve ter pelo menos 6 caracteres.
                   </p>
                 </div>
 
                 {/* Campo Confirmar Senha */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className="text-sm font-medium text-foreground">
                     Confirmar Senha
                   </label>
                   <div className="relative">
@@ -217,7 +217,7 @@ export default function ResetPassword() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
                       {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -258,8 +258,8 @@ export default function ResetPassword() {
 
         {/* Footer */}
         <div className="text-center mt-8">
-          <p className="text-sm text-gray-500">
-            © 2024 Metalma. Todos os direitos reservados.
+          <p className="text-sm text-muted-foreground">
+            As senhas devem ser idênticas.
           </p>
         </div>
       </div>

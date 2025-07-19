@@ -12,6 +12,8 @@ import { Loader2 } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { ReportTemplate } from '@/components/ui/ReportTemplate';
+import { useRef } from 'react';
 
 // Esquema de validação
 const configSchema = z.object({
@@ -39,6 +41,19 @@ export default function Configuracoes() {
   const [nivelForm, setNivelForm] = useState({ nome: '', descricao: '', ativo: true });
   const [selectedNivelPermissoes, setSelectedNivelPermissoes] = useState<string[]>([]);
 
+  // Estados para auditoria
+  const [auditoria, setAuditoria] = useState([]);
+  const [loadingAuditoria, setLoadingAuditoria] = useState(false);
+  const [filtroUsuario, setFiltroUsuario] = useState('');
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
+  const [filtroTipoEvento, setFiltroTipoEvento] = useState('');
+  const [showPrint, setShowPrint] = useState(false); // Corrige ReferenceError
+
+  // Estado para controlar a impressão
+  const printRef = useRef();
+  // Remover showPrint e setShowPrint
+
   useEffect(() => {
     fetchConfiguracoes();
     fetchUsuarios();
@@ -63,6 +78,88 @@ export default function Configuracoes() {
     } else {
       setPermissoes(data || []);
     }
+  }
+
+  // Função para buscar auditoria
+  async function fetchAuditoria() {
+    if (!filtroDataInicio && !filtroDataFim) {
+      toast({ title: 'Informe pelo menos uma data para buscar auditoria.' });
+      setAuditoria([]);
+      return;
+    }
+    setLoadingAuditoria(true);
+    try {
+      let query = supabase
+        .from('auditoria_login')
+        .select('*')
+        .order('data_hora', { ascending: false });
+
+      // Aplicar filtros
+      if (filtroUsuario) {
+        query = query.or(`nome_usuario.ilike.%${filtroUsuario}%,email_usuario.ilike.%${filtroUsuario}%`);
+      }
+      
+      if (filtroDataInicio) {
+        query = query.gte('data_hora', filtroDataInicio + 'T00:00:00');
+      }
+      
+      if (filtroDataFim) {
+        query = query.lte('data_hora', filtroDataFim + 'T23:59:59');
+      }
+      
+      if (filtroTipoEvento) {
+        query = query.eq('tipo_evento', filtroTipoEvento);
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        toast({ title: 'Erro ao buscar auditoria', description: error.message, variant: 'destructive' });
+      } else {
+        setAuditoria(data || []);
+      }
+    } catch (error) {
+      toast({ title: 'Erro ao buscar auditoria', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoadingAuditoria(false);
+    }
+  }
+
+  // Função para limpar filtros
+  function limparFiltros() {
+    setFiltroUsuario('');
+    setFiltroDataInicio('');
+    setFiltroDataFim('');
+    setFiltroTipoEvento('');
+  }
+
+  // Função para exportar auditoria
+  function exportarAuditoria() {
+    const csvContent = [
+      ['Usuário', 'Email', 'Evento', 'Data/Hora', 'User Agent'],
+      ...auditoria.map(item => [
+        item.nome_usuario,
+        item.email_usuario,
+        item.tipo_evento,
+        new Date(item.data_hora).toLocaleString('pt-BR'),
+        item.user_agent
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `auditoria_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Função para imprimir
+  function handlePrint() {
+    window.print();
   }
 
   async function fetchNivelPermissoes(nivelId: string) {
@@ -605,6 +702,158 @@ export default function Configuracoes() {
         </CardContent>
       </Card>
 
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Auditoria de Login/Logout</CardTitle>
+          <CardDescription>Monitore todos os acessos ao sistema com filtros avançados.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Filtros */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-muted/30 rounded-lg">
+            <div>
+              <label className="block text-sm font-medium mb-1">Usuário</label>
+              <Input 
+                placeholder="Nome ou email"
+                value={filtroUsuario}
+                onChange={(e) => setFiltroUsuario(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Data Início</label>
+              <Input 
+                type="date"
+                value={filtroDataInicio}
+                onChange={(e) => setFiltroDataInicio(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Data Fim</label>
+              <Input 
+                type="date"
+                value={filtroDataFim}
+                onChange={(e) => setFiltroDataFim(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Tipo de Evento</label>
+              <select 
+                className="w-full border rounded px-2 py-1 bg-background text-foreground border-border"
+                value={filtroTipoEvento}
+                onChange={(e) => setFiltroTipoEvento(e.target.value)}
+              >
+                <option value="">Todos</option>
+                <option value="login">Login</option>
+                <option value="logout">Logout</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Botões de ação */}
+          <div className="flex justify-between mb-4">
+            <div className="flex gap-2">
+              <Button onClick={fetchAuditoria} disabled={loadingAuditoria}>
+                {loadingAuditoria && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Buscar
+              </Button>
+              <Button variant="outline" onClick={limparFiltros}>
+                Limpar Filtros
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={exportarAuditoria} disabled={auditoria.length === 0}>
+                Exportar CSV
+              </Button>
+              <Button onClick={handlePrint} disabled={auditoria.length === 0} variant="secondary">
+                Imprimir
+              </Button>
+            </div>
+          </div>
+
+          {/* Tabela de auditoria */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm border">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="px-3 py-2 text-left">Usuário</th>
+                  <th className="px-3 py-2 text-left">Email</th>
+                  <th className="px-3 py-2 text-left">Evento</th>
+                  <th className="px-3 py-2 text-left">Data/Hora</th>
+                  <th className="px-3 py-2 text-left">User Agent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingAuditoria ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                    </td>
+                  </tr>
+                ) : auditoria.length > 0 ? (
+                  auditoria.map((item) => (
+                    <tr key={item.id} className="border-b">
+                      <td className="px-3 py-2 font-medium">{item.nome_usuario}</td>
+                      <td className="px-3 py-2">{item.email_usuario}</td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          item.tipo_evento === 'login' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {item.tipo_evento === 'login' ? 'Login' : 'Logout'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {new Date(item.data_hora).toLocaleString('pt-BR')}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs truncate">
+                        {item.user_agent}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="text-center py-4 text-muted-foreground">
+                      Nenhum registro de auditoria encontrado.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Estatísticas */}
+          {auditoria.length > 0 && (
+            <div className="mt-4 p-4 bg-muted/30 rounded-lg">
+              <h4 className="font-medium mb-2">Estatísticas</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Total de registros:</span>
+                  <div className="font-medium">{auditoria.length}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Logins:</span>
+                  <div className="font-medium text-green-600">
+                    {auditoria.filter(item => item.tipo_evento === 'login').length}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Logouts:</span>
+                  <div className="font-medium text-red-600">
+                    {auditoria.filter(item => item.tipo_evento === 'logout').length}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Usuários únicos:</span>
+                  <div className="font-medium">
+                    {new Set(auditoria.map(item => item.email_usuario)).size}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Modal de cadastro/edição de usuário */}
       {showUserModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -731,6 +980,80 @@ export default function Configuracoes() {
           </div>
         </div>
       )}
+
+      {/* Renderização condicional para impressão */}
+      {/* No JSX, remova showPrint e sempre renderize o relatório, mas escondido na tela */}
+      {/* Impressão: renderizar relatório só ao clicar em Imprimir, desmontar após o print */}
+      {showPrint && (
+        <div style={{ position: 'absolute', left: '-9999px', top: 0 }} className="print-auditoria">
+          <ReportTemplate
+            title="Relatório de Auditoria"
+            period={{ start: filtroDataInicio || '2023-01-01', end: filtroDataFim || new Date().toISOString().split('T')[0] }}
+            type="Auditoria de Login/Logout"
+          >
+            <div className="mb-4">
+              <strong>Filtros aplicados:</strong>
+              <ul className="text-xs">
+                <li>Usuário: {filtroUsuario || 'Todos'}</li>
+                <li>Data Início: {filtroDataInicio || '...'}</li>
+                <li>Data Fim: {filtroDataFim || '...'}</li>
+                <li>Tipo de Evento: {filtroTipoEvento || 'Todos'}</li>
+              </ul>
+            </div>
+            <div className="report-content">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Usuário</th>
+                    <th>Email</th>
+                    <th>Evento</th>
+                    <th>Data/Hora</th>
+                    <th>User Agent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditoria.map((item) => (
+                    <tr key={item.id}>
+                      <td>{item.nome_usuario}</td>
+                      <td>{item.email_usuario}</td>
+                      <td>{item.tipo_evento === 'login' ? 'Login' : 'Logout'}</td>
+                      <td>{new Date(item.data_hora).toLocaleString('pt-BR')}</td>
+                      <td style={{ maxWidth: 200, wordBreak: 'break-all' }}>{item.user_agent}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {/* Estatísticas */}
+              <div className="mt-4">
+                <strong>Estatísticas:</strong>
+                <ul className="text-xs">
+                  <li>Total de registros: {auditoria.length}</li>
+                  <li>Logins: {auditoria.filter(item => item.tipo_evento === 'login').length}</li>
+                  <li>Logouts: {auditoria.filter(item => item.tipo_evento === 'logout').length}</li>
+                  <li>Usuários únicos: {new Set(auditoria.map(item => item.email_usuario)).size}</li>
+                </ul>
+              </div>
+            </div>
+          </ReportTemplate>
+        </div>
+      )}
+
+      {/* CSS para impressão: só mostra .print-auditoria na impressão */}
+      <style>{`
+        @media print {
+          body *:not(.print-auditoria):not(.print-auditoria *) {
+            display: none !important;
+          }
+          .print-auditoria {
+            display: block !important;
+            position: static !important;
+            left: 0 !important;
+            width: 100% !important;
+            background: white !important;
+            color: black !important;
+          }
+        }
+      `}</style>
     </div>
   );
 } 

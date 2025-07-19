@@ -82,6 +82,56 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Função para registrar login na auditoria
+  const registrarLogin = async (user, profile) => {
+    try {
+      const { error } = await supabase
+        .from('auditoria_login')
+        .insert({
+          user_id: user.id,
+          admin_id: profile?.id,
+          nome_usuario: profile?.nome || user.email,
+          email_usuario: user.email,
+          tipo_evento: 'login',
+          ip_address: null, // Será capturado pelo backend se necessário
+          user_agent: navigator.userAgent
+        });
+      
+      if (error) {
+        console.error('Erro ao registrar login na auditoria:', error);
+      } else {
+        console.log('Login registrado na auditoria');
+      }
+    } catch (error) {
+      console.error('Erro ao registrar login na auditoria:', error);
+    }
+  };
+
+  // Função para registrar logout na auditoria
+  const registrarLogout = async (user, profile) => {
+    try {
+      const { error } = await supabase
+        .from('auditoria_login')
+        .insert({
+          user_id: user?.id,
+          admin_id: profile?.id,
+          nome_usuario: profile?.nome || user?.email,
+          email_usuario: user?.email,
+          tipo_evento: 'logout',
+          ip_address: null,
+          user_agent: navigator.userAgent
+        });
+      
+      if (error) {
+        console.error('Erro ao registrar logout na auditoria:', error);
+      } else {
+        console.log('Logout registrado na auditoria');
+      }
+    } catch (error) {
+      console.error('Erro ao registrar logout na auditoria:', error);
+    }
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
@@ -178,6 +228,9 @@ export function AuthProvider({ children }) {
           const profile = await fetchUserProfile(session.user.id);
           setUserProfile(profile);
           
+          // Registrar login na auditoria
+          await registrarLogin(session.user, profile);
+          
           // Buscar permissões se tiver nível de acesso
           if (profile?.nivel_id) {
             const permissions = await fetchUserPermissions(profile.nivel_id);
@@ -213,6 +266,11 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     setLoading(true);
+    
+    // Registrar logout na auditoria antes de limpar os dados
+    if (user && userProfile) {
+      await registrarLogout(user, userProfile);
+    }
     
     // Limpar dados do usuário imediatamente
     setUser(null);

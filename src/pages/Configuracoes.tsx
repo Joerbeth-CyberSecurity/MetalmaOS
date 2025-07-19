@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ReportTemplate } from '@/components/ui/ReportTemplate';
 import { useRef } from 'react';
+import ReactDOM from 'react-dom';
 
 // Esquema de validação
 const configSchema = z.object({
@@ -48,11 +49,6 @@ export default function Configuracoes() {
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
   const [filtroTipoEvento, setFiltroTipoEvento] = useState('');
-  const [showPrint, setShowPrint] = useState(false); // Corrige ReferenceError
-
-  // Estado para controlar a impressão
-  const printRef = useRef();
-  // Remover showPrint e setShowPrint
 
   useEffect(() => {
     fetchConfiguracoes();
@@ -158,9 +154,9 @@ export default function Configuracoes() {
   }
 
   // Função para imprimir
-  function handlePrint() {
+  const handlePrint = () => {
     window.print();
-  }
+  };
 
   async function fetchNivelPermissoes(nivelId: string) {
     const { data, error } = await supabase
@@ -555,6 +551,16 @@ export default function Configuracoes() {
     setIsSaving(false);
   };
 
+  // Garante que o print-root existe no body
+  if (typeof window !== 'undefined' && !document.getElementById('print-root')) {
+    const printDiv = document.createElement('div');
+    printDiv.id = 'print-root';
+    printDiv.style.position = 'absolute';
+    printDiv.style.left = '-9999px';
+    printDiv.style.top = '0';
+    document.body.appendChild(printDiv);
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -762,9 +768,6 @@ export default function Configuracoes() {
             <div className="flex gap-2">
               <Button onClick={exportarAuditoria} disabled={auditoria.length === 0}>
                 Exportar CSV
-              </Button>
-              <Button onClick={handlePrint} disabled={auditoria.length === 0} variant="secondary">
-                Imprimir
               </Button>
             </div>
           </div>
@@ -981,78 +984,86 @@ export default function Configuracoes() {
         </div>
       )}
 
-      {/* Renderização condicional para impressão */}
-      {/* No JSX, remova showPrint e sempre renderize o relatório, mas escondido na tela */}
-      {/* Impressão: renderizar relatório só ao clicar em Imprimir, desmontar após o print */}
-      {showPrint && (
-        <div style={{ position: 'absolute', left: '-9999px', top: 0 }} className="print-auditoria">
-          <ReportTemplate
-            title="Relatório de Auditoria"
-            period={{ start: filtroDataInicio || '2023-01-01', end: filtroDataFim || new Date().toISOString().split('T')[0] }}
-            type="Auditoria de Login/Logout"
-          >
-            <div className="mb-4">
-              <strong>Filtros aplicados:</strong>
+      {/* Relatório de Auditoria para Impressão - SEMPRE PRESENTE NO DOM */}
+      <div className="only-print">
+        <ReportTemplate
+          title="Relatório de Auditoria"
+          period={{ start: filtroDataInicio || '2023-01-01', end: filtroDataFim || new Date().toISOString().split('T')[0] }}
+          type="Auditoria de Login/Logout"
+        >
+          <div className="mb-4">
+            <strong>Filtros aplicados:</strong>
+            <ul className="text-xs">
+              <li>Usuário: {filtroUsuario || 'Todos'}</li>
+              <li>Data Início: {filtroDataInicio || '...'}</li>
+              <li>Data Fim: {filtroDataFim || '...'}</li>
+              <li>Tipo de Evento: {filtroTipoEvento || 'Todos'}</li>
+            </ul>
+          </div>
+          <div className="report-content">
+            <table>
+              <thead>
+                <tr>
+                  <th>Usuário</th>
+                  <th>Email</th>
+                  <th>Evento</th>
+                  <th>Data/Hora</th>
+                  <th>User Agent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditoria.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.nome_usuario}</td>
+                    <td>{item.email_usuario}</td>
+                    <td>{item.tipo_evento === 'login' ? 'Login' : 'Logout'}</td>
+                    <td>{new Date(item.data_hora).toLocaleString('pt-BR')}</td>
+                    <td style={{ maxWidth: 200, wordBreak: 'break-all' }}>{item.user_agent}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {/* Estatísticas */}
+            <div className="mt-4">
+              <strong>Estatísticas:</strong>
               <ul className="text-xs">
-                <li>Usuário: {filtroUsuario || 'Todos'}</li>
-                <li>Data Início: {filtroDataInicio || '...'}</li>
-                <li>Data Fim: {filtroDataFim || '...'}</li>
-                <li>Tipo de Evento: {filtroTipoEvento || 'Todos'}</li>
+                <li>Total de registros: {auditoria.length}</li>
+                <li>Logins: {auditoria.filter(item => item.tipo_evento === 'login').length}</li>
+                <li>Logouts: {auditoria.filter(item => item.tipo_evento === 'logout').length}</li>
+                <li>Usuários únicos: {new Set(auditoria.map(item => item.email_usuario)).size}</li>
               </ul>
             </div>
-            <div className="report-content">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Usuário</th>
-                    <th>Email</th>
-                    <th>Evento</th>
-                    <th>Data/Hora</th>
-                    <th>User Agent</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditoria.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.nome_usuario}</td>
-                      <td>{item.email_usuario}</td>
-                      <td>{item.tipo_evento === 'login' ? 'Login' : 'Logout'}</td>
-                      <td>{new Date(item.data_hora).toLocaleString('pt-BR')}</td>
-                      <td style={{ maxWidth: 200, wordBreak: 'break-all' }}>{item.user_agent}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {/* Estatísticas */}
-              <div className="mt-4">
-                <strong>Estatísticas:</strong>
-                <ul className="text-xs">
-                  <li>Total de registros: {auditoria.length}</li>
-                  <li>Logins: {auditoria.filter(item => item.tipo_evento === 'login').length}</li>
-                  <li>Logouts: {auditoria.filter(item => item.tipo_evento === 'logout').length}</li>
-                  <li>Usuários únicos: {new Set(auditoria.map(item => item.email_usuario)).size}</li>
-                </ul>
-              </div>
-            </div>
-          </ReportTemplate>
-        </div>
-      )}
+          </div>
+        </ReportTemplate>
+      </div>
 
-      {/* CSS para impressão: só mostra .print-auditoria na impressão */}
+      {/* CSS para impressão: só mostra .only-print e esconde o resto */}
       <style>{`
+        .only-print {
+          display: none;
+        }
         @media print {
-          body *:not(.print-auditoria):not(.print-auditoria *) {
+          .only-print {
+            display: block !important;
+          }
+          body *:not(.only-print):not(.only-print *) {
             display: none !important;
           }
-          .print-auditoria {
-            display: block !important;
-            position: static !important;
-            left: 0 !important;
-            width: 100% !important;
-            background: white !important;
-            color: black !important;
-          }
         }
+        /* Corrige o ícone do date picker no modo escuro */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: invert(1) brightness(2); /* deixa o ícone branco no dark */
+          opacity: 1;
+        }
+        .dark input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: invert(1) brightness(2);
+          opacity: 1;
+        }
+        input[type="date"]::-ms-input-placeholder { color: #fff; }
+        input[type="date"]::-webkit-input-placeholder { color: #fff; opacity: 1; }
+        input[type="date"]::-moz-placeholder { color: #fff; opacity: 1; }
+        input[type="date"]:-ms-input-placeholder { color: #fff; opacity: 1; }
+        input[type="date"]::placeholder { color: #fff; opacity: 1; }
       `}</style>
     </div>
   );

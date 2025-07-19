@@ -559,3 +559,33 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+.only-print {
+  display: none;
+}
+@media print {
+  .only-print {
+    display: block !important;
+  }
+  body *:not(.only-print):not(.only-print *) {
+    display: none !important;
+  }
+}
+
+/* Corrige o ícone do date picker no modo escuro */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none !important;
+  opacity: 1 !important;
+  cursor: pointer;
+  display: block !important;
+}
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(2) !important;
+  opacity: 1 !important;
+  cursor: pointer;
+  display: block !important;
+}
+input[type="date"]::-ms-input-placeholder { color: #fff; }
+input[type="date"]::-webkit-input-placeholder { color: #fff; }
+input[type="date"]::-moz-placeholder { color: #fff; }
+input[type="date"]:-ms-input-placeholder { color: #fff; }

@@ -17,6 +17,7 @@ import Colaboradores from './pages/Colaboradores';
 import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
 import NotFound from './pages/NotFound';
+import ResetPassword from './pages/ResetPassword';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/*" element={
               <ProtectedRoute>
                 <Layout>

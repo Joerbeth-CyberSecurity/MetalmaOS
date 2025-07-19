@@ -12,7 +12,11 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { user } = useAuth();
+  const { user, userProfile, refreshUserProfile } = useAuth();
+
+  const handleRefreshProfile = async () => {
+    await refreshUserProfile();
+  };
 
   return (
     <SidebarProvider>
@@ -40,10 +44,16 @@ export function Layout({ children }: LayoutProps) {
                 <Bell className="h-4 w-4" />
               </Button>
               <DarkModeToggle />
-              <Button variant="ghost" size="sm" className="hover:bg-muted/30 hover:text-foreground transition-colors">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="hover:bg-muted/30 hover:text-foreground transition-colors"
+                onClick={handleRefreshProfile}
+                title="Atualizar perfil"
+              >
                 <User className="h-4 w-4" />
                 <span className="ml-2 text-sm">
-                  {user?.user_metadata?.nome || user?.email}
+                  {userProfile?.nome || user?.user_metadata?.nome || user?.email}
                 </span>
               </Button>
             </div>

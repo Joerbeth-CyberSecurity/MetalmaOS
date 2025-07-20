@@ -1,13 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import { Label } from '../components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Loader2, FileText, Download, Printer, Users, BarChart3, Clock, AlertTriangle } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
+import {
+  Loader2,
+  FileText,
+  Download,
+  Printer,
+  Users,
+  BarChart3,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+} from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import logo from '../assets/logo.png';
 import jsPDF from 'jspdf';
@@ -28,26 +61,26 @@ export default function Relatorios() {
       id: 'produtividade',
       title: 'Produtividade por Colaboradores',
       description: 'Análise de eficiência e horas trabalhadas',
-      icon: Users
+      icon: Users,
     },
     {
       id: 'paradas',
       title: 'Paradas por Falta de Material',
       description: 'Controle de interrupções',
-      icon: AlertTriangle
+      icon: AlertTriangle,
     },
     {
       id: 'os_status',
       title: 'Status das Ordens de Serviço',
       description: 'Distribuição de OS por status',
-      icon: BarChart3
+      icon: BarChart3,
     },
     {
       id: 'tempo',
       title: 'Controle do Tempo',
       description: 'Análise de tempo real vs previsto',
-      icon: Clock
-    }
+      icon: Clock,
+    },
   ];
 
   useEffect(() => {
@@ -84,29 +117,29 @@ export default function Relatorios() {
   const getDateRange = () => {
     const now = new Date();
     if (period === 'mes') {
-      return { 
-        start: startOfMonth(now).toISOString(), 
-        end: endOfMonth(now).toISOString() 
+      return {
+        start: startOfMonth(now).toISOString(),
+        end: endOfMonth(now).toISOString(),
       };
     } else if (period === 'semana') {
-      return { 
-        start: startOfWeek(now, { weekStartsOn: 1 }).toISOString(), 
-        end: endOfWeek(now, { weekStartsOn: 1 }).toISOString() 
+      return {
+        start: startOfWeek(now, { weekStartsOn: 1 }).toISOString(),
+        end: endOfWeek(now, { weekStartsOn: 1 }).toISOString(),
       };
     } else {
-      return { 
-        start: startOfMonth(now).toISOString(), 
-        end: endOfMonth(now).toISOString() 
+      return {
+        start: startOfMonth(now).toISOString(),
+        end: endOfMonth(now).toISOString(),
       };
     }
   };
 
   const generateReport = async () => {
     setLoading(true);
-    
+
     try {
       const { start, end } = getDateRange();
-      
+
       switch (selectedReport) {
         case 'produtividade':
           await generateProdutividadeReport(start, end);
@@ -146,7 +179,7 @@ export default function Relatorios() {
 
       // Processar dados
       const colabMap = {};
-      
+
       (colaboradores || []).forEach((colab) => {
         colabMap[colab.id] = {
           nome: colab.nome,
@@ -154,14 +187,15 @@ export default function Relatorios() {
           horas_trabalhadas: 0,
           eficiencia: 0,
           paradas_material: 0,
-          os_finalizadas: 0
+          os_finalizadas: 0,
         };
       });
 
       (tempos || []).forEach((tempo) => {
         if (colabMap[tempo.colaborador_id]) {
           if (tempo.tipo === 'trabalho') {
-            colabMap[tempo.colaborador_id].horas_trabalhadas += tempo.horas_calculadas || 0;
+            colabMap[tempo.colaborador_id].horas_trabalhadas +=
+              tempo.horas_calculadas || 0;
           } else if (tempo.tipo === 'parada_material') {
             colabMap[tempo.colaborador_id].paradas_material += 1;
           }
@@ -170,16 +204,17 @@ export default function Relatorios() {
 
       // Calcular eficiência
       Object.values(colabMap).forEach((colab) => {
-        colab.eficiencia = colab.meta_hora > 0 
-          ? Math.min(100, (colab.horas_trabalhadas / colab.meta_hora) * 100) 
-          : 0;
+        colab.eficiencia =
+          colab.meta_hora > 0
+            ? Math.min(100, (colab.horas_trabalhadas / colab.meta_hora) * 100)
+            : 0;
       });
 
       setReportData({
         type: 'produtividade',
         data: Object.values(colabMap),
         period: { start, end },
-        filters: { colaborador: colabFilter }
+        filters: { colaborador: colabFilter },
       });
     } catch (error) {
       console.error('Erro ao gerar relatório de produtividade:', error);
@@ -190,7 +225,8 @@ export default function Relatorios() {
     try {
       const { data: paradas } = await supabase
         .from('os_tempo')
-        .select(`
+        .select(
+          `
           tipo,
           data_inicio,
           data_fim,
@@ -198,7 +234,8 @@ export default function Relatorios() {
           os_id,
           colaborador:colaboradores(nome),
           os:ordens_servico(numero_os)
-        `)
+        `
+        )
         .eq('tipo', 'parada_material')
         .gte('data_inicio', start)
         .lte('data_inicio', end)
@@ -210,16 +247,18 @@ export default function Relatorios() {
         motivo: p.motivo || 'Falta de material',
         data_inicio: p.data_inicio,
         data_fim: p.data_fim,
-        duracao: p.data_fim 
-          ? (new Date(p.data_fim).getTime() - new Date(p.data_inicio).getTime()) / (1000 * 60 * 60)
-          : 0
+        duracao: p.data_fim
+          ? (new Date(p.data_fim).getTime() -
+              new Date(p.data_inicio).getTime()) /
+            (1000 * 60 * 60)
+          : 0,
       }));
 
       setReportData({
         type: 'paradas',
         data: paradasData,
         period: { start, end },
-        filters: { colaborador: colabFilter }
+        filters: { colaborador: colabFilter },
       });
     } catch (error) {
       console.error('Erro ao gerar relatório de paradas:', error);
@@ -242,17 +281,21 @@ export default function Relatorios() {
         total++;
       });
 
-      const statusData = Object.entries(statusCount).map(([status, quantidade]) => ({
-        status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        quantidade,
-        percentual: total > 0 ? (quantidade / total) * 100 : 0
-      }));
+      const statusData = Object.entries(statusCount).map(
+        ([status, quantidade]) => ({
+          status: status
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (l) => l.toUpperCase()),
+          quantidade,
+          percentual: total > 0 ? (quantidade / total) * 100 : 0,
+        })
+      );
 
       setReportData({
         type: 'os_status',
         data: statusData,
         period: { start, end },
-        total
+        total,
       });
     } catch (error) {
       console.error('Erro ao gerar relatório de status:', error);
@@ -264,7 +307,8 @@ export default function Relatorios() {
       // Buscar ordens de serviço com dados de tempo corretos
       const { data: ordens, error: err1 } = await supabase
         .from('ordens_servico')
-        .select(`
+        .select(
+          `
           numero_os,
           tempo_execucao_real,
           tempo_parada,
@@ -272,7 +316,8 @@ export default function Relatorios() {
           status,
           data_abertura,
           cliente:clientes(nome)
-        `)
+        `
+        )
         .gte('data_abertura', start)
         .lte('data_abertura', end)
         .order('data_abertura', { ascending: false });
@@ -285,14 +330,16 @@ export default function Relatorios() {
       // Buscar dados de tempo da tabela os_tempo para cálculos mais precisos
       const { data: tempos, error: err2 } = await supabase
         .from('os_tempo')
-        .select(`
+        .select(
+          `
           os_id,
           tipo,
           data_inicio,
           data_fim,
           horas_calculadas,
           motivo
-        `)
+        `
+        )
         .gte('data_inicio', start)
         .lte('data_inicio', end);
 
@@ -304,22 +351,31 @@ export default function Relatorios() {
       // Processar dados combinando informações das duas tabelas
       const tempoData = (ordens || []).map((os) => {
         // Calcular tempo real baseado nos registros de os_tempo
-        const temposOS = (tempos || []).filter(t => t.os_id === os.id);
+        const temposOS = (tempos || []).filter((t) => t.os_id === os.id);
         let tempoRealCalculado = 0;
         let tempoParadaCalculado = 0;
 
-        temposOS.forEach(tempo => {
+        temposOS.forEach((tempo) => {
           if (tempo.tipo === 'trabalho') {
             // Calcular horas se data_fim existe, senão usar horas_calculadas
             if (tempo.data_fim && tempo.data_inicio) {
-              const duracao = (new Date(tempo.data_fim).getTime() - new Date(tempo.data_inicio).getTime()) / (1000 * 60 * 60);
+              const duracao =
+                (new Date(tempo.data_fim).getTime() -
+                  new Date(tempo.data_inicio).getTime()) /
+                (1000 * 60 * 60);
               tempoRealCalculado += duracao;
             } else if (tempo.horas_calculadas) {
               tempoRealCalculado += tempo.horas_calculadas;
             }
-          } else if (tempo.tipo === 'parada_material' || tempo.tipo === 'pausa') {
+          } else if (
+            tempo.tipo === 'parada_material' ||
+            tempo.tipo === 'pausa'
+          ) {
             if (tempo.data_fim && tempo.data_inicio) {
-              const duracao = (new Date(tempo.data_fim).getTime() - new Date(tempo.data_inicio).getTime()) / (1000 * 60 * 60);
+              const duracao =
+                (new Date(tempo.data_fim).getTime() -
+                  new Date(tempo.data_inicio).getTime()) /
+                (1000 * 60 * 60);
               tempoParadaCalculado += duracao;
             } else if (tempo.horas_calculadas) {
               tempoParadaCalculado += tempo.horas_calculadas;
@@ -328,8 +384,14 @@ export default function Relatorios() {
         });
 
         // Usar dados calculados ou dados da OS (priorizar os calculados)
-        const tempoReal = tempoRealCalculado > 0 ? tempoRealCalculado : (os.tempo_execucao_real || 0);
-        const tempoParada = tempoParadaCalculado > 0 ? tempoParadaCalculado : (os.tempo_parada || 0);
+        const tempoReal =
+          tempoRealCalculado > 0
+            ? tempoRealCalculado
+            : os.tempo_execucao_real || 0;
+        const tempoParada =
+          tempoParadaCalculado > 0
+            ? tempoParadaCalculado
+            : os.tempo_parada || 0;
         const tempoPrevisto = os.tempo_execucao_previsto || 0;
 
         return {
@@ -340,7 +402,10 @@ export default function Relatorios() {
           tempo_previsto: tempoPrevisto,
           status: os.status,
           data_abertura: os.data_abertura,
-          eficiencia: tempoPrevisto > 0 ? Math.min(100, (tempoReal / tempoPrevisto) * 100) : 0
+          eficiencia:
+            tempoPrevisto > 0
+              ? Math.min(100, (tempoReal / tempoPrevisto) * 100)
+              : 0,
         };
       });
 
@@ -348,23 +413,26 @@ export default function Relatorios() {
         type: 'tempo',
         data: tempoData,
         period: { start, end },
-        filters: { cliente: clienteFilter }
+        filters: { cliente: clienteFilter },
       });
     } catch (error) {
       console.error('Erro ao gerar relatório de tempo:', error);
     }
   };
 
-
-
   // Função para obter título do relatório
   const getReportTitle = (type) => {
     switch (type) {
-      case 'produtividade': return 'RELATÓRIO DE PRODUTIVIDADE';
-      case 'paradas': return 'RELATÓRIO DE PARADAS POR FALTA DE MATERIAL';
-      case 'os_status': return 'RELATÓRIO DE STATUS DAS ORDENS DE SERVIÇO';
-      case 'tempo': return 'RELATÓRIO DE CONTROLE DE TEMPO';
-      default: return 'RELATÓRIO';
+      case 'produtividade':
+        return 'RELATÓRIO DE PRODUTIVIDADE';
+      case 'paradas':
+        return 'RELATÓRIO DE PARADAS POR FALTA DE MATERIAL';
+      case 'os_status':
+        return 'RELATÓRIO DE STATUS DAS ORDENS DE SERVIÇO';
+      case 'tempo':
+        return 'RELATÓRIO DE CONTROLE DE TEMPO';
+      default:
+        return 'RELATÓRIO';
     }
   };
 
@@ -374,7 +442,7 @@ export default function Relatorios() {
       // Criar elemento de impressão
       const printWindow = window.open('', '_blank');
       const reportTitle = getReportTitle(reportData.type);
-      
+
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -484,7 +552,7 @@ export default function Relatorios() {
         </body>
         </html>
       `);
-      
+
       printWindow.document.close();
       printWindow.focus();
       printWindow.print();
@@ -492,28 +560,27 @@ export default function Relatorios() {
     }
   };
 
-    // Função para exportar PDF
+  // Função para exportar PDF
   const handleExportPDF = () => {
     console.log('Botão Exportar PDF clicado');
     console.log('reportData:', reportData);
-    
+
     if (reportData) {
       try {
         const reportTitle = getReportTitle(reportData.type);
         console.log('Gerando PDF para:', reportTitle);
-        
+
         // Teste simples primeiro
         const doc = new jsPDF();
         doc.text('Teste PDF - Metalma', 20, 20);
         doc.text(`Relatório: ${reportTitle}`, 20, 30);
         doc.text(`Data: ${formatDate(new Date().toISOString())}`, 20, 40);
-        
+
         const fileName = `teste_${reportTitle.toLowerCase().replace(/\s+/g, '_')}.pdf`;
         doc.save(fileName);
         console.log('PDF de teste salvo como:', fileName);
-        
+
         alert('PDF gerado com sucesso! Verifique a pasta de downloads.');
-        
       } catch (error) {
         console.error('Erro ao gerar PDF:', error);
         alert('Erro ao gerar PDF: ' + error.message);
@@ -525,7 +592,8 @@ export default function Relatorios() {
   };
 
   const formatHours = (hours) => `${hours.toFixed(1)}h`;
-  const formatDate = (dateString) => format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
+  const formatDate = (dateString) =>
+    format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
 
   const renderTableContent = () => {
     if (!reportData) return '';
@@ -573,7 +641,9 @@ export default function Relatorios() {
 
     switch (reportData.type) {
       case 'produtividade':
-        return reportData.data.map((colab, index) => `
+        return reportData.data
+          .map(
+            (colab, index) => `
           <tr>
             <td style="font-weight: bold;">${colab.nome}</td>
             <td>${formatHours(colab.horas_trabalhadas)}</td>
@@ -581,9 +651,13 @@ export default function Relatorios() {
             <td>${colab.eficiencia.toFixed(1)}%</td>
             <td>${colab.paradas_material}</td>
           </tr>
-        `).join('');
+        `
+          )
+          .join('');
       case 'paradas':
-        return reportData.data.map((parada, index) => `
+        return reportData.data
+          .map(
+            (parada, index) => `
           <tr>
             <td style="font-weight: bold;">${parada.os_numero}</td>
             <td>${parada.colaborador}</td>
@@ -591,17 +665,25 @@ export default function Relatorios() {
             <td>${formatDate(parada.data_inicio)}</td>
             <td>${formatHours(parada.duracao)}</td>
           </tr>
-        `).join('');
+        `
+          )
+          .join('');
       case 'os_status':
-        return reportData.data.map((status, index) => `
+        return reportData.data
+          .map(
+            (status, index) => `
           <tr>
             <td style="font-weight: bold;">${status.status}</td>
             <td>${status.quantidade}</td>
             <td>${status.percentual.toFixed(1)}%</td>
           </tr>
-        `).join('');
+        `
+          )
+          .join('');
       case 'tempo':
-        return reportData.data.map((tempo, index) => `
+        return reportData.data
+          .map(
+            (tempo, index) => `
           <tr>
             <td style="font-weight: bold;">${tempo.os_numero}</td>
             <td>${tempo.cliente}</td>
@@ -609,9 +691,11 @@ export default function Relatorios() {
             <td>${formatHours(tempo.tempo_parada)}</td>
             <td>${formatHours(tempo.tempo_previsto)}</td>
             <td>${tempo.eficiencia.toFixed(1)}%</td>
-            <td>${tempo.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
+            <td>${tempo.status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</td>
           </tr>
-        `).join('');
+        `
+          )
+          .join('');
       default:
         return '';
     }
@@ -678,7 +762,15 @@ export default function Relatorios() {
             <TableCell>{formatHours(colab.horas_trabalhadas)}</TableCell>
             <TableCell>{formatHours(colab.meta_hora)}</TableCell>
             <TableCell>
-              <Badge variant={colab.eficiencia >= 80 ? "default" : colab.eficiencia >= 60 ? "secondary" : "destructive"}>
+              <Badge
+                variant={
+                  colab.eficiencia >= 80
+                    ? 'default'
+                    : colab.eficiencia >= 60
+                      ? 'secondary'
+                      : 'destructive'
+                }
+              >
                 {colab.eficiencia.toFixed(1)}%
               </Badge>
             </TableCell>
@@ -712,13 +804,23 @@ export default function Relatorios() {
             <TableCell>{formatHours(tempo.tempo_parada)}</TableCell>
             <TableCell>{formatHours(tempo.tempo_previsto)}</TableCell>
             <TableCell>
-              <Badge variant={tempo.eficiencia >= 80 ? "default" : tempo.eficiencia >= 60 ? "secondary" : "destructive"}>
+              <Badge
+                variant={
+                  tempo.eficiencia >= 80
+                    ? 'default'
+                    : tempo.eficiencia >= 60
+                      ? 'secondary'
+                      : 'destructive'
+                }
+              >
                 {tempo.eficiencia.toFixed(1)}%
               </Badge>
             </TableCell>
             <TableCell>
               <Badge className={`status-${tempo.status.replace('_', '-')}`}>
-                {tempo.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {tempo.status
+                  .replace(/_/g, ' ')
+                  .replace(/\b\w/g, (l) => l.toUpperCase())}
               </Badge>
             </TableCell>
           </TableRow>
@@ -727,8 +829,6 @@ export default function Relatorios() {
         return null;
     }
   };
-
-
 
   return (
     <div className="space-y-6">
@@ -746,20 +846,22 @@ export default function Relatorios() {
           <CardTitle>Seleção de Relatório</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {reportTypes.map((report) => {
               const Icon = report.icon;
               return (
                 <Button
                   key={report.id}
-                  variant={selectedReport === report.id ? "default" : "outline"}
-                  className="h-auto p-4 flex flex-col items-center gap-2"
+                  variant={selectedReport === report.id ? 'default' : 'outline'}
+                  className="flex h-auto flex-col items-center gap-2 p-4"
                   onClick={() => setSelectedReport(report.id)}
                 >
                   <Icon className="h-6 w-6" />
                   <div className="text-center">
                     <div className="font-medium">{report.title}</div>
-                    <div className="text-xs text-muted-foreground">{report.description}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {report.description}
+                    </div>
                   </div>
                 </Button>
               );
@@ -774,7 +876,7 @@ export default function Relatorios() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Período</Label>
               <Select value={period} onValueChange={setPeriod}>
@@ -797,7 +899,7 @@ export default function Relatorios() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os colaboradores</SelectItem>
-                  {colaboradores.map(colab => (
+                  {colaboradores.map((colab) => (
                     <SelectItem key={colab.id} value={colab.id}>
                       {colab.nome}
                     </SelectItem>
@@ -814,7 +916,7 @@ export default function Relatorios() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os clientes</SelectItem>
-                  {clientes.map(cliente => (
+                  {clientes.map((cliente) => (
                     <SelectItem key={cliente.id} value={cliente.id}>
                       {cliente.nome}
                     </SelectItem>
@@ -825,7 +927,7 @@ export default function Relatorios() {
           </div>
 
           {/* Botões de Ação */}
-          <div className="flex gap-2 mt-6">
+          <div className="mt-6 flex gap-2">
             <Button onClick={generateReport} disabled={loading}>
               {loading ? (
                 <>
@@ -839,7 +941,7 @@ export default function Relatorios() {
                 </>
               )}
             </Button>
-            
+
             {reportData && (
               <Button variant="outline" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
@@ -864,17 +966,13 @@ export default function Relatorios() {
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow>
-                  {renderTableContentJSX()}
-                </TableRow>
+                <TableRow>{renderTableContentJSX()}</TableRow>
               </TableHeader>
-              <TableBody>
-                {renderTableRowsJSX()}
-              </TableBody>
+              <TableBody>{renderTableRowsJSX()}</TableBody>
             </Table>
           </CardContent>
         </Card>
       )}
     </div>
   );
-} 
+}

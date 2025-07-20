@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Pencil, Trash2, Loader2 } from 'lucide-react';
+import {
+  PlusCircle,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Loader2,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,7 +43,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from '@/components/ui/alert-dialog';
 import {
   Form,
   FormControl,
@@ -45,9 +51,9 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from '@/components/ui/use-toast';
 
 // Função para aplicar máscara de CPF
 function maskCPF(value: string) {
@@ -62,15 +68,18 @@ function maskCPF(value: string) {
 function isValidCPF(cpf: string) {
   cpf = cpf.replace(/\D/g, '');
   if (cpf.length !== 11 || /^([0-9])\1+$/.test(cpf)) return false;
-  let sum = 0, rest;
-  for (let i = 1; i <= 9; i++) sum += parseInt(cpf.substring(i-1, i)) * (11 - i);
+  let sum = 0,
+    rest;
+  for (let i = 1; i <= 9; i++)
+    sum += parseInt(cpf.substring(i - 1, i)) * (11 - i);
   rest = (sum * 10) % 11;
-  if ((rest === 10) || (rest === 11)) rest = 0;
+  if (rest === 10 || rest === 11) rest = 0;
   if (rest !== parseInt(cpf.substring(9, 10))) return false;
   sum = 0;
-  for (let i = 1; i <= 10; i++) sum += parseInt(cpf.substring(i-1, i)) * (12 - i);
+  for (let i = 1; i <= 10; i++)
+    sum += parseInt(cpf.substring(i - 1, i)) * (12 - i);
   rest = (sum * 10) % 11;
-  if ((rest === 10) || (rest === 11)) rest = 0;
+  if (rest === 10 || rest === 11) rest = 0;
   if (rest !== parseInt(cpf.substring(10, 11))) return false;
   return true;
 }
@@ -79,16 +88,27 @@ function isValidCPF(cpf: string) {
 const colaboradorSchema = z.object({
   nome: z.string().min(3, { message: 'O nome é obrigatório.' }),
   cargo: z.string().min(2, { message: 'O cargo é obrigatório.' }),
-  salario: z.number().min(0, { message: 'O salário deve ser um número válido.' }),
-  data_admissao: z.string().min(1, { message: 'A data de admissão é obrigatória.' }),
-  email: z.string().email({ message: 'E-mail inválido.' }).optional().or(z.literal('')),
+  salario: z
+    .number()
+    .min(0, { message: 'O salário deve ser um número válido.' }),
+  data_admissao: z
+    .string()
+    .min(1, { message: 'A data de admissão é obrigatória.' }),
+  email: z
+    .string()
+    .email({ message: 'E-mail inválido.' })
+    .optional()
+    .or(z.literal('')),
   telefone: z.string().optional(),
-  cpf: z.string().optional().refine(
-    (val) => !val || isValidCPF(val),
-    { message: 'CPF inválido.' }
-  ),
+  cpf: z
+    .string()
+    .optional()
+    .refine((val) => !val || isValidCPF(val), { message: 'CPF inválido.' }),
   endereco: z.string().optional(),
-  meta_hora: z.number().min(0, { message: 'A meta de horas deve ser um número válido.' }).optional(),
+  meta_hora: z
+    .number()
+    .min(0, { message: 'A meta de horas deve ser um número válido.' })
+    .optional(),
 });
 
 type ColaboradorFormData = z.infer<typeof colaboradorSchema>;
@@ -113,8 +133,10 @@ export default function Colaboradores() {
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedColaborador, setSelectedColaborador] = useState<Colaborador | null>(null);
-  const [colaboradorToDelete, setColaboradorToDelete] = useState<Colaborador | null>(null);
+  const [selectedColaborador, setSelectedColaborador] =
+    useState<Colaborador | null>(null);
+  const [colaboradorToDelete, setColaboradorToDelete] =
+    useState<Colaborador | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
@@ -136,7 +158,7 @@ export default function Colaboradores() {
   useEffect(() => {
     fetchColaboradores();
   }, []);
-  
+
   useEffect(() => {
     if (selectedColaborador) {
       form.reset({
@@ -147,14 +169,14 @@ export default function Colaboradores() {
       });
     } else {
       form.reset({
-        nome: '', 
-        email: '', 
-        telefone: '', 
-        cpf: '', 
-        endereco: '', 
+        nome: '',
+        email: '',
+        telefone: '',
+        cpf: '',
+        endereco: '',
         cargo: '',
-        salario: 0, 
-        meta_hora: 8, 
+        salario: 0,
+        meta_hora: 8,
         data_admissao: '',
       });
     }
@@ -168,7 +190,11 @@ export default function Colaboradores() {
       .order('nome', { ascending: true });
 
     if (error) {
-      toast({ title: "Erro ao buscar colaboradores", description: error.message, variant: "destructive" });
+      toast({
+        title: 'Erro ao buscar colaboradores',
+        description: error.message,
+        variant: 'destructive',
+      });
     } else {
       setColaboradores(data);
     }
@@ -184,10 +210,10 @@ export default function Colaboradores() {
     setSelectedColaborador(colaborador);
     setSheetOpen(true);
   };
-  
+
   const onSubmit = async (values: ColaboradorFormData) => {
     setIsSaving(true);
-    
+
     // Converte campos vazios para null antes de enviar
     const dataToSave = {
       ...values,
@@ -198,7 +224,10 @@ export default function Colaboradores() {
     };
 
     const { error } = selectedColaborador
-      ? await supabase.from('colaboradores').update(dataToSave).eq('id', selectedColaborador.id)
+      ? await supabase
+          .from('colaboradores')
+          .update(dataToSave)
+          .eq('id', selectedColaborador.id)
       : await supabase.from('colaboradores').insert([dataToSave]);
 
     if (error) {
@@ -231,9 +260,13 @@ export default function Colaboradores() {
       .eq('id', colaboradorToDelete.id);
 
     if (error) {
-      toast({ title: "Erro ao excluir colaborador", description: error.message, variant: "destructive" });
+      toast({
+        title: 'Erro ao excluir colaborador',
+        description: error.message,
+        variant: 'destructive',
+      });
     } else {
-      toast({ title: "Colaborador excluído com sucesso!" });
+      toast({ title: 'Colaborador excluído com sucesso!' });
       setColaboradorToDelete(null);
       fetchColaboradores();
     }
@@ -257,7 +290,7 @@ export default function Colaboradores() {
       </div>
 
       {/* Tabela de Colaboradores */}
-      <div className="border rounded-lg">
+      <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -271,14 +304,16 @@ export default function Colaboradores() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                <TableCell colSpan={5} className="py-10 text-center">
+                  <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : (
               colaboradores.map((colaborador) => (
                 <TableRow key={colaborador.id}>
-                  <TableCell className="font-medium">{colaborador.nome}</TableCell>
+                  <TableCell className="font-medium">
+                    {colaborador.nome}
+                  </TableCell>
                   <TableCell>{colaborador.cargo || 'N/A'}</TableCell>
                   <TableCell>
                     <div className="flex flex-col">
@@ -289,7 +324,9 @@ export default function Colaboradores() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={colaborador.ativo ? 'default' : 'destructive'}>
+                    <Badge
+                      variant={colaborador.ativo ? 'default' : 'destructive'}
+                    >
                       {colaborador.ativo ? 'Ativo' : 'Inativo'}
                     </Badge>
                   </TableCell>
@@ -302,7 +339,9 @@ export default function Colaboradores() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(colaborador)}>
+                        <DropdownMenuItem
+                          onClick={() => handleEdit(colaborador)}
+                        >
                           <Pencil className="mr-2 h-4 w-4" />
                           Editar
                         </DropdownMenuItem>
@@ -322,161 +361,206 @@ export default function Colaboradores() {
           </TableBody>
         </Table>
       </div>
-      
+
       {/* Painel Lateral (Sheet) para Adicionar/Editar */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
+        <SheetContent className="overflow-y-auto sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle>{selectedColaborador ? 'Editar Colaborador' : 'Adicionar Novo Colaborador'}</SheetTitle>
+            <SheetTitle>
+              {selectedColaborador
+                ? 'Editar Colaborador'
+                : 'Adicionar Novo Colaborador'}
+            </SheetTitle>
             <SheetDescription>
-              {selectedColaborador ? 'Altere os dados do colaborador.' : 'Preencha os dados do novo colaborador.'}
+              {selectedColaborador
+                ? 'Altere os dados do colaborador.'
+                : 'Preencha os dados do novo colaborador.'}
             </SheetDescription>
           </SheetHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-              <FormField name="nome" control={form.control} render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome*</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="Nome completo" 
-                      value={field.value || ''} 
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField name="email" control={form.control} render={({ field }) => (
-                <FormItem>
-                  <FormLabel>E-mail</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="email@exemplo.com" 
-                      value={field.value || ''} 
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField name="telefone" control={form.control} render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Telefone</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="(99) 99999-9999" 
-                      value={field.value || ''} 
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField name="cpf" control={form.control} render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CPF</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="000.000.000-00" 
-                      value={field.value || ''} 
-                      maxLength={14}
-                      onChange={e => field.onChange(maskCPF(e.target.value))}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField name="cargo" control={form.control} render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cargo*</FormLabel>
-                  <FormControl>
-                    <Input 
-                      placeholder="Ex: Desenvolvedor" 
-                      value={field.value || ''} 
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4 py-4"
+            >
+              <FormField
+                name="nome"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome*</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Nome completo"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                name="email"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>E-mail</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="email@exemplo.com"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                name="telefone"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="(99) 99999-9999"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                name="cpf"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="000.000.000-00"
+                        value={field.value || ''}
+                        maxLength={14}
+                        onChange={(e) =>
+                          field.onChange(maskCPF(e.target.value))
+                        }
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                name="cargo"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cargo*</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: Desenvolvedor"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid grid-cols-2 gap-4">
-                <FormField name="salario" control={form.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Salário*</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        value={field.value || ''} 
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value === '') {
-                            field.onChange(0);
-                          } else {
-                            const numValue = parseFloat(value);
-                            field.onChange(isNaN(numValue) ? 0 : numValue);
-                          }
-                        }}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField name="meta_hora" control={form.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Meta de Horas</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        value={field.value || 8} 
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value === '') {
-                            field.onChange(8);
-                          } else {
-                            const numValue = parseInt(value);
-                            field.onChange(isNaN(numValue) ? 8 : numValue);
-                          }
-                        }}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  name="salario"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Salário*</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={field.value || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              field.onChange(0);
+                            } else {
+                              const numValue = parseFloat(value);
+                              field.onChange(isNaN(numValue) ? 0 : numValue);
+                            }
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  name="meta_hora"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Meta de Horas</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          value={field.value || 8}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              field.onChange(8);
+                            } else {
+                              const numValue = parseInt(value);
+                              field.onChange(isNaN(numValue) ? 8 : numValue);
+                            }
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <FormField name="data_admissao" control={form.control} render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Data de Admissão*</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="date" 
-                      value={field.value || ''} 
-                      onChange={field.onChange}
-                      onBlur={field.onBlur}
-                      name={field.name}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <div className="pt-6 flex justify-end">
+              <FormField
+                name="data_admissao"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Admissão*</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end pt-6">
                 <Button type="submit" disabled={isSaving}>
-                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSaving && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   {isSaving ? 'Salvando...' : 'Salvar Colaborador'}
                 </Button>
               </div>
@@ -486,16 +570,23 @@ export default function Colaboradores() {
       </Sheet>
 
       {/* Diálogo de Confirmação para Excluir */}
-      <AlertDialog open={!!colaboradorToDelete} onOpenChange={(open) => !open && setColaboradorToDelete(null)}>
+      <AlertDialog
+        open={!!colaboradorToDelete}
+        onOpenChange={(open) => !open && setColaboradorToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Isso excluirá permanentemente o colaborador <span className="font-bold">{colaboradorToDelete?.nome}</span>.
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente o
+              colaborador{' '}
+              <span className="font-bold">{colaboradorToDelete?.nome}</span>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
@@ -509,4 +600,4 @@ export default function Colaboradores() {
       </AlertDialog>
     </div>
   );
-} 
+}

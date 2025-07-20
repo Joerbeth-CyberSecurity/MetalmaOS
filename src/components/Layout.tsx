@@ -20,14 +20,14 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-gradient-to-br from-background to-secondary/10">
+      <div className="flex min-h-screen w-full bg-gradient-to-br from-background to-secondary/10">
         <AppSidebar />
-        
-        <div className="flex-1 flex flex-col">
+
+        <div className="flex flex-1 flex-col">
           {/* Header */}
-          <header className="h-14 border-b border-border/60 bg-card/50 backdrop-blur-sm flex items-center justify-between px-4">
+          <header className="flex h-14 items-center justify-between border-b border-border/60 bg-card/50 px-4 backdrop-blur-sm">
             <div className="flex items-center gap-4">
-              <SidebarTrigger className="hover:bg-muted/30 hover:text-foreground transition-colors" />
+              <SidebarTrigger className="transition-colors hover:bg-muted/30 hover:text-foreground" />
               {/* <Logo width={110} height={32} /> */}
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-foreground">
@@ -38,16 +38,20 @@ export function Layout({ children }: LayoutProps) {
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="hover:bg-muted/30 hover:text-foreground transition-colors">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="transition-colors hover:bg-muted/30 hover:text-foreground"
+              >
                 <Bell className="h-4 w-4" />
               </Button>
               <DarkModeToggle />
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="hover:bg-muted/30 hover:text-foreground transition-colors"
+              <Button
+                variant="ghost"
+                size="sm"
+                className="transition-colors hover:bg-muted/30 hover:text-foreground"
                 onClick={handleRefreshProfile}
                 title="Atualizar perfil"
               >
@@ -58,11 +62,9 @@ export function Layout({ children }: LayoutProps) {
               </Button>
             </div>
           </header>
-          
+
           {/* Main Content */}
-          <main className="flex-1 p-6 overflow-auto">
-            {children}
-          </main>
+          <main className="flex-1 overflow-auto p-6">{children}</main>
         </div>
       </div>
     </SidebarProvider>

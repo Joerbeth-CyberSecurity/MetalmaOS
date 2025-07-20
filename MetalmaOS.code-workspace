@@ -1,0 +1,46 @@
+{
+  "folders": [
+    {
+      "name": "MetalmaOS",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "css.validate": false,
+    "less.validate": false,
+    "scss.validate": false,
+    "files.associations": {
+      "*.css": "tailwindcss"
+    },
+    "tailwindCSS.includeLanguages": {
+      "typescript": "javascript",
+      "typescriptreact": "javascript"
+    },
+    "tailwindCSS.experimental.classRegex": [
+      ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
+      ["cx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"]
+    ],
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit",
+      "source.fixAll.stylelint": "explicit"
+    },
+    "typescript.preferences.includePackageJsonAutoImports": "on",
+    "emmet.includeLanguages": {
+      "typescript": "html",
+      "typescriptreact": "html"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "bradlc.vscode-tailwindcss",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-typescript-next",
+      "formulahendry.auto-rename-tag",
+      "christian-kohler.path-intellisense",
+      "ms-vscode.vscode-json",
+      "stylelint.vscode-stylelint"
+    ]
+  }
+} 

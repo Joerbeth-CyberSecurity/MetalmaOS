@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { PlusCircle, MoreHorizontal, Pencil, Trash2, Loader2 } from 'lucide-react';
+import {
+  PlusCircle,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Loader2,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,7 +43,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from '@/components/ui/alert-dialog';
 import {
   Form,
   FormControl,
@@ -45,10 +51,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form"
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from "@/components/ui/use-toast"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { useToast } from '@/components/ui/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 import { ReportTemplate } from '@/components/ui/ReportTemplate';
 
 // Função para aplicar máscara de CPF
@@ -74,15 +87,18 @@ function maskCNPJ(value: string) {
 function isValidCPF(cpf: string) {
   cpf = cpf.replace(/\D/g, '');
   if (cpf.length !== 11 || /^([0-9])\1+$/.test(cpf)) return false;
-  let sum = 0, rest;
-  for (let i = 1; i <= 9; i++) sum += parseInt(cpf.substring(i-1, i)) * (11 - i);
+  let sum = 0,
+    rest;
+  for (let i = 1; i <= 9; i++)
+    sum += parseInt(cpf.substring(i - 1, i)) * (11 - i);
   rest = (sum * 10) % 11;
-  if ((rest === 10) || (rest === 11)) rest = 0;
+  if (rest === 10 || rest === 11) rest = 0;
   if (rest !== parseInt(cpf.substring(9, 10))) return false;
   sum = 0;
-  for (let i = 1; i <= 10; i++) sum += parseInt(cpf.substring(i-1, i)) * (12 - i);
+  for (let i = 1; i <= 10; i++)
+    sum += parseInt(cpf.substring(i - 1, i)) * (12 - i);
   rest = (sum * 10) % 11;
-  if ((rest === 10) || (rest === 11)) rest = 0;
+  if (rest === 10 || rest === 11) rest = 0;
   if (rest !== parseInt(cpf.substring(10, 11))) return false;
   return true;
 }
@@ -91,34 +107,53 @@ function isValidCNPJ(cnpj: string) {
   cnpj = cnpj.replace(/\D/g, '');
   if (cnpj.length !== 14) return false;
   if (/^([0-9])\1+$/.test(cnpj)) return false;
-  let t = cnpj.length - 2, d = cnpj.substring(t), d1 = parseInt(d.charAt(0)), d2 = parseInt(d.charAt(1)), calc = x => {
-    let n = cnpj.substring(0, x), y = x - 7, s = 0, r = 2;
-    for (let i = x; i >= 1; i--) {
-      s += n.charAt(x - i) * r++;
-      if (r > 9) r = 2;
-    }
-    return s;
-  };
-  let dg1 = calc(t), dg2 = calc(t + 1);
-  dg1 = 11 - (dg1 % 11); if (dg1 >= 10) dg1 = 0;
-  dg2 = 11 - (dg2 % 11); if (dg2 >= 10) dg2 = 0;
+  let t = cnpj.length - 2,
+    d = cnpj.substring(t),
+    d1 = parseInt(d.charAt(0)),
+    d2 = parseInt(d.charAt(1)),
+    calc = (x) => {
+      let n = cnpj.substring(0, x),
+        y = x - 7,
+        s = 0,
+        r = 2;
+      for (let i = x; i >= 1; i--) {
+        s += n.charAt(x - i) * r++;
+        if (r > 9) r = 2;
+      }
+      return s;
+    };
+  let dg1 = calc(t),
+    dg2 = calc(t + 1);
+  dg1 = 11 - (dg1 % 11);
+  if (dg1 >= 10) dg1 = 0;
+  dg2 = 11 - (dg2 % 11);
+  if (dg2 >= 10) dg2 = 0;
   return dg1 === d1 && dg2 === d2;
 }
 
 // Esquema de validação para o formulário de cliente
 const clienteSchema = z.object({
-  nome: z.string().min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
+  nome: z
+    .string()
+    .min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
   telefone: z.string().min(8, { message: 'O telefone é obrigatório.' }),
-  cpf_cnpj: z.string().min(11, { message: 'O CPF/CNPJ é obrigatório.' }).refine(
-    (val) => {
-      const num = val.replace(/\D/g, '');
-      if (num.length === 11) return isValidCPF(val);
-      if (num.length === 14) return isValidCNPJ(val);
-      return false;
-    },
-    { message: 'CPF/CNPJ inválido.' }
-  ),
-  email: z.string().email({ message: 'E-mail inválido.' }).optional().or(z.literal('')),
+  cpf_cnpj: z
+    .string()
+    .min(11, { message: 'O CPF/CNPJ é obrigatório.' })
+    .refine(
+      (val) => {
+        const num = val.replace(/\D/g, '');
+        if (num.length === 11) return isValidCPF(val);
+        if (num.length === 14) return isValidCNPJ(val);
+        return false;
+      },
+      { message: 'CPF/CNPJ inválido.' }
+    ),
+  email: z
+    .string()
+    .email({ message: 'E-mail inválido.' })
+    .optional()
+    .or(z.literal('')),
   endereco: z.string().optional(),
   cidade: z.string().optional(),
   estado: z.string().optional(),
@@ -188,7 +223,6 @@ export default function Clientes() {
     }
   }, [selectedCliente, sheetOpen, form]);
 
-
   const fetchClientes = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -197,7 +231,11 @@ export default function Clientes() {
       .order('nome', { ascending: true });
 
     if (error) {
-      toast({ title: "Erro ao buscar clientes", description: error.message, variant: "destructive" });
+      toast({
+        title: 'Erro ao buscar clientes',
+        description: error.message,
+        variant: 'destructive',
+      });
     } else {
       setClientes(data);
     }
@@ -216,9 +254,12 @@ export default function Clientes() {
 
   const onSubmit = async (values: ClienteFormData) => {
     setIsSaving(true);
-    
+
     const { error } = selectedCliente
-      ? await supabase.from('clientes').update(values).eq('id', selectedCliente.id)
+      ? await supabase
+          .from('clientes')
+          .update(values)
+          .eq('id', selectedCliente.id)
       : await supabase.from('clientes').insert([values]);
 
     if (error) {
@@ -229,7 +270,7 @@ export default function Clientes() {
       toast({
         title: `Erro ao ${selectedCliente ? 'atualizar' : 'salvar'} cliente`,
         description: msg,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } else {
       toast({
@@ -252,13 +293,13 @@ export default function Clientes() {
 
     if (error) {
       toast({
-        title: "Erro ao excluir cliente",
+        title: 'Erro ao excluir cliente',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } else {
       toast({
-        title: "Cliente excluído com sucesso!",
+        title: 'Cliente excluído com sucesso!',
       });
       setClienteToDelete(null);
       fetchClientes();
@@ -268,7 +309,7 @@ export default function Clientes() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
           <p className="text-muted-foreground">
@@ -280,12 +321,16 @@ export default function Clientes() {
             <PlusCircle className="mr-2 h-4 w-4" />
             Adicionar Cliente
           </Button>
-          <Button onClick={() => setExportOpen(true)} type="button" className="bg-primary text-white font-semibold shadow-soft hover:bg-primary/80 transition">
+          <Button
+            onClick={() => setExportOpen(true)}
+            type="button"
+            className="bg-primary font-semibold text-white shadow-soft transition hover:bg-primary/80"
+          >
             Imprimir / Exportar PDF
           </Button>
         </div>
       </div>
-      <div className="border rounded-lg">
+      <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -299,8 +344,8 @@ export default function Clientes() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                <TableCell colSpan={5} className="py-10 text-center">
+                  <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : (
@@ -360,16 +405,56 @@ export default function Clientes() {
           <DialogHeader>
             <DialogTitle>Relatório de Clientes</DialogTitle>
           </DialogHeader>
-          <div className="overflow-auto max-h-[70vh]">
+          <div className="max-h-[70vh] overflow-auto">
             <ReportTemplate>
-              <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 24 }}>Lista de Clientes</h2>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 24 }}>
+                Lista de Clientes
+              </h2>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: 15,
+                }}
+              >
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 8 }}>Nome</th>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 8 }}>Contato</th>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 8 }}>Localização</th>
-                    <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc', padding: 8 }}>Status</th>
+                    <th
+                      style={{
+                        textAlign: 'left',
+                        borderBottom: '1px solid #ccc',
+                        padding: 8,
+                      }}
+                    >
+                      Nome
+                    </th>
+                    <th
+                      style={{
+                        textAlign: 'left',
+                        borderBottom: '1px solid #ccc',
+                        padding: 8,
+                      }}
+                    >
+                      Contato
+                    </th>
+                    <th
+                      style={{
+                        textAlign: 'left',
+                        borderBottom: '1px solid #ccc',
+                        padding: 8,
+                      }}
+                    >
+                      Localização
+                    </th>
+                    <th
+                      style={{
+                        textAlign: 'left',
+                        borderBottom: '1px solid #ccc',
+                        padding: 8,
+                      }}
+                    >
+                      Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -378,10 +463,18 @@ export default function Clientes() {
                       <td style={{ padding: 8 }}>{cliente.nome}</td>
                       <td style={{ padding: 8 }}>
                         <div>{cliente.email}</div>
-                        <div style={{ fontSize: 13, color: '#888' }}>{cliente.telefone}</div>
+                        <div style={{ fontSize: 13, color: '#888' }}>
+                          {cliente.telefone}
+                        </div>
                       </td>
-                      <td style={{ padding: 8 }}>{cliente.cidade && cliente.estado ? `${cliente.cidade}, ${cliente.estado}` : 'N/A'}</td>
-                      <td style={{ padding: 8 }}>{cliente.ativo ? 'Ativo' : 'Inativo'}</td>
+                      <td style={{ padding: 8 }}>
+                        {cliente.cidade && cliente.estado
+                          ? `${cliente.cidade}, ${cliente.estado}`
+                          : 'N/A'}
+                      </td>
+                      <td style={{ padding: 8 }}>
+                        {cliente.ativo ? 'Ativo' : 'Inativo'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -389,7 +482,12 @@ export default function Clientes() {
             </ReportTemplate>
           </div>
           <DialogFooter>
-            <Button onClick={() => window.print()} className="bg-primary text-white">Imprimir / Salvar PDF</Button>
+            <Button
+              onClick={() => window.print()}
+              className="bg-primary text-white"
+            >
+              Imprimir / Salvar PDF
+            </Button>
             <DialogClose asChild>
               <Button variant="outline">Fechar</Button>
             </DialogClose>
@@ -400,13 +498,20 @@ export default function Clientes() {
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle>{selectedCliente ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</SheetTitle>
+            <SheetTitle>
+              {selectedCliente ? 'Editar Cliente' : 'Adicionar Novo Cliente'}
+            </SheetTitle>
             <SheetDescription>
-              {selectedCliente ? 'Altere os dados do cliente.' : 'Preencha os dados do novo cliente.'}
+              {selectedCliente
+                ? 'Altere os dados do cliente.'
+                : 'Preencha os dados do novo cliente.'}
             </SheetDescription>
           </SheetHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4 py-4"
+            >
               <FormField
                 control={form.control}
                 name="nome"
@@ -414,9 +519,9 @@ export default function Clientes() {
                   <FormItem>
                     <FormLabel>Nome*</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="Nome completo do cliente" 
-                        value={field.value || ''} 
+                      <Input
+                        placeholder="Nome completo do cliente"
+                        value={field.value || ''}
                         onChange={field.onChange}
                         onBlur={field.onBlur}
                         name={field.name}
@@ -433,9 +538,9 @@ export default function Clientes() {
                   <FormItem>
                     <FormLabel>E-mail</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="email@exemplo.com" 
-                        value={field.value || ''} 
+                      <Input
+                        placeholder="email@exemplo.com"
+                        value={field.value || ''}
                         onChange={field.onChange}
                         onBlur={field.onBlur}
                         name={field.name}
@@ -452,9 +557,9 @@ export default function Clientes() {
                   <FormItem>
                     <FormLabel>Telefone*</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="(99) 99999-9999" 
-                        value={field.value || ''} 
+                      <Input
+                        placeholder="(99) 99999-9999"
+                        value={field.value || ''}
                         onChange={field.onChange}
                         onBlur={field.onBlur}
                         name={field.name}
@@ -464,7 +569,7 @@ export default function Clientes() {
                   </FormItem>
                 )}
               />
-               <FormField
+              <FormField
                 control={form.control}
                 name="cpf_cnpj"
                 render={({ field }) => (
@@ -473,11 +578,12 @@ export default function Clientes() {
                     <FormControl>
                       <Input
                         placeholder="00.000.000/0000-00"
-                        value={field.value || ''} 
+                        value={field.value || ''}
                         maxLength={18}
-                        onChange={e => {
+                        onChange={(e) => {
                           const v = e.target.value.replace(/\D/g, '');
-                          if (v.length <= 11) field.onChange(maskCPF(e.target.value));
+                          if (v.length <= 11)
+                            field.onChange(maskCPF(e.target.value));
                           else field.onChange(maskCNPJ(e.target.value));
                         }}
                         onBlur={field.onBlur}
@@ -496,8 +602,8 @@ export default function Clientes() {
                     <FormItem>
                       <FormLabel>Cidade</FormLabel>
                       <FormControl>
-                        <Input 
-                          value={field.value || ''} 
+                        <Input
+                          value={field.value || ''}
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           name={field.name}
@@ -514,9 +620,9 @@ export default function Clientes() {
                     <FormItem>
                       <FormLabel>Estado</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="UF" 
-                          value={field.value || ''} 
+                        <Input
+                          placeholder="UF"
+                          value={field.value || ''}
                           onChange={field.onChange}
                           onBlur={field.onBlur}
                           name={field.name}
@@ -527,10 +633,12 @@ export default function Clientes() {
                   )}
                 />
               </div>
-              
-              <div className="pt-6 flex justify-end">
+
+              <div className="flex justify-end pt-6">
                 <Button type="submit" disabled={isSaving}>
-                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSaving && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   {isSaving ? 'Salvando...' : 'Salvar Cliente'}
                 </Button>
               </div>
@@ -540,16 +648,23 @@ export default function Clientes() {
       </Sheet>
 
       {/* Diálogo de Confirmação para Excluir */}
-      <AlertDialog open={!!clienteToDelete} onOpenChange={(open) => !open && setClienteToDelete(null)}>
+      <AlertDialog
+        open={!!clienteToDelete}
+        onOpenChange={(open) => !open && setClienteToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Isso excluirá permanentemente o cliente <span className="font-bold">{clienteToDelete?.nome}</span> do banco de dados.
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente o
+              cliente <span className="font-bold">{clienteToDelete?.nome}</span>{' '}
+              do banco de dados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
@@ -563,4 +678,4 @@ export default function Clientes() {
       </AlertDialog>
     </div>
   );
-} 
+}

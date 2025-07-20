@@ -11,9 +11,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-secondary/20">
+        <div className="space-y-4 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Verificando autenticação...</p>
         </div>
       </div>

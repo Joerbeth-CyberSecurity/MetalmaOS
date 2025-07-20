@@ -13,12 +13,12 @@ export const ReportTemplate: React.FC<ReportTemplateProps> = ({
   title,
   period,
   children,
-  type
+  type,
 }) => {
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { 
-      style: 'currency', 
-      currency: 'BRL' 
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
     }).format(value);
   };
 
@@ -27,45 +27,51 @@ export const ReportTemplate: React.FC<ReportTemplateProps> = ({
   };
 
   return (
-    <div className="print-container bg-white text-black p-8 max-w-none">
+    <div className="print-container max-w-none bg-white p-8 text-black">
       {/* Cabeçalho da Empresa */}
-      <div className="border-b-2 border-gray-300 pb-4 mb-6">
+      <div className="mb-6 border-b-2 border-gray-300 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img 
-              src="/logo.png" 
-              alt="Metalma Inox & Cia" 
+            <img
+              src="/logo.png"
+              alt="Metalma Inox & Cia"
               className="h-16 w-auto"
             />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">METALMA INOX & CIA</h1>
-              <p className="text-sm text-gray-600">Sistema de Controle de Ordens de Serviço</p>
-              <p className="text-xs text-gray-500">Gestão Moderna e Eficiente</p>
+              <h1 className="text-2xl font-bold text-gray-900">
+                METALMA INOX & CIA
+              </h1>
+              <p className="text-sm text-gray-600">
+                Sistema de Controle de Ordens de Serviço
+              </p>
+              <p className="text-xs text-gray-500">
+                Gestão Moderna e Eficiente
+              </p>
             </div>
           </div>
           <div className="text-right">
             <p className="text-sm text-gray-600">Relatório Gerado em:</p>
-            <p className="text-sm font-medium">{format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</p>
+            <p className="text-sm font-medium">
+              {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+            </p>
           </div>
         </div>
       </div>
 
       {/* Título do Relatório */}
-      <div className="text-center mb-6">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">{title}</h2>
+      <div className="mb-6 text-center">
+        <h2 className="mb-2 text-3xl font-bold text-gray-900">{title}</h2>
         <p className="text-lg text-gray-600">
           Período: {formatDate(period.start)} a {formatDate(period.end)}
         </p>
       </div>
 
       {/* Conteúdo do Relatório */}
-      <div className="report-content">
-        {children}
-      </div>
+      <div className="report-content">{children}</div>
 
       {/* Rodapé */}
-      <div className="border-t-2 border-gray-300 pt-4 mt-8">
-        <div className="flex justify-between items-center text-sm text-gray-600">
+      <div className="mt-8 border-t-2 border-gray-300 pt-4">
+        <div className="flex items-center justify-between text-sm text-gray-600">
           <div>
             <p>Metalma Inox & Cia - Sistema de Controle de OS</p>
             <p>Relatório: {type}</p>
@@ -151,4 +157,4 @@ export const ReportTemplate: React.FC<ReportTemplateProps> = ({
       `}</style>
     </div>
   );
-}; 
+};

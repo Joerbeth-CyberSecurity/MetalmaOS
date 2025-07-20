@@ -7,7 +7,9 @@ interface SecurityContextType {
   securityChecks: () => boolean;
 }
 
-const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
+const SecurityContext = createContext<SecurityContextType | undefined>(
+  undefined
+);
 
 interface SecurityProviderProps {
   children: ReactNode;
@@ -20,10 +22,13 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
   // Verificações de segurança
   const securityChecks = (): boolean => {
     // Verificar se está em HTTPS em produção
-    if (process.env.NODE_ENV === 'production' && window.location.protocol !== 'https:') {
+    if (
+      process.env.NODE_ENV === 'production' &&
+      window.location.protocol !== 'https:'
+    ) {
       logSecurityEvent('NON_HTTPS_ACCESS', {
         protocol: window.location.protocol,
-        url: window.location.href
+        url: window.location.href,
       });
       return false;
     }
@@ -32,7 +37,11 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
     const scripts = document.querySelectorAll('script');
     for (const script of scripts) {
       const src = script.src;
-      if (src && !src.startsWith(window.location.origin) && !src.startsWith('https://')) {
+      if (
+        src &&
+        !src.startsWith(window.location.origin) &&
+        !src.startsWith('https://')
+      ) {
         logSecurityEvent('SUSPICIOUS_SCRIPT', { src });
         return false;
       }
@@ -46,11 +55,11 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
     const checkSecurity = () => {
       const secure = securityChecks();
       setIsSecure(secure);
-      
+
       if (!secure) {
         logSecurityEvent('SECURITY_CHECK_FAILED', {
           url: window.location.href,
-          userAgent: navigator.userAgent
+          userAgent: navigator.userAgent,
         });
       }
     };
@@ -63,7 +72,7 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
 
     // Monitorar tentativas de acesso ao localStorage
     const originalSetItem = localStorage.setItem;
-    localStorage.setItem = function(key: string, value: string) {
+    localStorage.setItem = function (key: string, value: string) {
       if (key.includes('script') || key.includes('javascript')) {
         logSecurityEvent('SUSPICIOUS_LOCALSTORAGE_SET', { key, value });
         return;
@@ -73,18 +82,20 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
 
     // Monitorar tentativas de eval
     const originalEval = window.eval;
-    window.eval = function(code: string) {
+    window.eval = function (code: string) {
       logSecurityEvent('EVAL_ATTEMPT', { code: code.substring(0, 100) });
       throw new Error('eval() não é permitido por questões de segurança');
     };
 
     // Monitorar tentativas de Function constructor
     const originalFunction = window.Function;
-    (window as any).Function = function(...args: string[]) {
-      logSecurityEvent('FUNCTION_CONSTRUCTOR_ATTEMPT', { 
-        args: args.map(arg => arg.substring(0, 50))
+    (window as any).Function = function (...args: string[]) {
+      logSecurityEvent('FUNCTION_CONSTRUCTOR_ATTEMPT', {
+        args: args.map((arg) => arg.substring(0, 50)),
       });
-      throw new Error('Function constructor não é permitido por questões de segurança');
+      throw new Error(
+        'Function constructor não é permitido por questões de segurança'
+      );
     };
 
     return () => {
@@ -101,7 +112,7 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
       if (window.self !== window.top) {
         logSecurityEvent('CLICKJACKING_ATTEMPT', {
           referrer: document.referrer,
-          url: window.location.href
+          url: window.location.href,
         });
         window.top.location.href = window.location.href;
       }
@@ -116,18 +127,18 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
       const suspiciousDomains = [
         'supabase.co',
         'metalma.com',
-        'metalma.com.br'
+        'metalma.com.br',
       ];
-      
+
       const currentDomain = window.location.hostname;
-      const isSuspicious = !suspiciousDomains.some(domain => 
+      const isSuspicious = !suspiciousDomains.some((domain) =>
         currentDomain.includes(domain)
       );
-      
+
       if (isSuspicious && process.env.NODE_ENV === 'production') {
         logSecurityEvent('SUSPICIOUS_DOMAIN', {
           domain: currentDomain,
-          url: window.location.href
+          url: window.location.href,
         });
       }
     };
@@ -137,7 +148,7 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
 
   const value: SecurityContextType = {
     isSecure,
-    securityChecks
+    securityChecks,
   };
 
   return (
@@ -150,7 +161,9 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
 export function useSecurityContext() {
   const context = useContext(SecurityContext);
   if (context === undefined) {
-    throw new Error('useSecurityContext deve ser usado dentro de um SecurityProvider');
+    throw new Error(
+      'useSecurityContext deve ser usado dentro de um SecurityProvider'
+    );
   }
   return context;
-} 
+}

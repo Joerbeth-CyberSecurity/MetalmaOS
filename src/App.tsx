@@ -6,7 +6,7 @@ import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Loader2 } from 'lucide-react';
 import { ThemeProvider } from './components/ThemeProvider';
-import { SecurityProvider } from './components/SecurityProvider'; 
+import { SecurityProvider } from './components/SecurityProvider';
 
 // Importações de páginas
 import Auth from './pages/Auth';
@@ -27,29 +27,47 @@ function App() {
         <AuthProvider>
           <Toaster />
           <Router>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/*" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Suspense fallback={<div className="flex justify-center items-center h-full"><Loader2 className="animate-spin h-8 w-8" /></div>}>
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/ordens-servico" element={<OrdensServico />} />
-                      <Route path="/clientes" element={<Clientes />} />
-                      <Route path="/produtos" element={<Produtos />} />
-                      <Route path="/colaboradores" element={<Colaboradores />} />
-                      <Route path="/relatorios" element={<Relatorios />} />
-                      <Route path="/configuracoes" element={<Configuracoes />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </Suspense>
-                </Layout>
-              </ProtectedRoute>
-            }/>
-          </Routes>
-        </Router>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Suspense
+                        fallback={
+                          <div className="flex h-full items-center justify-center">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                          </div>
+                        }
+                      >
+                        <Routes>
+                          <Route path="/" element={<Dashboard />} />
+                          <Route
+                            path="/ordens-servico"
+                            element={<OrdensServico />}
+                          />
+                          <Route path="/clientes" element={<Clientes />} />
+                          <Route path="/produtos" element={<Produtos />} />
+                          <Route
+                            path="/colaboradores"
+                            element={<Colaboradores />}
+                          />
+                          <Route path="/relatorios" element={<Relatorios />} />
+                          <Route
+                            path="/configuracoes"
+                            element={<Configuracoes />}
+                          />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </Suspense>
+                    </Layout>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </Router>
         </AuthProvider>
       </SecurityProvider>
     </ThemeProvider>

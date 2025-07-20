@@ -9,7 +9,11 @@ interface LogoProps {
   className?: string;
 }
 
-export const Logo: React.FC<LogoProps> = ({ width = 180, height = 'auto', className }) => {
+export const Logo: React.FC<LogoProps> = ({
+  width = 180,
+  height = 'auto',
+  className,
+}) => {
   const { theme } = useTheme();
   const logoSrc = theme === 'dark' ? logoDark : logoLight;
 
@@ -20,11 +24,11 @@ export const Logo: React.FC<LogoProps> = ({ width = 180, height = 'auto', classN
       width={width}
       height={height}
       className={`${className || ''} object-contain`}
-      style={{ 
-        maxWidth: '100%', 
+      style={{
+        maxWidth: '100%',
         height: height === 'auto' ? 'auto' : height,
-        display: 'block'
+        display: 'block',
       }}
     />
   );
-}; 
+};

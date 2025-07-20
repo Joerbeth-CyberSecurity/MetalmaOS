@@ -30,7 +30,7 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    
+
     /* OS System specific colors */
     --success: 120 80% 40%;
     --success-foreground: 0 0% 100%;
@@ -38,29 +38,29 @@
     --warning-foreground: 0 0% 100%;
     --info: 200 90% 60%;
     --info-foreground: 0 0% 100%;
-    
+
     /* Status colors for OS */
     --status-aberta: 47.9 95.8% 53.1%;
     --status-em-andamento: 217.2 91.2% 59.8%;
     --status-pausada: 0 84.2% 60.2%; /* Vermelho para atenção */
     --status-finalizada: 142.1 76.2% 36.3%;
     --status-cancelada: 0 84.2% 60.2%;
-    
+
     /* Priority colors */
     --priority-baixa: 142.1 76.2% 36.3%;
     --priority-normal: 217.2 91.2% 59.8%;
     --priority-alta: 25 95% 53%;
     --priority-urgente: 0 84.2% 60.2%;
-    
+
     /* Gradients */
     --gradient-primary: linear-gradient(90deg, #bfc0c0 0%, #1bb300 100%);
     --gradient-success: linear-gradient(90deg, #1bb300 0%, #bfc0c0 100%);
     --gradient-card: linear-gradient(135deg, #f8f8f8 0%, #e0e0e0 100%);
-    
+
     /* Shadows */
-    --shadow-soft: 0 2px 8px 0 rgba(0,0,0,0.08);
-    --shadow-medium: 0 4px 16px 0 rgba(0,0,0,0.12);
-    --shadow-large: 0 8px 32px 0 rgba(0,0,0,0.16);
+    --shadow-soft: 0 2px 8px 0 rgba(0, 0, 0, 0.08);
+    --shadow-medium: 0 4px 16px 0 rgba(0, 0, 0, 0.12);
+    --shadow-large: 0 8px 32px 0 rgba(0, 0, 0, 0.16);
   }
 
   .dark {
@@ -83,12 +83,12 @@
     --border: 0 0% 20%;
     --input: 0 0% 15%;
     --ring: 120 80% 40%;
-    
+
     /* OS System specific colors - dark mode */
     --success: 120 80% 40%;
     --warning: 40 90% 60%;
     --info: 200 90% 60%;
-    
+
     /* Status colors for OS - dark mode */
     --status-aberta: 47.9 95.8% 53.1%;
     --status-em-andamento: 217.2 91.2% 59.8%;
@@ -104,161 +104,163 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
   }
 }
 
 @layer components {
   /* Modern card styles */
   .card-modern {
-    @apply bg-gradient-to-br from-card to-card/95 backdrop-blur-sm border border-border/50 shadow-soft rounded-lg;
+    @apply rounded-lg border border-border/50 bg-gradient-to-br from-card to-card/95 shadow-soft backdrop-blur-sm;
   }
-  
+
   .card-elevated {
-    @apply bg-gradient-to-br from-card to-card/95 backdrop-blur-sm border border-border/50 shadow-medium rounded-lg;
+    @apply rounded-lg border border-border/50 bg-gradient-to-br from-card to-card/95 shadow-medium backdrop-blur-sm;
   }
-  
+
   /* Status badge styles */
   .status-aberta {
-    @apply bg-status-aberta/10 text-status-aberta border border-status-aberta/20;
+    @apply border border-status-aberta/20 bg-status-aberta/10 text-status-aberta;
   }
-  
+
   .status-em-andamento {
-    @apply bg-status-em-andamento/10 text-status-em-andamento border border-status-em-andamento/20;
+    @apply border border-status-em-andamento/20 bg-status-em-andamento/10 text-status-em-andamento;
   }
-  
+
   .status-pausada {
     background-color: #fce4ec !important; /* Fundo rosa claro */
     color: #c2185b !important; /* Texto rosa forte */
     border: 1px solid #e91e63 !important; /* Borda rosa forte */
   }
-  
+
   .status-finalizada {
-    @apply bg-status-finalizada/10 text-status-finalizada border border-status-finalizada/20;
+    @apply border border-status-finalizada/20 bg-status-finalizada/10 text-status-finalizada;
   }
-  
+
   .status-cancelada {
-    @apply bg-status-cancelada/10 text-status-cancelada border border-status-cancelada/20;
+    @apply border border-status-cancelada/20 bg-status-cancelada/10 text-status-cancelada;
   }
-  
+
   .status-falta-material {
     background-color: hsl(25 95% 53% / 0.1) !important;
     color: hsl(25 95% 53%) !important;
     border: 1px solid hsl(25 95% 53% / 0.2) !important;
   }
-  
+
   /* Status badge styles for dark mode */
   .dark .status-aberta {
     background-color: hsl(47.9 95.8% 53.1% / 0.2) !important;
     color: hsl(47.9 95.8% 53.1%) !important;
     border: 1px solid hsl(47.9 95.8% 53.1% / 0.3) !important;
   }
-  
+
   .dark .status-em-andamento {
     background-color: hsl(217.2 91.2% 59.8% / 0.2) !important;
     color: hsl(217.2 91.2% 59.8%) !important;
     border: 1px solid hsl(217.2 91.2% 59.8% / 0.3) !important;
   }
-  
+
   .dark .status-pausada {
     background-color: hsl(0 75% 55% / 0.2) !important;
     color: hsl(0 75% 55%) !important;
     border: 1px solid hsl(0 75% 55% / 0.3) !important;
   }
-  
+
   .dark .status-finalizada {
     background-color: hsl(142.1 70.6% 45.3% / 0.2) !important;
     color: hsl(142.1 70.6% 45.3%) !important;
     border: 1px solid hsl(142.1 70.6% 45.3% / 0.3) !important;
   }
-  
+
   .dark .status-cancelada {
     background-color: hsl(0 62.8% 30.6% / 0.2) !important;
     color: hsl(0 62.8% 30.6%) !important;
     border: 1px solid hsl(0 62.8% 30.6% / 0.3) !important;
   }
-  
+
   .dark .status-falta-material {
     background-color: hsl(25 95% 53% / 0.2) !important;
     color: hsl(25 95% 53%) !important;
     border: 1px solid hsl(25 95% 53% / 0.3) !important;
   }
-  
+
   /* Priority badge styles */
   .priority-baixa {
-    @apply bg-priority-baixa/10 text-priority-baixa border border-priority-baixa/20;
+    @apply border border-priority-baixa/20 bg-priority-baixa/10 text-priority-baixa;
   }
-  
+
   .priority-normal {
-    @apply bg-priority-normal/10 text-priority-normal border border-priority-normal/20;
+    @apply border border-priority-normal/20 bg-priority-normal/10 text-priority-normal;
   }
-  
+
   .priority-alta {
-    @apply bg-priority-alta/10 text-priority-alta border border-priority-alta/20;
+    @apply border border-priority-alta/20 bg-priority-alta/10 text-priority-alta;
   }
-  
+
   .priority-urgente {
-    @apply bg-priority-urgente/10 text-priority-urgente border border-priority-urgente/20;
+    @apply border border-priority-urgente/20 bg-priority-urgente/10 text-priority-urgente;
   }
-  
+
   /* Modern input styles */
   .input-modern {
-    @apply bg-background/50 backdrop-blur-sm border-border/60 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all duration-200;
+    @apply border-border/60 bg-background/50 backdrop-blur-sm transition-all duration-200 focus:border-primary/50 focus:ring-2 focus:ring-primary/20;
   }
-  
+
   /* Navigation styles */
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all duration-200;
+    @apply flex items-center gap-3 rounded-md px-3 py-2 text-muted-foreground transition-all duration-200 hover:bg-secondary/50 hover:text-foreground;
   }
-  
+
   .nav-item.active {
-    @apply text-primary bg-primary/10 border border-primary/20;
+    @apply border border-primary/20 bg-primary/10 text-primary;
   }
-  
+
   /* Button gradient styles */
   .btn-gradient {
-    @apply bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-soft hover:shadow-medium transition-all duration-200;
+    @apply bg-gradient-to-r from-primary to-primary/90 shadow-soft transition-all duration-200 hover:from-primary/90 hover:to-primary hover:shadow-medium;
   }
-  
+
   .btn-success {
-    @apply bg-gradient-to-r from-success to-success/90 hover:from-success/90 hover:to-success text-success-foreground;
+    @apply bg-gradient-to-r from-success to-success/90 text-success-foreground hover:from-success/90 hover:to-success;
   }
-  
+
   /* Select styles for dark mode compatibility */
   select {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     border-color: hsl(var(--border));
   }
-  
+
   select:focus {
     outline: none;
     border-color: hsl(var(--primary));
     box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
   }
-  
+
   select option {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
   }
-  
+
   /* Dark mode specific select styles */
   .dark select {
     background-color: hsl(0 0% 12%);
     color: hsl(0 0% 100%);
     border-color: hsl(0 0% 20%);
   }
-  
+
   .dark select:focus {
     border-color: hsl(120 80% 40%);
     box-shadow: 0 0 0 2px hsl(120 80% 40% / 0.2);
   }
-  
+
   .dark select option {
     background-color: hsl(0 0% 12%);
     color: hsl(0 0% 100%);
   }
-  
+
   /* Input and textarea dark mode fixes */
   .dark input,
   .dark textarea {
@@ -266,65 +268,65 @@
     color: hsl(0 0% 100%) !important;
     border-color: hsl(0 0% 20%) !important;
   }
-  
+
   .dark input:focus,
   .dark textarea:focus {
     border-color: hsl(120 80% 40%) !important;
     box-shadow: 0 0 0 2px hsl(120 80% 40% / 0.2) !important;
   }
-  
+
   .dark input::placeholder,
   .dark textarea::placeholder {
     color: hsl(0 0% 80%) !important;
   }
-  
+
   /* Ensure form elements work in dark mode */
-  .dark input[type="text"],
-  .dark input[type="email"],
-  .dark input[type="password"],
-  .dark input[type="number"],
-  .dark input[type="search"],
-  .dark input[type="tel"],
-  .dark input[type="url"],
+  .dark input[type='text'],
+  .dark input[type='email'],
+  .dark input[type='password'],
+  .dark input[type='number'],
+  .dark input[type='search'],
+  .dark input[type='tel'],
+  .dark input[type='url'],
   .dark textarea {
     background-color: hsl(0 0% 12%) !important;
     color: hsl(0 0% 100%) !important;
   }
-  
+
   /* Header button hover styles */
   .hover\:bg-muted\/30:hover {
     background-color: hsl(var(--muted) / 0.3) !important;
   }
-  
+
   .dark .hover\:bg-muted\/30:hover {
     background-color: hsl(220 13% 20% / 0.3) !important;
   }
-  
+
   .hover\:text-foreground:hover {
     color: hsl(var(--foreground)) !important;
   }
-  
+
   .dark .hover\:text-foreground:hover {
     color: hsl(0 0% 100%) !important;
   }
-  
+
   /* Print styles for reports */
   @media print {
     body {
       background: white !important;
       color: black !important;
     }
-    
+
     /* Hide all elements except the report */
     * {
       display: none !important;
     }
-    
+
     .relatorio-impressao,
     .relatorio-impressao * {
       display: block !important;
     }
-    
+
     .relatorio-impressao {
       background: white !important;
       color: black !important;
@@ -336,28 +338,28 @@
       width: 100% !important;
       height: 100% !important;
     }
-    
+
     .relatorio-cabecalho {
       text-align: center !important;
       margin-bottom: 30px !important;
       border-bottom: 2px solid #333 !important;
       padding-bottom: 20px !important;
     }
-    
+
     .relatorio-logo {
       width: 120px !important;
       height: auto !important;
       margin: 0 auto 15px auto !important;
       display: block !important;
     }
-    
+
     .relatorio-empresa {
       font-size: 18px !important;
       font-weight: bold !important;
       margin: 0 0 5px 0 !important;
       color: #333 !important;
     }
-    
+
     .relatorio-titulo {
       font-size: 16px !important;
       font-weight: bold !important;
@@ -365,23 +367,23 @@
       color: #333 !important;
       text-transform: uppercase !important;
     }
-    
+
     .relatorio-info {
       font-size: 11px !important;
       color: #666 !important;
       margin: 0 !important;
     }
-    
+
     .relatorio-tabela {
       margin: 20px 0 !important;
     }
-    
+
     .relatorio-tabela table {
       width: 100% !important;
       border-collapse: collapse !important;
       margin: 0 !important;
     }
-    
+
     .relatorio-tabela th,
     .relatorio-tabela td {
       border: 1px solid #333 !important;
@@ -389,13 +391,13 @@
       text-align: left !important;
       font-size: 11px !important;
     }
-    
+
     .relatorio-tabela th {
       background-color: #f0f0f0 !important;
       font-weight: bold !important;
       color: #333 !important;
     }
-    
+
     .relatorio-rodape {
       text-align: center !important;
       margin-top: 30px !important;
@@ -404,22 +406,22 @@
       font-size: 10px !important;
       color: #666 !important;
     }
-    
+
     /* Hide elements that shouldn't be printed */
     .no-print {
       display: none !important;
     }
   }
-  
+
   /* Animation utilities */
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
   }
-  
+
   .animate-slide-up {
     animation: slideUp 0.3s ease-out;
   }
-  
+
   .animate-scale-in {
     animation: scaleIn 0.2s ease-out;
   }
@@ -573,19 +575,42 @@ All colors MUST be HSL.
 }
 
 /* Corrige o ícone do date picker no modo escuro */
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type='date']::-webkit-calendar-picker-indicator {
   filter: none !important;
   opacity: 1 !important;
   cursor: pointer;
   display: block !important;
 }
-.dark input[type="date"]::-webkit-calendar-picker-indicator {
+.dark input[type='date']::-webkit-calendar-picker-indicator {
   filter: invert(1) brightness(2) !important;
   opacity: 1 !important;
   cursor: pointer;
   display: block !important;
 }
-input[type="date"]::-ms-input-placeholder { color: #fff; }
-input[type="date"]::-webkit-input-placeholder { color: #fff; }
-input[type="date"]::-moz-placeholder { color: #fff; }
-input[type="date"]:-ms-input-placeholder { color: #fff; }
+/* Placeholders para inputs de data - adaptáveis ao tema */
+input[type='date']::-ms-input-placeholder {
+  color: hsl(var(--muted-foreground));
+}
+input[type='date']::-webkit-input-placeholder {
+  color: hsl(var(--muted-foreground));
+}
+input[type='date']::-moz-placeholder {
+  color: hsl(var(--muted-foreground));
+}
+input[type='date']:-ms-input-placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Placeholders para inputs de data no modo escuro */
+.dark input[type='date']::-ms-input-placeholder {
+  color: hsl(0 0% 80%);
+}
+.dark input[type='date']::-webkit-input-placeholder {
+  color: hsl(0 0% 80%);
+}
+.dark input[type='date']::-moz-placeholder {
+  color: hsl(0 0% 80%);
+}
+.dark input[type='date']:-ms-input-placeholder {
+  color: hsl(0 0% 80%);
+}

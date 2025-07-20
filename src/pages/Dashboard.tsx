@@ -1,17 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  ClipboardList, 
-  Users, 
-  UserCheck, 
-  TrendingUp, 
-  Clock, 
+import {
+  ClipboardList,
+  Users,
+  UserCheck,
+  TrendingUp,
+  Clock,
   CheckCircle,
   AlertCircle,
-  XCircle
+  XCircle,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -63,13 +69,24 @@ export default function Dashboard() {
 
       if (ordensServico) {
         const totalOS = ordensServico.length;
-        const osAbertas = ordensServico.filter(os => os.status === 'aberta').length;
-        const osEmAndamento = ordensServico.filter(os => os.status === 'em_andamento').length;
-        const osFinalizadas = ordensServico.filter(os => os.status === 'finalizada').length;
+        const osAbertas = ordensServico.filter(
+          (os) => os.status === 'aberta'
+        ).length;
+        const osEmAndamento = ordensServico.filter(
+          (os) => os.status === 'em_andamento'
+        ).length;
+        const osFinalizadas = ordensServico.filter(
+          (os) => os.status === 'finalizada'
+        ).length;
 
-        const horasTrabalhadasMes = colaboradores?.reduce((acc, col) => acc + (col.horas_trabalhadas || 0), 0) || 0;
-        const metaHoraMedia = colaboradores?.length 
-          ? colaboradores.reduce((acc, col) => acc + (col.meta_hora || 0), 0) / colaboradores.length 
+        const horasTrabalhadasMes =
+          colaboradores?.reduce(
+            (acc, col) => acc + (col.horas_trabalhadas || 0),
+            0
+          ) || 0;
+        const metaHoraMedia = colaboradores?.length
+          ? colaboradores.reduce((acc, col) => acc + (col.meta_hora || 0), 0) /
+            colaboradores.length
           : 0;
 
         setStats({
@@ -90,9 +107,15 @@ export default function Dashboard() {
     }
   };
 
-  const progressPercent = stats.metaHoraMedia > 0 
-    ? Math.min((stats.horasTrabalhadasMes / (stats.metaHoraMedia * stats.totalColaboradores)) * 100, 100)
-    : 0;
+  const progressPercent =
+    stats.metaHoraMedia > 0
+      ? Math.min(
+          (stats.horasTrabalhadasMes /
+            (stats.metaHoraMedia * stats.totalColaboradores)) *
+            100,
+          100
+        )
+      : 0;
 
   // Funções de navegação para ações rápidas
   const handleNovaOS = () => navigate('/ordens-servico');
@@ -107,12 +130,12 @@ export default function Dashboard() {
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="card-modern animate-pulse">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="h-4 bg-muted rounded w-1/2"></div>
-                <div className="h-4 w-4 bg-muted rounded"></div>
+                <div className="h-4 w-1/2 rounded bg-muted"></div>
+                <div className="h-4 w-4 rounded bg-muted"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-8 bg-muted rounded w-1/3 mb-2"></div>
-                <div className="h-3 bg-muted rounded w-2/3"></div>
+                <div className="mb-2 h-8 w-1/3 rounded bg-muted"></div>
+                <div className="h-3 w-2/3 rounded bg-muted"></div>
               </CardContent>
             </Card>
           ))}
@@ -122,7 +145,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="animate-fade-in space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
@@ -133,55 +156,61 @@ export default function Dashboard() {
 
       {/* Main Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="card-modern hover:shadow-medium transition-all duration-200">
+        <Card className="card-modern transition-all duration-200 hover:shadow-medium">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de OS</CardTitle>
             <ClipboardList className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{stats.totalOS}</div>
+            <div className="text-2xl font-bold text-primary">
+              {stats.totalOS}
+            </div>
             <p className="text-xs text-muted-foreground">
               Ordens de serviço no sistema
             </p>
           </CardContent>
         </Card>
 
-        <Card className="card-modern hover:shadow-medium transition-all duration-200">
+        <Card className="card-modern transition-all duration-200 hover:shadow-medium">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Clientes</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-info">{stats.totalClientes}</div>
-            <p className="text-xs text-muted-foreground">
-              Clientes ativos
-            </p>
+            <div className="text-2xl font-bold text-info">
+              {stats.totalClientes}
+            </div>
+            <p className="text-xs text-muted-foreground">Clientes ativos</p>
           </CardContent>
         </Card>
 
-        <Card className="card-modern hover:shadow-medium transition-all duration-200">
+        <Card className="card-modern transition-all duration-200 hover:shadow-medium">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Colaboradores</CardTitle>
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{stats.totalColaboradores}</div>
+            <div className="text-2xl font-bold text-success">
+              {stats.totalColaboradores}
+            </div>
             <p className="text-xs text-muted-foreground">
               Colaboradores ativos
             </p>
           </CardContent>
         </Card>
 
-        <Card className="card-modern hover:shadow-medium transition-all duration-200">
+        <Card className="card-modern transition-all duration-200 hover:shadow-medium">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Horas Trabalhadas</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Horas Trabalhadas
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">{stats.horasTrabalhadasMes.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground">
-              Horas no mês atual
-            </p>
+            <div className="text-2xl font-bold text-warning">
+              {stats.horasTrabalhadasMes.toFixed(1)}
+            </div>
+            <p className="text-xs text-muted-foreground">Horas no mês atual</p>
           </CardContent>
         </Card>
       </div>
@@ -196,12 +225,10 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-status-aberta mb-2">
+            <div className="mb-2 text-3xl font-bold text-status-aberta">
               {stats.osAbertas}
             </div>
-            <Badge className="status-aberta">
-              Aguardando início
-            </Badge>
+            <Badge className="status-aberta">Aguardando início</Badge>
           </CardContent>
         </Card>
 
@@ -213,12 +240,10 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-status-em-andamento mb-2">
+            <div className="mb-2 text-3xl font-bold text-status-em-andamento">
               {stats.osEmAndamento}
             </div>
-            <Badge className="status-em-andamento">
-              Em execução
-            </Badge>
+            <Badge className="status-em-andamento">Em execução</Badge>
           </CardContent>
         </Card>
 
@@ -230,12 +255,10 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-status-finalizada mb-2">
+            <div className="mb-2 text-3xl font-bold text-status-finalizada">
               {stats.osFinalizadas}
             </div>
-            <Badge className="status-finalizada">
-              Concluídas
-            </Badge>
+            <Badge className="status-finalizada">Concluídas</Badge>
           </CardContent>
         </Card>
       </div>
@@ -251,7 +274,8 @@ export default function Dashboard() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
-              {stats.horasTrabalhadasMes.toFixed(1)}h de {(stats.metaHoraMedia * stats.totalColaboradores).toFixed(1)}h
+              {stats.horasTrabalhadasMes.toFixed(1)}h de{' '}
+              {(stats.metaHoraMedia * stats.totalColaboradores).toFixed(1)}h
             </span>
             <span className="text-sm text-muted-foreground">
               {progressPercent.toFixed(1)}%
@@ -274,32 +298,32 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <div 
+          <div
             onClick={handleNovaOS}
-            className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+            className="flex cursor-pointer flex-col items-center rounded-lg border p-4 transition-colors hover:bg-secondary/50"
           >
-            <ClipboardList className="h-8 w-8 text-primary mb-2" />
+            <ClipboardList className="mb-2 h-8 w-8 text-primary" />
             <span className="text-sm font-medium">Nova OS</span>
           </div>
-          <div 
+          <div
             onClick={handleNovoCliente}
-            className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+            className="flex cursor-pointer flex-col items-center rounded-lg border p-4 transition-colors hover:bg-secondary/50"
           >
-            <Users className="h-8 w-8 text-info mb-2" />
+            <Users className="mb-2 h-8 w-8 text-info" />
             <span className="text-sm font-medium">Novo Cliente</span>
           </div>
-          <div 
+          <div
             onClick={handleNovoColaborador}
-            className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+            className="flex cursor-pointer flex-col items-center rounded-lg border p-4 transition-colors hover:bg-secondary/50"
           >
-            <UserCheck className="h-8 w-8 text-success mb-2" />
+            <UserCheck className="mb-2 h-8 w-8 text-success" />
             <span className="text-sm font-medium">Novo Colaborador</span>
           </div>
-          <div 
+          <div
             onClick={handleRelatorios}
-            className="flex flex-col items-center p-4 border rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
+            className="flex cursor-pointer flex-col items-center rounded-lg border p-4 transition-colors hover:bg-secondary/50"
           >
-            <TrendingUp className="h-8 w-8 text-warning mb-2" />
+            <TrendingUp className="mb-2 h-8 w-8 text-warning" />
             <span className="text-sm font-medium">Relatórios</span>
           </div>
         </CardContent>

@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
-import { 
-  validateInput, 
-  validateEmail, 
-  validatePassword, 
-  validateCPF, 
+import {
+  validateInput,
+  validateEmail,
+  validatePassword,
+  validateCPF,
   validateCNPJ,
   sanitizeText,
   sanitizeHTML,
@@ -11,7 +11,7 @@ import {
   logSecurityEvent,
   generateCSRFToken,
   validateCSRFToken,
-  detectXSS
+  detectXSS,
 } from '@/lib/security';
 
 /**
@@ -23,12 +23,15 @@ export function useSecurity() {
   /**
    * Valida e sanitiza entrada de texto
    */
-  const validateAndSanitize = useCallback((
-    input: any, 
-    type: 'text' | 'email' | 'number' | 'phone' | 'cpf' | 'cnpj'
-  ) => {
-    return validateInput(input, type);
-  }, []);
+  const validateAndSanitize = useCallback(
+    (
+      input: any,
+      type: 'text' | 'email' | 'number' | 'phone' | 'cpf' | 'cnpj'
+    ) => {
+      return validateInput(input, type);
+    },
+    []
+  );
 
   /**
    * Valida email com sanitização
@@ -36,11 +39,11 @@ export function useSecurity() {
   const validateEmailInput = useCallback((email: string) => {
     const sanitized = sanitizeText(email);
     const isValid = validateEmail(sanitized);
-    
+
     if (!isValid) {
       logSecurityEvent('INVALID_EMAIL_ATTEMPT', { email: sanitized });
     }
-    
+
     return { isValid, sanitized };
   }, []);
 
@@ -49,17 +52,17 @@ export function useSecurity() {
    */
   const validatePasswordInput = useCallback((password: string) => {
     const result = validatePassword(password);
-    
+
     if (!result.isValid) {
-      logSecurityEvent('WEAK_PASSWORD_ATTEMPT', { 
+      logSecurityEvent('WEAK_PASSWORD_ATTEMPT', {
         length: password.length,
         hasLower: /[a-z]/.test(password),
         hasUpper: /[A-Z]/.test(password),
         hasNumber: /\d/.test(password),
-        hasSpecial: /[!@#$%^&*]/.test(password)
+        hasSpecial: /[!@#$%^&*]/.test(password),
       });
     }
-    
+
     return result;
   }, []);
 
@@ -69,11 +72,11 @@ export function useSecurity() {
   const validateCPFInput = useCallback((cpf: string) => {
     const sanitized = sanitizeText(cpf);
     const isValid = validateCPF(sanitized);
-    
+
     if (!isValid) {
       logSecurityEvent('INVALID_CPF_ATTEMPT', { cpf: sanitized });
     }
-    
+
     return { isValid, sanitized };
   }, []);
 
@@ -83,11 +86,11 @@ export function useSecurity() {
   const validateCNPJInput = useCallback((cnpj: string) => {
     const sanitized = sanitizeText(cnpj);
     const isValid = validateCNPJ(sanitized);
-    
+
     if (!isValid) {
       logSecurityEvent('INVALID_CNPJ_ATTEMPT', { cnpj: sanitized });
     }
-    
+
     return { isValid, sanitized };
   }, []);
 
@@ -103,11 +106,11 @@ export function useSecurity() {
    */
   const checkRateLimit = useCallback((identifier: string) => {
     const isAllowed = rateLimiter.isAllowed(identifier);
-    
+
     if (!isAllowed) {
       logSecurityEvent('RATE_LIMIT_EXCEEDED', { identifier });
     }
-    
+
     return isAllowed;
   }, []);
 
@@ -123,70 +126,79 @@ export function useSecurity() {
   /**
    * Valida token CSRF
    */
-  const validateCSRFInput = useCallback((token: string) => {
-    return validateCSRFToken(token, csrfToken);
-  }, [csrfToken]);
+  const validateCSRFInput = useCallback(
+    (token: string) => {
+      return validateCSRFToken(token, csrfToken);
+    },
+    [csrfToken]
+  );
 
   /**
    * Detecta tentativas de XSS
    */
   const detectXSSInput = useCallback((input: string) => {
     const hasXSS = detectXSS(input);
-    
+
     if (hasXSS) {
-      logSecurityEvent('XSS_ATTEMPT_DETECTED', { 
+      logSecurityEvent('XSS_ATTEMPT_DETECTED', {
         input: input.substring(0, 100), // Log apenas os primeiros 100 chars
         userAgent: navigator.userAgent,
-        url: window.location.href
+        url: window.location.href,
       });
     }
-    
+
     return hasXSS;
   }, []);
 
   /**
    * Validação completa de formulário
    */
-  const validateForm = useCallback((formData: Record<string, any>, schema: Record<string, any>) => {
-    const errors: Record<string, string[]> = {};
-    const sanitizedData: Record<string, any> = {};
-    
-    for (const [field, config] of Object.entries(schema)) {
-      const value = formData[field];
-      const validation = validateInput(value, config.type);
-      
-      if (!validation.isValid) {
-        errors[field] = validation.errors;
-      } else {
-        sanitizedData[field] = validation.sanitized;
+  const validateForm = useCallback(
+    (formData: Record<string, any>, schema: Record<string, any>) => {
+      const errors: Record<string, string[]> = {};
+      const sanitizedData: Record<string, any> = {};
+
+      for (const [field, config] of Object.entries(schema)) {
+        const value = formData[field];
+        const validation = validateInput(value, config.type);
+
+        if (!validation.isValid) {
+          errors[field] = validation.errors;
+        } else {
+          sanitizedData[field] = validation.sanitized;
+        }
+
+        // Verificar XSS
+        if (typeof value === 'string' && detectXSSInput(value)) {
+          if (!errors[field]) errors[field] = [];
+          errors[field].push('Conteúdo não permitido detectado');
+        }
       }
-      
-      // Verificar XSS
-      if (typeof value === 'string' && detectXSSInput(value)) {
-        if (!errors[field]) errors[field] = [];
-        errors[field].push('Conteúdo não permitido detectado');
-      }
-    }
-    
-    return {
-      isValid: Object.keys(errors).length === 0,
-      errors,
-      sanitizedData
-    };
-  }, [detectXSSInput]);
+
+      return {
+        isValid: Object.keys(errors).length === 0,
+        errors,
+        sanitizedData,
+      };
+    },
+    [detectXSSInput]
+  );
 
   /**
    * Log de tentativa de acesso não autorizado
    */
-  const logUnauthorizedAccess = useCallback((action: string, details: any = {}) => {
-    logSecurityEvent('UNAUTHORIZED_ACCESS_ATTEMPT', {
-      action,
-      details,
-      userAgent: navigator.userAgent,
-      url: window.location.href,
-      timestamp: new Date().toISOString()
-    });
-  }, []);
+  const logUnauthorizedAccess = useCallback(
+    (action: string, details: any = {}) => {
+      logSecurityEvent('UNAUTHORIZED_ACCESS_ATTEMPT', {
+        action,
+        details,
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+      });
+    },
+    []
+  );
 
   /**
    * Log de ação administrativa
@@ -197,7 +209,7 @@ export function useSecurity() {
       details,
       userAgent: navigator.userAgent,
       url: window.location.href,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }, []);
 
@@ -209,23 +221,23 @@ export function useSecurity() {
     validateCPFInput,
     validateCNPJInput,
     validateForm,
-    
+
     // Sanitização
     sanitizeHTMLInput,
-    
+
     // Rate Limiting
     checkRateLimit,
-    
+
     // CSRF
     csrfToken,
     refreshCSRFToken,
     validateCSRFInput,
-    
+
     // XSS Detection
     detectXSSInput,
-    
+
     // Logging
     logUnauthorizedAccess,
-    logAdminAction
+    logAdminAction,
   };
-} 
+}

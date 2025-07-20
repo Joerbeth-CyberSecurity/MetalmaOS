@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { 
-  Building2, 
-  ClipboardList, 
-  Users, 
-  Package, 
-  UserCheck, 
-  BarChart3, 
+import {
+  Building2,
+  ClipboardList,
+  Users,
+  Package,
+  UserCheck,
+  BarChart3,
   Settings,
-  LogOut
+  LogOut,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -28,15 +28,45 @@ import { Logo } from '@/components/ui/Logo';
 
 const items = [
   { title: 'Dashboard', url: '/', icon: BarChart3, permission: null }, // Sempre visível
-  { title: 'Ordens de Serviço', url: '/ordens-servico', icon: ClipboardList, permission: 'os_visualizar' },
-  { title: 'Clientes', url: '/clientes', icon: Users, permission: 'clientes_visualizar' },
-  { title: 'Colaboradores', url: '/colaboradores', icon: UserCheck, permission: 'colaboradores_visualizar' },
-  { title: 'Produtos', url: '/produtos', icon: Package, permission: 'produtos_visualizar' },
-  { title: 'Relatórios', url: '/relatorios', icon: BarChart3, permission: 'relatorios_visualizar' },
+  {
+    title: 'Ordens de Serviço',
+    url: '/ordens-servico',
+    icon: ClipboardList,
+    permission: 'os_visualizar',
+  },
+  {
+    title: 'Clientes',
+    url: '/clientes',
+    icon: Users,
+    permission: 'clientes_visualizar',
+  },
+  {
+    title: 'Colaboradores',
+    url: '/colaboradores',
+    icon: UserCheck,
+    permission: 'colaboradores_visualizar',
+  },
+  {
+    title: 'Produtos',
+    url: '/produtos',
+    icon: Package,
+    permission: 'produtos_visualizar',
+  },
+  {
+    title: 'Relatórios',
+    url: '/relatorios',
+    icon: BarChart3,
+    permission: 'relatorios_visualizar',
+  },
 ];
 
 const adminItems = [
-  { title: 'Configurações', url: '/configuracoes', icon: Settings, permission: 'configuracoes_visualizar' },
+  {
+    title: 'Configurações',
+    url: '/configuracoes',
+    icon: Settings,
+    permission: 'configuracoes_visualizar',
+  },
 ];
 
 export function AppSidebar() {
@@ -48,16 +78,16 @@ export function AppSidebar() {
 
   const isActive = (path: string) => currentPath === path;
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive 
-      ? 'bg-sidebar-primary/10 text-sidebar-primary border border-sidebar-primary/20' 
+    isActive
+      ? 'bg-sidebar-primary/10 text-sidebar-primary border border-sidebar-primary/20'
       : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-foreground/10';
 
   // Filtrar itens baseado nas permissões
-  const filteredItems = items.filter(item => 
-    item.permission === null || hasPermission(item.permission)
+  const filteredItems = items.filter(
+    (item) => item.permission === null || hasPermission(item.permission)
   );
 
-  const filteredAdminItems = adminItems.filter(item => 
+  const filteredAdminItems = adminItems.filter((item) =>
     hasPermission(item.permission)
   );
 
@@ -79,9 +109,7 @@ export function AppSidebar() {
       const h = Math.floor(diff / 3600);
       const m = Math.floor((diff % 3600) / 60);
       const s = diff % 60;
-      setElapsed(
-        `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`
-      );
+      setElapsed(`${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`);
     }, 1000);
     return () => clearInterval(interval);
   }, [logonTime]);
@@ -93,15 +121,21 @@ export function AppSidebar() {
     >
       <SidebarContent>
         {/* Header */}
-        <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center justify-center w-full">
-            <Logo width={collapsed ? 32 : 120} height={collapsed ? 32 : 50} className="object-contain" />
+        <div className="border-b border-sidebar-border p-4">
+          <div className="flex w-full items-center justify-center">
+            <Logo
+              width={collapsed ? 32 : 120}
+              height={collapsed ? 32 : 50}
+              className="object-contain"
+            />
           </div>
         </div>
 
         {/* Main Navigation */}
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/70">Menu Principal</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-sidebar-foreground/70">
+            Menu Principal
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {filteredItems.map((item) => (
@@ -121,7 +155,9 @@ export function AppSidebar() {
         {/* Admin Navigation - Só mostra se tiver itens */}
         {filteredAdminItems.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/70">Administração</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-sidebar-foreground/70">
+              Administração
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {filteredAdminItems.map((item) => (
@@ -140,20 +176,28 @@ export function AppSidebar() {
         )}
 
         {/* Logout Button */}
-        <div className="mt-auto p-4 border-t border-sidebar-border">
+        <div className="mt-auto border-t border-sidebar-border p-4">
           {/* Sessão do usuário */}
           <div className="mb-3">
-            <div className="rounded-md bg-muted/60 p-3 text-xs text-muted-foreground flex flex-col gap-1">
-              <div><span className="font-medium">Logon:</span> {logonTime.toLocaleTimeString()}</div>
-              <div><span className="font-medium">Tempo conectado:</span> {elapsed}</div>
-              <div><span className="font-medium">Agora:</span> {now.toLocaleString()}</div>
+            <div className="flex flex-col gap-1 rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">
+              <div>
+                <span className="font-medium">Logon:</span>{' '}
+                {logonTime.toLocaleTimeString()}
+              </div>
+              <div>
+                <span className="font-medium">Tempo conectado:</span> {elapsed}
+              </div>
+              <div>
+                <span className="font-medium">Agora:</span>{' '}
+                {now.toLocaleString()}
+              </div>
             </div>
           </div>
 
           <Button
             onClick={signOut}
             variant="ghost"
-            className="w-full justify-start text-sidebar-foreground/80 hover:text-destructive hover:bg-destructive/10"
+            className="w-full justify-start text-sidebar-foreground/80 hover:bg-destructive/10 hover:text-destructive"
           >
             <LogOut className="h-4 w-4" />
             {!collapsed && <span className="ml-2">Sair</span>}

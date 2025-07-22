@@ -67,6 +67,13 @@ const adminItems = [
     icon: Settings,
     permission: 'configuracoes_visualizar',
   },
+  {
+    title: 'Ajuda',
+    url: 'https://joerbeth-cybersecurity.github.io/ajudaMetalmaOS/', // Link correto do GitHub Pages
+    icon: BarChart3, // Pode trocar por um ícone mais apropriado
+    permission: 'configuracoes_visualizar',
+    external: true, // Garante que abra em nova aba
+  },
 ];
 
 export function AppSidebar() {
@@ -163,10 +170,23 @@ export function AppSidebar() {
                 {filteredAdminItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
-                      <NavLink to={item.url} end className={getNavCls}>
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
+                      {item.external ? (
+                        <NavLink
+                          to={item.url}
+                          end
+                          className={getNavCls}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      ) : (
+                        <NavLink to={item.url} end className={getNavCls}>
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}

@@ -1,188 +1,99 @@
-# 🏭 Metalma OS - Sistema de Ordens de Serviço
+# Metalma OS – Sistema de Controle de Ordens de Serviço
 
-Sistema completo para gerenciamento de ordens de serviço da Metalma, desenvolvido com tecnologias modernas e interface intuitiva.
+## Visão Geral
+O Metalma OS é uma plataforma moderna para gestão de ordens de serviço (OS), produtividade, clientes, colaboradores e produtos, voltada para empresas que buscam eficiência, controle e análise de resultados.
 
-## 🚀 Tecnologias
-
-- **React18lioteca JavaScript para interfaces
-- **TypeScript** - Tipagem estática para JavaScript
-- **Vite** - Build tool e dev server
-- **Tailwind CSS** - Framework CSS utilitário
-- **Supabase** - Backend como serviço (BaaS)
-- **shadcn/ui** - Componentes de UI modernos
-- **React Router** - Roteamento da aplicação
-- **React Hook Form** - Gerenciamento de formulários
-- **Zod** - Validação de esquemas
-
-## 📋 Funcionalidades
-
-### ✅ Gestão de Clientes
-- Cadastro completo de clientes
-- Edição e exclusão de registros
-- Busca e filtros
-- Validação de dados
-
-### ✅ Gestão de Colaboradores
-- Controle de funcionários
-- Perfis e permissões
-- Histórico de atividades
-
-### ✅ Gestão de Produtos
-- Catálogo de produtos
-- Controle de estoque
-- Preços e especificações
-
-### ✅ Ordens de Serviço
-- Criação de OS
-- Acompanhamento de status
-- Relatórios detalhados
-
-### ✅ Relatórios
-- Relatórios gerenciais
-- Exportação de dados
-- Gráficos e estatísticas
-
-### ✅ Configurações
-- Configurações do sistema
-- Perfis de usuário
-- Backup e restauração
-
-## 📦 Instalação
-
-### Pré-requisitos
-- Node.js 18+ 
-- npm ou yarn
-- Conta no Supabase
-
-### Passos
-
-1. **Clone o repositório**
-```bash
-git clone https://github.com/SEU_USUARIO/metalma-os.git
-cd metalma-os
-```
-
-2. **Instale as dependências**
-```bash
-npm install
-```
-3*Configure as variáveis de ambiente**
-```bash
-cp env.example .env
-```
-
-Edite o arquivo `.env` com suas configurações do Supabase:
-```env
-VITE_SUPABASE_URL=sua_url_do_supabase
-VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
-```
-
-4. **Execute o projeto**
-```bash
-npm run dev
-```
-
-O projeto estará disponível em: http://localhost:880 🔧 Scripts Disponíveis
-
-```bash
-# Desenvolvimento
-npm run dev          # Inicia o servidor de desenvolvimento
-npm run build        # Gera build de produção
-npm run build:dev    # Gera build de desenvolvimento
-npm run preview      # Preview do build
-
-# Qualidade de código
-npm run lint         # Executa o linter
-```
-
-## 📁 Estrutura do Projeto
-
-```
-src/
-├── components/          # Componentes reutilizáveis
-│   ├── ui/             # Componentes de UI (shadcn/ui)
-│   ├── AppSidebar.tsx  # Sidebar da aplicação
-│   ├── Layout.tsx      # Layout principal
-│   └── ProtectedRoute.tsx # Rota protegida
-├── hooks/              # Custom hooks
-│   ├── useAuth.ts      # Hook de autenticação
-│   └── use-mobile.tsx  # Hook para mobile
-├── integrations/       # Integrações externas
-│   └── supabase/       # Configuração do Supabase
-├── lib/                # Utilitários
-│   └── utils.ts        # Funções utilitárias
-├── pages/              # Páginas da aplicação
-│   ├── Auth.tsx        # Página de autenticação
-│   ├── Dashboard.tsx   # Dashboard principal
-│   ├── Index.tsx       # Página inicial
-│   └── NotFound.tsx    # Página 404
-└── main.tsx           # Ponto de entrada
-```
-
-## 🌐 Deploy
-
-### Vercel (Recomendado)1Acesse [vercel.com](https://vercel.com)
-2. Conecte sua conta GitHub
-3. Importe o repositório `metalma-os`
-4. Configure as variáveis de ambiente
-5. Deploy automático a cada push
-
-### GitHub Pages
-1. Configure GitHub Actions
-2. Build automático na branch main
-3. Deploy na branch gh-pages
-
-## 🔐 Variáveis de Ambiente
-
-| Variável | Descrição | Obrigatório |
-|----------|-----------|-------------|
-| `VITE_SUPABASE_URL` | URL do projeto Supabase | ✅ |
-| `VITE_SUPABASE_ANON_KEY` | Chave anônima do Supabase | ✅ |
-| `VITE_APP_NAME` | Nome da aplicação | ❌ |
-| `VITE_APP_VERSION` | Versão da aplicação | ❌ |
-
-## 🎨 Interface
-
-O sistema utiliza uma interface moderna e responsiva com:
-- Design system consistente
-- Componentes acessíveis
-- Tema escuro/claro
-- Layout responsivo
-- Navegação intuitiva
-
-## 🔄 Desenvolvimento
-
-### Adicionando novas funcionalidades
-1. Crie uma nova branch: `git checkout -b feature/nova-funcionalidade`
-2. Desenvolva a funcionalidade
-3. Teste localmente4 Faça commit: `git commit -m "feat: nova funcionalidade"`
-5: `git push origin feature/nova-funcionalidade`
-6. Crie um Pull Request
-
-### Padrões de código
-- TypeScript para tipagem
-- ESLint para qualidade
-- Prettier para formatação
-- Conventional Commits
-
-## 📄 Licença
-
-MIT License - veja o arquivo [LICENSE](LICENSE) para detalhes.
-
-## 🤝 Contribuição
-
-1. Fork o projeto
-2ie uma branch para sua feature
-3mmit suas mudanças
-4. Push para a branch
-5. Abra um Pull Request
-
-## 📞 Suporte
-
-Para suporte e dúvidas:
-- Abra uma [Issue](https://github.com/SEU_USUARIO/metalma-os/issues)
-- Entre em contato: [seu-email@exemplo.com]
+- **Público-alvo:** Empresas industriais, prestadores de serviço, equipes técnicas.
+- **Benefícios:** Centralização de informações, controle de produtividade, relatórios inteligentes, usabilidade moderna.
 
 ---
 
-**🎉 Sistema Metalma OS - Gerenciando ordens de serviço com excelência!**
+## Como Funciona
+O sistema é dividido em módulos principais, acessíveis por uma sidebar moderna e responsiva:
+- **Dashboard**: Visão geral de estatísticas e produtividade.
+- **Ordens de Serviço**: Cadastro, acompanhamento e controle de OS.
+- **Clientes**: Gestão de clientes com validação de CPF/CNPJ.
+- **Colaboradores**: Cadastro, metas e acompanhamento de produtividade.
+- **Produtos**: Controle de estoque, preços e percentual global.
+- **Relatórios**: Geração de relatórios inteligentes.
+- **Configurações**: Parâmetros do sistema, usuários, permissões e auditoria.
+
+A navegação é protegida por autenticação e permissões de acesso.
+
+---
+
+## Módulos do Sistema
+
+### 1. Dashboard
+- Exibe totais de OS (abertas, em andamento, finalizadas), clientes, colaboradores, horas trabalhadas e meta de produtividade.
+- Progresso mensal das horas trabalhadas vs meta.
+- Acesso rápido para cadastro de OS, clientes, colaboradores e relatórios.
+
+### 2. Ordens de Serviço (OS)
+- **Cadastro/Edição**: Cliente, descrição, produtos, colaboradores, tempo previsto, meta por hora, valor total.
+- **Associação**: Vínculo de produtos e colaboradores à OS.
+- **Controle de tempo**: Registro de início, pausa, parada, finalização. Comparação entre tempo real e previsto.
+- **Status**: Aberta, em andamento, finalizada, cancelada, falta de material.
+- **Cálculos automáticos**: Valor total, meta por hora, tempo de execução previsto.
+- **Gestão de paradas**: Registro de motivo, duração e impacto.
+
+### 3. Clientes
+- **Cadastro/Edição**: Nome, e-mail, telefone, CPF/CNPJ (com validação), endereço, cidade, estado, CEP.
+- **Busca e exportação**: Filtros inteligentes, exportação de dados e impressão de relatórios.
+- **Validação**: Máscara e validação de CPF/CNPJ.
+- **Status**: Ativo/Inativo.
+
+### 4. Colaboradores
+- **Cadastro/Edição**: Nome, cargo, salário, meta de horas, data de admissão, CPF, e-mail, telefone, endereço.
+- **Produtividade individual**: Horas trabalhadas, comparação com meta, eficiência.
+- **Status**: Ativo/Inativo.
+
+### 5. Produtos
+- **Cadastro/Edição**: Nome, descrição, preço unitário, estoque, unidade, percentual global.
+- **Busca e filtro**: Pesquisa por nome, exportação e impressão.
+- **Status**: Ativo/Inativo.
+
+### 6. Relatórios
+- **Tipos**:
+  - Produtividade por colaboradores (eficiência, horas trabalhadas, paradas por material).
+  - Controle do tempo (real vs previsto por OS).
+  - Status das OS (abertas, em andamento, finalizadas, canceladas).
+  - Paradas por falta de material.
+- **Filtros**: Período, colaborador, cliente.
+- **Visualização**: Tabelas, gráficos, exportação e impressão.
+
+### 7. Configurações
+- **Parâmetros do sistema**: Percentual global de produtos, meta de horas padrão, prefixo de OS.
+- **Usuários**: Cadastro, edição, exclusão, redefinição de senha, níveis de acesso.
+- **Permissões**: Controle granular por módulo e ação.
+- **Níveis de acesso**: Criação, edição, exclusão e associação de permissões.
+- **Auditoria**: Monitoramento de login/logout, filtros por usuário, data e tipo de evento, exportação CSV.
+
+---
+
+## Fluxos e Lógicas de Negócio
+- **Produtividade por Colaboradores**: Soma das horas trabalhadas, comparação com meta individual, exibição de eficiência e ranking.
+- **Controle do Tempo**: Registro de tempo real (início, pausa, parada, finalização), análise de eficiência e gargalos.
+- **Percentual Global de Produtos**: Cálculo do percentual de cada produto em relação ao total de produtos utilizados nas OS.
+- **Meta de Horas Padrão**: Definição e acompanhamento mensal por colaborador.
+- **Tempo de Execução Previsto**: Definido na criação da OS, usado para análise de eficiência.
+- **Meta por Hora (R$)**: Valor/hora esperado para cada OS, calculado automaticamente.
+
+---
+
+## Dicas de Usabilidade
+- Para cadastrar uma nova OS, acesse o menu "Ordens de Serviço" e clique em "Adicionar".
+- Utilize os filtros e exporte relatórios conforme a necessidade.
+- Registre paradas e pausas diretamente na OS para controle preciso do tempo.
+- Acompanhe a produtividade da equipe pelo dashboard e relatórios.
+- Altere o tema (claro/escuro) no topo da tela.
+
+
+---
+
+## Suporte
+- E-mail: informatica@jkinfonet.com.br
+
+---
+
+**Este arquivo README.md é a documentação oficial e única do MetalmaOS.**

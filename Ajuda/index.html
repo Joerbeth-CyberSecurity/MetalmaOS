@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metalma OS - Sistema de Controle de Ordens de Serviço</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="logo">
+                <img src="images/logo.png" alt="Metalma Logo" class="logo-img">
+            </div>
+            <div class="header-actions">
+                <button class="theme-toggle" id="themeToggle">
+                    <i class="fas fa-sun" id="themeIcon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="#dashboard" class="nav-link active" data-section="dashboard">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#sobre" class="nav-link" data-section="sobre">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Sobre</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#ordens-servico" class="nav-link" data-section="ordens-servico">
+                        <i class="fas fa-clipboard-list"></i>
+                        <span>Ordens de Serviço</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#clientes" class="nav-link" data-section="clientes">
+                        <i class="fas fa-users"></i>
+                        <span>Clientes</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#colaboradores" class="nav-link" data-section="colaboradores">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Colaboradores</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#produtos" class="nav-link" data-section="produtos">
+                        <i class="fas fa-box"></i>
+                        <span>Produtos</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#relatorios" class="nav-link" data-section="relatorios">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Relatórios</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#configuracoes" class="nav-link" data-section="configuracoes">
+                        <i class="fas fa-cog"></i>
+                        <span>Configurações</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#fluxos-logicas" class="nav-link" data-section="fluxos-logicas">
+                        <i class="fas fa-cogs"></i>
+                        <span>Fluxos e Lógicas de Negócio</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#fluxos-logicas" class="nav-link" data-section="fluxos-logicas">
+                        <i class="fas fa-cogs"></i>
+                        <span>Fluxos e Lógicas</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#suporte" class="nav-link" data-section="suporte">
+                        <i class="fas fa-headset"></i>
+                        <span>Suporte</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content" id="mainContent">
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="content-section active">
+            <div class="hero">
+                <h1 class="hero-title">Metalma OS</h1>
+                <p class="hero-subtitle">Sistema de Controle de Ordens de Serviço</p>
+                <p class="hero-description">
+                    Uma plataforma moderna para gestão de ordens de serviço, produtividade, clientes, 
+                    colaboradores e produtos, voltada para empresas que buscam eficiência, controle e análise de resultados.
+                </p>
+                <div class="hero-stats">
+                    <div class="stat-card">
+                        <i class="fas fa-clipboard-list"></i>
+                        <h3>Ordens de Serviço</h3>
+                        <p>Controle completo do ciclo de vida</p>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-users"></i>
+                        <h3>Gestão de Clientes</h3>
+                        <p>Cadastro com validação CPF/CNPJ</p>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-chart-line"></i>
+                        <h3>Produtividade</h3>
+                        <p>Acompanhamento em tempo real</p>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>Relatórios Inteligentes</h3>
+                        <p>Análises detalhadas e exportação</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sobre Section -->
+        <section id="sobre" class="content-section">
+            <div class="section-header">
+                <h2>Sobre o Metalma OS</h2>
+                <p>Conheça os benefícios e características da nossa plataforma</p>
+            </div>
+            <div class="content-grid">
+                <div class="feature-card">
+                    <i class="fas fa-target"></i>
+                    <h3>Público-alvo</h3>
+                    <p>Empresas industriais, prestadores de serviço e equipes técnicas que buscam maior controle e eficiência operacional.</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-star"></i>
+                    <h3>Benefícios</h3>
+                    <ul>
+                        <li>Centralização de informações</li>
+                        <li>Controle de produtividade</li>
+                        <li>Relatórios inteligentes</li>
+                        <li>Usabilidade moderna</li>
+                    </ul>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-shield-alt"></i>
+                    <h3>Segurança</h3>
+                    <p>Sistema protegido por autenticação e controle granular de permissões de acesso por módulo e ação.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ordens de Serviço Section -->
+        <section id="ordens-servico" class="content-section">
+            <div class="section-header">
+                <h2>Ordens de Serviço</h2>
+                <p>Controle completo do ciclo de vida das ordens de serviço</p>
+            </div>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <i class="fas fa-plus-circle"></i>
+                    <div>
+                        <h3>Cadastro/Edição</h3>
+                        <p>Cliente, descrição, produtos, colaboradores, tempo previsto, meta por hora, valor total.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-link"></i>
+                    <div>
+                        <h3>Associação</h3>
+                        <p>Vínculo de produtos e colaboradores à OS com controle detalhado.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-clock"></i>
+                    <div>
+                        <h3>Controle de Tempo</h3>
+                        <p>Registro de início, pausa, parada, finalização. Comparação entre tempo real e previsto.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-tasks"></i>
+                    <div>
+                        <h3>Status</h3>
+                        <p>Aberta, em andamento, finalizada, cancelada, falta de material.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-calculator"></i>
+                    <div>
+                        <h3>Cálculos Automáticos</h3>
+                        <p>Valor total, meta por hora, tempo de execução previsto.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Clientes Section -->
+        <section id="clientes" class="content-section">
+            <div class="section-header">
+                <h2>Gestão de Clientes</h2>
+                <p>Cadastro completo com validação e controle de dados</p>
+            </div>
+            <div class="content-grid">
+                <div class="feature-card">
+                    <i class="fas fa-user-plus"></i>
+                    <h3>Cadastro Completo</h3>
+                    <p>Nome, e-mail, telefone, CPF/CNPJ com validação automática, endereço completo, cidade, estado, CEP.</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-search"></i>
+                    <h3>Busca Inteligente</h3>
+                    <p>Filtros avançados, exportação de dados e impressão de relatórios personalizados.</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-check-circle"></i>
+                    <h3>Validação</h3>
+                    <p>Máscara automática e validação de CPF/CNPJ para garantir dados corretos.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Colaboradores Section -->
+        <section id="colaboradores" class="content-section">
+            <div class="section-header">
+                <h2>Colaboradores</h2>
+                <p>Gestão completa da equipe e acompanhamento de produtividade</p>
+            </div>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <i class="fas fa-user-edit"></i>
+                    <div>
+                        <h3>Cadastro Detalhado</h3>
+                        <p>Nome, cargo, salário, meta de horas, data de admissão, CPF, e-mail, telefone, endereço.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-chart-line"></i>
+                    <div>
+                        <h3>Produtividade Individual</h3>
+                        <p>Horas trabalhadas, comparação com meta, eficiência e ranking de performance.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-toggle-on"></i>
+                    <div>
+                        <h3>Controle de Status</h3>
+                        <p>Gerenciamento de colaboradores ativos e inativos.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Produtos Section -->
+        <section id="produtos" class="content-section">
+            <div class="section-header">
+                <h2>Produtos</h2>
+                <p>Controle de estoque e gestão de produtos</p>
+            </div>
+            <div class="content-grid">
+                <div class="feature-card">
+                    <i class="fas fa-box-open"></i>
+                    <h3>Cadastro de Produtos</h3>
+                    <p>Nome, descrição, preço unitário, estoque, unidade, percentual global.</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-filter"></i>
+                    <h3>Busca e Filtro</h3>
+                    <p>Pesquisa por nome, exportação e impressão de relatórios.</p>
+                </div>
+                <div class="feature-card">
+                    <i class="fas fa-percentage"></i>
+                    <h3>Percentual Global</h3>
+                    <p>Cálculo automático do percentual de cada produto em relação ao total utilizado nas OS.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Relatórios Section -->
+        <section id="relatorios" class="content-section">
+            <div class="section-header">
+                <h2>Relatórios Inteligentes</h2>
+                <p>Análises detalhadas para tomada de decisão</p>
+            </div>
+            <div class="report-types">
+                <div class="report-card">
+                    <i class="fas fa-user-clock"></i>
+                    <h3>Produtividade por Colaboradores</h3>
+                    <p>Eficiência, horas trabalhadas, paradas por material e ranking de performance.</p>
+                </div>
+                <div class="report-card">
+                    <i class="fas fa-stopwatch"></i>
+                    <h3>Controle do Tempo</h3>
+                    <p>Análise de tempo real vs previsto por OS, identificação de gargalos.</p>
+                </div>
+                <div class="report-card">
+                    <i class="fas fa-clipboard-check"></i>
+                    <h3>Status das OS</h3>
+                    <p>Abertas, em andamento, finalizadas, canceladas com filtros personalizados.</p>
+                </div>
+                <div class="report-card">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Paradas por Material</h3>
+                    <p>Análise de paradas por falta de material e impacto na produtividade.</p>
+                </div>
+            </div>
+            <div class="report-features">
+                <h3>Recursos dos Relatórios</h3>
+                <ul>
+                    <li><i class="fas fa-filter"></i> Filtros por período, colaborador, cliente</li>
+                    <li><i class="fas fa-table"></i> Visualização em tabelas e gráficos</li>
+                    <li><i class="fas fa-download"></i> Exportação em diversos formatos</li>
+                    <li><i class="fas fa-print"></i> Impressão otimizada</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Configurações Section -->
+        <section id="configuracoes" class="content-section">
+            <div class="section-header">
+                <h2>Configurações</h2>
+                <p>Parâmetros do sistema e controle de acesso</p>
+            </div>
+            <div class="config-grid">
+                <div class="config-card">
+                    <i class="fas fa-sliders-h"></i>
+                    <h3>Parâmetros do Sistema</h3>
+                    <ul>
+                        <li>Percentual global de produtos</li>
+                        <li>Meta de horas padrão</li>
+                        <li>Prefixo de OS</li>
+                    </ul>
+                </div>
+                <div class="config-card">
+                    <i class="fas fa-users-cog"></i>
+                    <h3>Usuários</h3>
+                    <ul>
+                        <li>Cadastro e edição</li>
+                        <li>Redefinição de senha</li>
+                        <li>Níveis de acesso</li>
+                    </ul>
+                </div>
+                <div class="config-card">
+                    <i class="fas fa-shield-alt"></i>
+                    <h3>Permissões</h3>
+                    <ul>
+                        <li>Controle granular por módulo</li>
+                        <li>Permissões por ação</li>
+                        <li>Criação de níveis de acesso</li>
+                    </ul>
+                </div>
+                <div class="config-card">
+                    <i class="fas fa-history"></i>
+                    <h3>Auditoria</h3>
+                    <ul>
+                        <li>Monitoramento de login/logout</li>
+                        <li>Filtros por usuário e data</li>
+                        <li>Exportação CSV</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Fluxos e Lógicas de Negócio Section -->
+        <section id="fluxos-logicas" class="content-section">
+            <div class="section-header">
+                <h2>Fluxos e Lógicas de Negócio</h2>
+                <p>Entenda o funcionamento interno e os cálculos do sistema</p>
+            </div>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <i class="fas fa-chart-pie"></i>
+                    <div>
+                        <h3>Produtividade por Colaboradores</h3>
+                        <p>Soma das horas trabalhadas, comparação com meta individual, exibição de eficiência e ranking.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-hourglass-half"></i>
+                    <div>
+                        <h3>Controle do Tempo</h3>
+                        <p>Registro de tempo real (início, pausa, parada, finalização), análise de eficiência e gargalos.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-percent"></i>
+                    <div>
+                        <h3>Percentual Global de Produtos</h3>
+                        <p>Cálculo do percentual de cada produto em relação ao total de produtos utilizados nas OS.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-calendar-alt"></i>
+                    <div>
+                        <h3>Meta de Horas Padrão</h3>
+                        <p>Definição e acompanhamento mensal por colaborador.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-clock"></i>
+                    <div>
+                        <h3>Tempo de Execução Previsto</h3>
+                        <p>Definido na criação da OS, usado para análise de eficiência.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <div>
+                        <h3>Meta por Hora (R$)</h3>
+                        <p>Valor/hora esperado para cada OS, calculado automaticamente.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Suporte Section -->
+        <section id="suporte" class="content-section">
+            <div class="section-header">
+                <h2>Suporte</h2>
+                <p>Entre em contato conosco</p>
+            </div>
+            <div class="support-content">
+                <div class="contact-card">
+                    <img src="images/OFICIALCYBERJKNET.png" alt="JK Infonet Logo" style="width: 100px; margin-bottom: 1rem;">
+                    <h3>JK Infonet</h3>
+                    <p>Nosso parceiro de tecnologia</p>
+                </div>
+                <div class="contact-card">
+                    <i class="fas fa-envelope"></i>
+                    <h3>E-mail</h3>
+                    <p><a href="mailto:informatica@jkinfonet.com.br">informatica@jkinfonet.com.br</a></p>
+                </div>
+                <div class="contact-card">
+                    <i class="fab fa-linkedin"></i>
+                    <h3>LinkedIn</h3>
+                    <p><a href="https://www.linkedin.com/in/joerbeth-serra-costa" target="_blank">joerbeth-serra-costa</a></p>
+                </div>
+                <div class="contact-card">
+                    <i class="fas fa-globe"></i>
+                    <h3>Site</h3>
+                    <p><a href="https://www.jkinfonet.com.br" target="_blank">www.jkinfonet.com.br</a></p>
+                </div>
+                <div class="tips-section">
+                    <h3>Dicas de Usabilidade</h3>
+                    <ul>
+                        <li>Para cadastrar uma nova OS, acesse o menu "Ordens de Serviço" e clique em "Adicionar"</li>
+                        <li>Utilize os filtros e exporte relatórios conforme a necessidade</li>
+                        <li>Registre paradas e pausas diretamente na OS para controle preciso do tempo</li>
+                        <li>Acompanhe a produtividade da equipe pelo dashboard e relatórios</li>
+                        <li>Altere o tema (claro/escuro) no topo da tela</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2024 Metalma INOX & CIA. Todos os direitos reservados.</p>
+            <p>Este arquivo é a documentação oficial e única do MetalmaOS.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+
+    <!-- WhatsApp Button -->
+    <a href="https://wa.me/5598988174245" class="whatsapp-button" target="_blank">
+        <i class="fab fa-whatsapp"></i>
+    </a>
+</body>
+</html>
+

@@ -1,0 +1,21 @@
+Bem-vindo ao MetalmaOS, a plataforma moderna e eficiente para gestão de ordens de serviço, produtividade, clientes, colaboradores e produtos.
+
+Com uma interface intuitiva, responsiva e segura, o MetalmaOS centraliza todas as informações essenciais para o seu negócio.
+
+No Dashboard, você acompanha em tempo real o status das ordens de serviço, clientes, colaboradores e o progresso das metas de produtividade.
+
+Cadastre e gerencie ordens de serviço de forma completa, associando clientes, produtos e colaboradores. Controle o tempo real e previsto, registre pausas e paradas, e acompanhe o status de cada OS.
+
+Gerencie seus clientes com facilidade, utilizando filtros inteligentes, validação automática de dados e exportação de informações.
+
+Defina metas de horas para cada colaborador e acompanhe a produtividade individual, promovendo eficiência e reconhecimento.
+
+Mantenha o controle do estoque, preços e percentual global de cada produto utilizado nas ordens de serviço.
+
+Gere relatórios completos de produtividade, controle de tempo, status das OS e paradas. Visualize gráficos e exporte dados para análise detalhada.
+
+Personalize o sistema conforme as necessidades da sua empresa, controle permissões de acesso e aproveite o modo escuro para maior conforto visual.
+
+Conte com suporte dedicado, documentação completa e uma plataforma em constante evolução para garantir o sucesso do seu negócio.
+
+MetalmaOS – Gestão moderna, resultados reais. Fale com nosso time e leve sua operação para o próximo nível! 

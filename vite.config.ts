@@ -57,4 +57,5 @@ export default defineConfig(({ mode }) => ({
     // Remover informações de debug em produção
     __DEV__: mode === 'development',
   },
+  base: '/', // Caminho base para domínio personalizado
 }));

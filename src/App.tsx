@@ -19,6 +19,7 @@ import Relatorios from './pages/Relatorios';
 import Configuracoes from './pages/Configuracoes';
 import NotFound from './pages/NotFound';
 import ResetPassword from './pages/ResetPassword';
+import Ajuda from './pages/Ajuda';
 
 function App() {
   return (
@@ -59,6 +60,7 @@ function App() {
                             path="/configuracoes"
                             element={<Configuracoes />}
                           />
+                          <Route path="/ajuda" element={<Ajuda />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </Suspense>

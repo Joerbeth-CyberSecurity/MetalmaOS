@@ -26,8 +26,17 @@ import { useAuth } from '@/hooks/useAuth.jsx';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
 
-const items = [
-  { title: 'Dashboard', url: '/', icon: BarChart3, permission: null }, // Sempre visível
+// Adicionar tipagem para external
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: any;
+  permission: string | null;
+  external?: boolean;
+}
+
+const items: MenuItem[] = [
+  { title: 'Dashboard', url: '/', icon: BarChart3, permission: null },
   {
     title: 'Ordens de Serviço',
     url: '/ordens-servico',
@@ -36,9 +45,9 @@ const items = [
   },
   {
     title: 'Clientes',
-    url: '/clientes',
     icon: Users,
     permission: 'clientes_visualizar',
+    url: '/clientes',
   },
   {
     title: 'Colaboradores',
@@ -58,21 +67,21 @@ const items = [
     icon: BarChart3,
     permission: 'relatorios_visualizar',
   },
+  {
+    title: 'Ajuda',
+    url: 'https://joerbeth-cybersecurity.github.io/ajudaMetalmaOS/',
+    icon: BarChart3,
+    permission: null,
+    external: true,
+  },
 ];
 
-const adminItems = [
+const adminItems: MenuItem[] = [
   {
     title: 'Configurações',
     url: '/configuracoes',
     icon: Settings,
     permission: 'configuracoes_visualizar',
-  },
-  {
-    title: 'Ajuda',
-    url: 'https://joerbeth-cybersecurity.github.io/ajudaMetalmaOS/', // Link correto do GitHub Pages
-    icon: BarChart3, // Pode trocar por um ícone mais apropriado
-    permission: 'configuracoes_visualizar',
-    external: true, // Garante que abra em nova aba
   },
 ];
 
@@ -148,10 +157,22 @@ export function AppSidebar() {
               {filteredItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end className={getNavCls}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
+                    {item.external ? (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={getNavCls({ isActive: false })}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </a>
+                    ) : (
+                      <NavLink to={item.url} end className={({ isActive }) => getNavCls({ isActive })}>
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

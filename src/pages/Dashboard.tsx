@@ -145,17 +145,17 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-6 px-2 sm:px-4 md:px-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
           Visão geral do sistema de controle de ordens de serviço
         </p>
       </div>
 
-      {/* Main Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Cards principais */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="card-modern transition-all duration-200 hover:shadow-medium">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de OS</CardTitle>
@@ -216,7 +216,7 @@ export default function Dashboard() {
       </div>
 
       {/* Status Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         <Card className="card-elevated">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -272,7 +272,7 @@ export default function Dashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-2">
             <span className="text-sm font-medium">
               {stats.horasTrabalhadasMes.toFixed(1)}h de{' '}
               {(stats.metaHoraMedia * stats.totalColaboradores).toFixed(1)}h
@@ -282,7 +282,7 @@ export default function Dashboard() {
             </span>
           </div>
           <Progress value={progressPercent} className="w-full" />
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="flex flex-col md:flex-row justify-between text-xs text-muted-foreground gap-2">
             <span>Meta por colaborador: {stats.metaHoraMedia.toFixed(1)}h</span>
             <span>{stats.totalColaboradores} colaboradores ativos</span>
           </div>

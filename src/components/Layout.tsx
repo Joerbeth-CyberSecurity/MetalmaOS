@@ -18,12 +18,21 @@ export function Layout({ children }: LayoutProps) {
     await refreshUserProfile();
   };
 
+  const ENV_LABEL = import.meta.env.VITE_ENV_LABEL || '';
+  const ENV_COLOR = import.meta.env.VITE_ENV_COLOR || '';
+
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-gradient-to-br from-background to-secondary/10">
+      <div className="flex min-h-screen w-full flex-col bg-gradient-to-br from-background to-secondary/10 md:flex-row">
         <AppSidebar />
 
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col min-w-0 overflow-x-auto">
+          {/* Banner de ambiente */}
+          {ENV_LABEL && (
+            <div style={{ background: ENV_COLOR || '#22c55e', color: '#fff', textAlign: 'center', fontWeight: 'bold', padding: '4px 0' }}>
+              {ENV_LABEL}
+            </div>
+          )}
           {/* Header */}
           <header className="flex h-14 items-center justify-between border-b border-border/60 bg-card/50 px-4 backdrop-blur-sm">
             <div className="flex items-center gap-4">

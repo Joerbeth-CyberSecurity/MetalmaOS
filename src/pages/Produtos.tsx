@@ -277,7 +277,7 @@ export default function Produtos() {
         )}
       </div>
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border print-area">
         <Table>
           <TableHeader>
             <TableRow>
@@ -337,6 +337,24 @@ export default function Produtos() {
           </TableBody>
         </Table>
       </div>
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-area, .print-area * {
+            visibility: visible;
+          }
+          .print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            background: white;
+            z-index: 9999;
+          }
+        }
+      `}</style>
       {/* Painel Lateral (Sheet) para Adicionar/Editar Produto */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="overflow-y-auto sm:max-w-lg">

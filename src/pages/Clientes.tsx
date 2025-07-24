@@ -111,13 +111,13 @@ function isValidCNPJ(cnpj: string) {
     d = cnpj.substring(t),
     d1 = parseInt(d.charAt(0)),
     d2 = parseInt(d.charAt(1)),
-    calc = (x) => {
+    calc = (x: number) => {
       let n = cnpj.substring(0, x),
         y = x - 7,
         s = 0,
         r = 2;
       for (let i = x; i >= 1; i--) {
-        s += n.charAt(x - i) * r++;
+        s += parseInt(n.charAt(x - i)) * r++;
         if (r > 9) r = 2;
       }
       return s;
@@ -136,19 +136,8 @@ const clienteSchema = z.object({
   nome: z
     .string()
     .min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
-  telefone: z.string().min(8, { message: 'O telefone é obrigatório.' }),
-  cpf_cnpj: z
-    .string()
-    .min(11, { message: 'O CPF/CNPJ é obrigatório.' })
-    .refine(
-      (val) => {
-        const num = val.replace(/\D/g, '');
-        if (num.length === 11) return isValidCPF(val);
-        if (num.length === 14) return isValidCNPJ(val);
-        return false;
-      },
-      { message: 'CPF/CNPJ inválido.' }
-    ),
+  telefone: z.string().optional(), // Não obrigatório
+  cpf_cnpj: z.string().optional(), // Não obrigatório
   email: z
     .string()
     .email({ message: 'E-mail inválido.' })
@@ -406,84 +395,88 @@ export default function Clientes() {
             <DialogTitle>Relatório de Clientes</DialogTitle>
           </DialogHeader>
           <div className="max-h-[70vh] overflow-auto">
-            <ReportTemplate>
-              <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 24 }}>
-                Lista de Clientes
-              </h2>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: 15,
-                }}
-              >
-                <thead>
-                  <tr>
-                    <th
-                      style={{
-                        textAlign: 'left',
-                        borderBottom: '1px solid #ccc',
-                        padding: 8,
-                      }}
-                    >
-                      Nome
-                    </th>
-                    <th
-                      style={{
-                        textAlign: 'left',
-                        borderBottom: '1px solid #ccc',
-                        padding: 8,
-                      }}
-                    >
-                      Contato
-                    </th>
-                    <th
-                      style={{
-                        textAlign: 'left',
-                        borderBottom: '1px solid #ccc',
-                        padding: 8,
-                      }}
-                    >
-                      Localização
-                    </th>
-                    <th
-                      style={{
-                        textAlign: 'left',
-                        borderBottom: '1px solid #ccc',
-                        padding: 8,
-                      }}
-                    >
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {clientes.map((cliente) => (
-                    <tr key={cliente.id}>
-                      <td style={{ padding: 8 }}>{cliente.nome}</td>
-                      <td style={{ padding: 8 }}>
-                        <div>{cliente.email}</div>
-                        <div style={{ fontSize: 13, color: '#888' }}>
-                          {cliente.telefone}
-                        </div>
-                      </td>
-                      <td style={{ padding: 8 }}>
-                        {cliente.cidade && cliente.estado
-                          ? `${cliente.cidade}, ${cliente.estado}`
-                          : 'N/A'}
-                      </td>
-                      <td style={{ padding: 8 }}>
-                        {cliente.ativo ? 'Ativo' : 'Inativo'}
-                      </td>
+            <div className="print-area">
+              <ReportTemplate title="Relatório de Clientes" period={{ start: '', end: '' }} type="clientes">
+                <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 24 }}>
+                  Lista de Clientes
+                </h2>
+                <table
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: 15,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th
+                        style={{
+                          textAlign: 'left',
+                          borderBottom: '1px solid #ccc',
+                          padding: 8,
+                        }}
+                      >
+                        Nome
+                      </th>
+                      <th
+                        style={{
+                          textAlign: 'left',
+                          borderBottom: '1px solid #ccc',
+                          padding: 8,
+                        }}
+                      >
+                        Contato
+                      </th>
+                      <th
+                        style={{
+                          textAlign: 'left',
+                          borderBottom: '1px solid #ccc',
+                          padding: 8,
+                        }}
+                      >
+                        Localização
+                      </th>
+                      <th
+                        style={{
+                          textAlign: 'left',
+                          borderBottom: '1px solid #ccc',
+                          padding: 8,
+                        }}
+                      >
+                        Status
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </ReportTemplate>
+                  </thead>
+                  <tbody>
+                    {clientes.map((cliente) => (
+                      <tr key={cliente.id}>
+                        <td style={{ padding: 8 }}>{cliente.nome}</td>
+                        <td style={{ padding: 8 }}>
+                          <div>{cliente.email}</div>
+                          <div style={{ fontSize: 13, color: '#888' }}>
+                            {cliente.telefone}
+                          </div>
+                        </td>
+                        <td style={{ padding: 8 }}>
+                          {cliente.cidade && cliente.estado
+                            ? `${cliente.cidade}, ${cliente.estado}`
+                            : 'N/A'}
+                        </td>
+                        <td style={{ padding: 8 }}>
+                          {cliente.ativo ? 'Ativo' : 'Inativo'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ReportTemplate>
+            </div>
           </div>
           <DialogFooter>
             <Button
-              onClick={() => window.print()}
+              onClick={() => {
+                window.print();
+              }}
               className="bg-primary text-white"
             >
               Imprimir / Salvar PDF
@@ -494,6 +487,24 @@ export default function Clientes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .print-area, .print-area * {
+            visibility: visible;
+          }
+          .print-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            background: white;
+            z-index: 9999;
+          }
+        }
+      `}</style>
       {/* Painel Lateral (Sheet) para Adicionar/Editar Cliente */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="sm:max-w-lg">
@@ -555,7 +566,7 @@ export default function Clientes() {
                 name="telefone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Telefone*</FormLabel>
+                    <FormLabel>Telefone</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="(99) 99999-9999"
@@ -574,7 +585,7 @@ export default function Clientes() {
                 name="cpf_cnpj"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>CPF/CNPJ*</FormLabel>
+                    <FormLabel>CPF/CNPJ</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="00.000.000/0000-00"

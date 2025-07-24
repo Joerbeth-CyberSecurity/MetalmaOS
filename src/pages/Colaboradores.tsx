@@ -100,10 +100,7 @@ const colaboradorSchema = z.object({
     .optional()
     .or(z.literal('')),
   telefone: z.string().optional(),
-  cpf: z
-    .string()
-    .optional()
-    .refine((val) => !val || isValidCPF(val), { message: 'CPF inválido.' }),
+  cpf: z.string().optional(), // Sem validação
   endereco: z.string().optional(),
   meta_hora: z
     .number()

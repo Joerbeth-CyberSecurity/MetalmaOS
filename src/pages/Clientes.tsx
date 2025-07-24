@@ -483,7 +483,34 @@ export default function Clientes() {
           </div>
           <DialogFooter>
             <Button
-              onClick={() => window.print()}
+              onClick={() => {
+                const printContent = document.querySelector('.print-area')?.innerHTML;
+                if (printContent) {
+                  const printWindow = window.open('', '', 'width=900,height=700');
+                  printWindow!.document.write(`
+                    <html>
+                      <head>
+                        <title>Relatório de Clientes</title>
+                        <style>
+                          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+                          table { width: 100%; border-collapse: collapse; font-size: 15px; }
+                          th, td { border: 1px solid #ccc; padding: 8px; }
+                          th { background: #f3f3f3; }
+                        </style>
+                      </head>
+                      <body>
+                        ${printContent}
+                      </body>
+                    </html>
+                  `);
+                  printWindow!.document.close();
+                  printWindow!.focus();
+                  setTimeout(() => {
+                    printWindow!.print();
+                    printWindow!.close();
+                  }, 500);
+                }
+              }}
               className="bg-primary text-white"
             >
               Imprimir / Salvar PDF

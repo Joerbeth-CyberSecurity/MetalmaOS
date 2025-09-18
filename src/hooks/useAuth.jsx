@@ -26,6 +26,7 @@ export function AuthProvider({ children }) {
         .from('admins')
         .select(
           `
+          id,
           nome, 
           email, 
           tipo_usuario, 

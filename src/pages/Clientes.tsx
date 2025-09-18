@@ -137,18 +137,7 @@ const clienteSchema = z.object({
     .string()
     .min(3, { message: 'O nome deve ter pelo menos 3 caracteres.' }),
   telefone: z.string().min(8, { message: 'O telefone é obrigatório.' }),
-  cpf_cnpj: z
-    .string()
-    .min(11, { message: 'O CPF/CNPJ é obrigatório.' })
-    .refine(
-      (val) => {
-        const num = val.replace(/\D/g, '');
-        if (num.length === 11) return isValidCPF(val);
-        if (num.length === 14) return isValidCNPJ(val);
-        return false;
-      },
-      { message: 'CPF/CNPJ inválido.' }
-    ),
+  cpf_cnpj: z.string().optional().or(z.literal('')),
   email: z
     .string()
     .email({ message: 'E-mail inválido.' })
@@ -186,6 +175,7 @@ export default function Clientes() {
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const [exportOpen, setExportOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const form = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema),
@@ -315,6 +305,13 @@ export default function Clientes() {
           <p className="text-muted-foreground">
             Gerencie os clientes da sua empresa.
           </p>
+          <div className="mt-3 w-full max-w-sm">
+            <Input
+              placeholder="Pesquisar cliente por nome"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
         <div className="flex gap-2">
           <Button onClick={handleAddNew} type="button">
@@ -349,7 +346,11 @@ export default function Clientes() {
                 </TableCell>
               </TableRow>
             ) : (
-              clientes.map((cliente) => (
+              clientes
+                .filter((c) =>
+                  (c.nome || '').toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((cliente) => (
                 <TableRow key={cliente.id}>
                   <TableCell className="font-medium">{cliente.nome}</TableCell>
                   <TableCell>
@@ -601,7 +602,7 @@ export default function Clientes() {
                 name="cpf_cnpj"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>CPF/CNPJ*</FormLabel>
+                    <FormLabel>CPF/CNPJ</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="00.000.000/0000-00"

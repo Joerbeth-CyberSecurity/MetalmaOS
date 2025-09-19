@@ -177,6 +177,9 @@ export default function Clientes() {
   const [exportOpen, setExportOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Normaliza entrada para comparação de CPF/CNPJ (mantém apenas dígitos)
+  const onlyDigits = (v: string) => (v || '').replace(/\D/g, '');
+
   const form = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema),
     defaultValues: {
@@ -307,7 +310,7 @@ export default function Clientes() {
           </p>
           <div className="mt-3 w-full max-w-sm">
             <Input
-              placeholder="Pesquisar cliente por nome"
+              placeholder="Pesquisar por nome ou CPF/CNPJ"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -347,9 +350,16 @@ export default function Clientes() {
               </TableRow>
             ) : (
               clientes
-                .filter((c) =>
-                  (c.nome || '').toLowerCase().includes(searchTerm.toLowerCase())
-                )
+                .filter((c) => {
+                  const term = (searchTerm || '').toLowerCase();
+                  if (!term) return true;
+                  const byName = (c.nome || '').toLowerCase().includes(term);
+                  const digitsTerm = onlyDigits(searchTerm);
+                  const byDoc = digitsTerm
+                    ? onlyDigits(c.cpf_cnpj || '').includes(digitsTerm)
+                    : false;
+                  return byName || byDoc;
+                })
                 .map((cliente) => (
                 <TableRow key={cliente.id}>
                   <TableCell className="font-medium">{cliente.nome}</TableCell>

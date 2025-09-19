@@ -18,6 +18,7 @@ import {
   Clock,
   Timer,
   StopCircle,
+  Percent,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -71,6 +72,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -88,7 +95,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 // Tipos baseados no schema do Supabase (types.ts)
 type ClienteRow = Database['public']['Tables']['clientes']['Row'];
 type ProdutoRow = Database['public']['Tables']['produtos']['Row'];
-type OrdemServicoRow = Database['public']['Tables']['ordens_servico']['Row'];
+type OrdemServicoRow = Database['public']['Tables']['ordens_servico']['Row'] & {
+  desconto_tipo?: 'valor' | 'percentual' | null;
+  desconto_valor?: number | null;
+  valor_total_com_desconto?: number | null;
+};
 type OsProdutosRow = Database['public']['Tables']['os_produtos']['Row'];
 type ColaboradorRow = Database['public']['Tables']['colaboradores']['Row'];
 
@@ -200,10 +211,14 @@ export default function OrdensServico() {
   const [isStarting, setIsStarting] = useState(false);
   const [isPausing, setIsPausing] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [showDescontoDialog, setShowDescontoDialog] = useState(false);
+  const [tipoDesconto, setTipoDesconto] = useState<'valor' | 'percentual'>('valor');
+  const [valorDesconto, setValorDesconto] = useState<number>(0);
   const [showParadaDialog, setShowParadaDialog] = useState(false);
   const [motivoParada, setMotivoParada] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [produtoSearch, setProdutoSearch] = useState('');
+  const [descontoFilter, setDescontoFilter] = useState<'todos' | 'com' | 'sem'>('todos');
 
   const form = useForm<OsFormData>({
     resolver: zodResolver(osSchema),
@@ -689,9 +704,17 @@ export default function OrdensServico() {
     }
   };
 
-  const handleFinishOS = async (os: OrdemServicoComRelacoes) => {
+  const finalizarComDesconto = async (
+    os: OrdemServicoComRelacoes,
+    tipo: 'valor' | 'percentual',
+    valor: number
+  ) => {
     setIsFinishing(true);
     try {
+      const totalAtual = os.valor_total || 0;
+      const descontoValor = tipo === 'valor' ? valor : (totalAtual * (valor || 0)) / 100;
+      const descontoAplicado = Math.max(0, Math.min(descontoValor, totalAtual));
+      const novoTotal = Math.max(0, totalAtual - descontoAplicado);
       // Encontrar o registro de tempo atual sem data_fim
       const { data: tempoAtual } = await supabase
         .from('os_tempo')
@@ -710,12 +733,15 @@ export default function OrdensServico() {
         if (updateError) throw updateError;
       }
 
-      // Atualizar status da OS
+      // Atualizar status e descontos da OS
       const { error: osError } = await supabase
         .from('ordens_servico')
         .update({
           status: 'finalizada',
           data_fim: new Date().toISOString(),
+          desconto_tipo: tipo,
+          desconto_valor: descontoAplicado,
+          // valor_total_com_desconto é coluna gerada no banco; não atualizar aqui
         })
         .eq('id', os.id);
 
@@ -733,6 +759,13 @@ export default function OrdensServico() {
     } finally {
       setIsFinishing(false);
     }
+  };
+
+  const handleFinishOS = (os: OrdemServicoComRelacoes) => {
+    setSelectedOs(os);
+    setTipoDesconto('valor');
+    setValorDesconto(0);
+    setShowDescontoDialog(true);
   };
 
   const handleAssociateColaboradores = async (os: OrdemServicoComRelacoes) => {
@@ -764,9 +797,15 @@ export default function OrdensServico() {
     }
   };
 
-  const filteredOrdens = statusFilter
+  const filteredOrdensBase = statusFilter
     ? ordens.filter((os) => os.status === statusFilter)
     : ordens;
+
+  const filteredOrdens = filteredOrdensBase.filter((os) => {
+    if (descontoFilter === 'com') return (os.desconto_valor || 0) > 0;
+    if (descontoFilter === 'sem') return (os.desconto_valor || 0) <= 0;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -793,21 +832,35 @@ export default function OrdensServico() {
           </Button>
         </div>
       </div>
-      <div className="mb-2 flex items-center gap-2">
-        <label className="text-foreground">Status:</label>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded border border-border bg-background px-2 py-1 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-        >
-          <option value="">Todos</option>
-          <option value="aberta">Aberta</option>
-          <option value="em_andamento">Em andamento</option>
-          <option value="finalizada">Finalizada</option>
-          <option value="cancelada">Cancelada</option>
-          <option value="pausada">Pausada</option>
-          <option value="falta_material">Falta de material</option>
-        </select>
+      <div className="mb-2 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <label className="text-foreground">Status:</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded border border-border bg-background px-2 py-1 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="">Todos</option>
+            <option value="aberta">Aberta</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="finalizada">Finalizada</option>
+            <option value="cancelada">Cancelada</option>
+            <option value="pausada">Pausada</option>
+            <option value="falta_material">Falta de material</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-foreground">Desconto:</label>
+          <select
+            value={descontoFilter}
+            onChange={(e) => setDescontoFilter(e.target.value as any)}
+            className="rounded border border-border bg-background px-2 py-1 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="todos">Todos</option>
+            <option value="com">Com desconto</option>
+            <option value="sem">Sem desconto</option>
+          </select>
+        </div>
       </div>
       <div className="rounded-lg border">
         <Table>
@@ -818,6 +871,8 @@ export default function OrdensServico() {
               <TableHead>Descrição</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Valor</TableHead>
+              <TableHead>Desconto</TableHead>
+              <TableHead>Total c/ desconto</TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Colaboradores</TableHead>
               <TableHead>Ações</TableHead>
@@ -831,8 +886,18 @@ export default function OrdensServico() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredOrdens.map((os) => (
-                <TableRow key={os.id}>
+              filteredOrdens.map((os) => {
+                const temDesconto = (os.desconto_valor || 0) > 0;
+                const percCalculado = (os.desconto_valor || 0) > 0
+                  ? (((os.desconto_valor || 0) / (os.valor_total || 1)) * 100)
+                  : 0;
+                return (
+                <TableRow
+                  key={os.id}
+                  className={cn(
+                    temDesconto && 'bg-emerald-50/60 dark:bg-emerald-900/10'
+                  )}
+                >
                   <TableCell className="font-medium">{os.numero_os}</TableCell>
                   <TableCell>{os.clientes?.nome || 'N/A'}</TableCell>
                   <TableCell className="max-w-xs truncate">
@@ -848,6 +913,43 @@ export default function OrdensServico() {
                     </span>
                   </TableCell>
                   <TableCell>{formatCurrency(os.valor_total)}</TableCell>
+                  <TableCell>
+                    {os.desconto_valor && os.desconto_valor > 0 ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help underline decoration-dotted underline-offset-4">
+                              <span className="inline-flex items-center gap-1">
+                                {os.desconto_tipo === 'percentual'
+                                  ? `${percCalculado.toFixed(2)}%`
+                                  : formatCurrency(os.desconto_valor)}
+                                <Percent className="h-3.5 w-3.5 text-emerald-600" />
+                              </span>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="space-y-1">
+                              <div>Tipo: {os.desconto_tipo === 'percentual' ? 'Percentual' : 'Valor'}</div>
+                              <div>Valor original: {formatCurrency(os.valor_total || 0)}</div>
+                              <div>Desconto aplicado: {formatCurrency(os.desconto_valor || 0)}</div>
+                              <div>Percentual: {percCalculado.toFixed(2)}%</div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      '-'
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {formatCurrency(
+                      os.valor_total_com_desconto ??
+                        Math.max(
+                          0,
+                          (os.valor_total || 0) - (os.desconto_valor || 0)
+                        )
+                    )}
+                  </TableCell>
                   <TableCell>{formatDate(os.data_abertura)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
@@ -940,7 +1042,7 @@ export default function OrdensServico() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
+              );})
             )}
           </TableBody>
         </Table>
@@ -1363,6 +1465,88 @@ export default function OrdensServico() {
               disabled={!motivoParada.trim() || !selectedOs}
             >
               Confirmar Parada
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDescontoDialog} onOpenChange={setShowDescontoDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finalizar OS - Desconto</DialogTitle>
+            <DialogDescription>
+              Informe um desconto em valor (R$) ou percentual (%). O total da OS será abatido e os campos ficarão salvos.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2">
+                <input
+                  id="tipo-valor"
+                  type="radio"
+                  name="tipo-desconto"
+                  checked={tipoDesconto === 'valor'}
+                  onChange={() => setTipoDesconto('valor')}
+                />
+                <label htmlFor="tipo-valor">Valor (R$)</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="tipo-percentual"
+                  type="radio"
+                  name="tipo-desconto"
+                  checked={tipoDesconto === 'percentual'}
+                  onChange={() => setTipoDesconto('percentual')}
+                />
+                <label htmlFor="tipo-percentual">Percentual (%)</label>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Valor do Desconto</label>
+              <Input
+                type="number"
+                step={tipoDesconto === 'valor' ? '0.01' : '0.1'}
+                value={Number.isNaN(valorDesconto) ? '' : valorDesconto}
+                onChange={(e) => setValorDesconto(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            {selectedOs && (
+              <div className="text-sm text-muted-foreground">
+                <div>Total atual: {formatCurrency(selectedOs.valor_total || 0)}</div>
+                <div>
+                  Desconto aplicado:{' '}
+                  {tipoDesconto === 'valor'
+                    ? formatCurrency(Math.max(0, Math.min(valorDesconto || 0, selectedOs.valor_total || 0)))
+                    : `${Math.max(0, Math.min(valorDesconto || 0, 100)).toFixed(2)}%`}
+                </div>
+                <div>
+                  Novo total:{' '}
+                  {formatCurrency(
+                    Math.max(
+                      0,
+                      (selectedOs.valor_total || 0) -
+                        (tipoDesconto === 'valor'
+                          ? Math.max(0, Math.min(valorDesconto || 0, selectedOs.valor_total || 0))
+                          : ((selectedOs.valor_total || 0) * Math.max(0, Math.min(valorDesconto || 0, 100))) / 100)
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDescontoDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (!selectedOs) return;
+                setShowDescontoDialog(false);
+                finalizarComDesconto(selectedOs, tipoDesconto, valorDesconto);
+              }}
+              disabled={!selectedOs}
+            >
+              Confirmar e Finalizar
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
 import {
   Table,
   TableBody,
@@ -42,9 +43,10 @@ import {
   endOfWeek,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo2.png';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
+import OSReportDetail from '../components/OSReportDetail';
 
 export default function Relatorios() {
   const [selectedReport, setSelectedReport] = useState('produtividade');
@@ -55,6 +57,10 @@ export default function Relatorios() {
   const [period, setPeriod] = useState('mes');
   const [colabFilter, setColabFilter] = useState('todos');
   const [clienteFilter, setClienteFilter] = useState('todos');
+  const [osNumberFilter, setOsNumberFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [selectedOSDetail, setSelectedOSDetail] = useState(null);
 
   const reportTypes = [
     {
@@ -80,6 +86,12 @@ export default function Relatorios() {
       title: 'Controle do Tempo',
       description: 'Análise de tempo real vs previsto',
       icon: Clock,
+    },
+    {
+      id: 'emissao_os',
+      title: 'Emissão de OS',
+      description: 'Relatório detalhado de ordens de serviço',
+      icon: FileText,
     },
   ];
 
@@ -126,6 +138,11 @@ export default function Relatorios() {
         start: startOfWeek(now, { weekStartsOn: 1 }).toISOString(),
         end: endOfWeek(now, { weekStartsOn: 1 }).toISOString(),
       };
+    } else if (period === 'personalizado') {
+      return {
+        start: startDate ? new Date(startDate).toISOString() : startOfMonth(now).toISOString(),
+        end: endDate ? new Date(endDate).toISOString() : endOfMonth(now).toISOString(),
+      };
     } else {
       return {
         start: startOfMonth(now).toISOString(),
@@ -152,6 +169,9 @@ export default function Relatorios() {
           break;
         case 'tempo':
           await generateTempoReport(start, end);
+          break;
+        case 'emissao_os':
+          await generateEmissaoOSReport(start, end);
           break;
       }
     } catch (error) {
@@ -420,6 +440,89 @@ export default function Relatorios() {
     }
   };
 
+  const generateEmissaoOSReport = async (start, end) => {
+    try {
+      let query = supabase
+        .from('ordens_servico')
+        .select(`
+          *,
+          clientes (
+            nome,
+            cpf_cnpj,
+            telefone,
+            email,
+            endereco,
+            cidade,
+            estado,
+            cep
+          ),
+          os_produtos (
+            *,
+            produtos (
+              nome,
+              descricao,
+              unidade
+            )
+          ),
+          os_colaboradores (
+            colaborador:colaboradores(nome)
+          )
+        `)
+        .gte('data_abertura', start)
+        .lte('data_abertura', end)
+        .order('data_abertura', { ascending: false });
+
+      // Aplicar filtros específicos
+      if (osNumberFilter.trim()) {
+        query = query.ilike('numero_os', `%${osNumberFilter.trim()}%`);
+      }
+
+      if (clienteFilter !== 'todos') {
+        query = query.eq('cliente_id', clienteFilter);
+      }
+
+      const { data: ordens, error } = await query;
+
+      if (error) {
+        console.error('Erro ao buscar OS:', error);
+        return;
+      }
+
+      // Processar dados para o relatório
+      const osData = (ordens || []).map((os) => ({
+        numero_os: os.numero_os,
+        cliente: os.clientes,
+        descricao: os.descricao,
+        status: os.status,
+        data_abertura: os.data_abertura,
+        data_fim: os.data_fim,
+        valor_total: os.valor_total,
+        desconto_tipo: os.desconto_tipo,
+        desconto_valor: os.desconto_valor,
+        valor_total_com_desconto: os.valor_total_com_desconto,
+        tempo_execucao_previsto: os.tempo_execucao_previsto,
+        tempo_execucao_real: os.tempo_execucao_real,
+        observacoes: os.observacoes,
+        produtos: os.os_produtos || [],
+        colaboradores: os.os_colaboradores || [],
+      }));
+
+      setReportData({
+        type: 'emissao_os',
+        data: osData,
+        period: { start, end },
+        filters: { 
+          cliente: clienteFilter,
+          osNumber: osNumberFilter,
+          startDate,
+          endDate
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório de emissão de OS:', error);
+    }
+  };
+
   // Função para obter título do relatório
   const getReportTitle = (type) => {
     switch (type) {
@@ -431,6 +534,8 @@ export default function Relatorios() {
         return 'RELATÓRIO DE STATUS DAS ORDENS DE SERVIÇO';
       case 'tempo':
         return 'RELATÓRIO DE CONTROLE DE TEMPO';
+      case 'emissao_os':
+        return 'RELATÓRIO DE EMISSÃO DE ORDENS DE SERVIÇO';
       default:
         return 'RELATÓRIO';
     }
@@ -595,6 +700,603 @@ export default function Relatorios() {
   const formatDate = (dateString) =>
     format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
 
+  const formatCurrency = (value) => {
+    if (value === null || value === undefined || isNaN(value)) return 'R$ 0,00';
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const handlePrintOSDetail = () => {
+    if (selectedOSDetail) {
+      const printWindow = window.open('', '_blank');
+      const os = selectedOSDetail;
+      
+      const totalProdutos = os.produtos.reduce(
+        (total, produto) => total + (produto.subtotal || 0),
+        0
+      );
+
+      // Converter logo para base64
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+        const logoBase64 = canvas.toDataURL('image/png');
+
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>OS ${os.numero_os}</title>
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                margin: 0; 
+                padding: 20px; 
+                background: white; 
+                color: black; 
+              }
+              .relatorio-impressao { 
+                max-width: 800px; 
+                margin: 0 auto; 
+              }
+              .relatorio-cabecalho { 
+                text-align: center; 
+                margin-bottom: 30px; 
+                border-bottom: 2px solid #333; 
+                padding-bottom: 20px; 
+              }
+              .relatorio-logo { 
+                width: 120px; 
+                height: auto; 
+                margin: 0 auto 15px auto; 
+                display: block; 
+              }
+              .relatorio-empresa { 
+                font-size: 18px; 
+                font-weight: bold; 
+                margin: 0 0 5px 0; 
+                color: #333; 
+              }
+              .relatorio-titulo { 
+                font-size: 16px; 
+                font-weight: bold; 
+                margin: 0 0 10px 0; 
+                color: #333; 
+                text-transform: uppercase; 
+              }
+              .relatorio-info { 
+                font-size: 11px; 
+                color: #666; 
+                margin: 0; 
+              }
+              .relatorio-secao { 
+                margin: 20px 0; 
+              }
+              .relatorio-secao h3 { 
+                font-size: 14px; 
+                font-weight: bold; 
+                margin: 0 0 10px 0; 
+                color: #333; 
+                border-bottom: 1px solid #ccc; 
+                padding-bottom: 5px; 
+              }
+              .relatorio-grid { 
+                display: grid; 
+                grid-template-columns: 1fr 1fr; 
+                gap: 20px; 
+                margin: 15px 0; 
+              }
+              .relatorio-tabela { 
+                margin: 20px 0; 
+              }
+              .relatorio-tabela table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin: 0; 
+              }
+              .relatorio-tabela th, .relatorio-tabela td { 
+                border: 1px solid #333; 
+                padding: 8px; 
+                text-align: left; 
+                font-size: 11px; 
+              }
+              .relatorio-tabela th { 
+                background-color: #f0f0f0; 
+                font-weight: bold; 
+                color: #333; 
+              }
+              .relatorio-resumo { 
+                background-color: #f9f9f9; 
+                padding: 15px; 
+                border: 1px solid #ccc; 
+                margin: 20px 0; 
+              }
+              .relatorio-resumo .total-final { 
+                border-top: 2px solid #333; 
+                padding-top: 10px; 
+                margin-top: 10px; 
+                font-weight: bold; 
+                font-size: 14px; 
+              }
+              .relatorio-rodape { 
+                text-align: center; 
+                margin-top: 30px; 
+                padding-top: 20px; 
+                border-top: 1px solid #ccc; 
+                font-size: 10px; 
+                color: #666; 
+              }
+              @media print {
+                body { margin: 0; padding: 15px; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="relatorio-impressao">
+              <div class="relatorio-cabecalho">
+                <img src="${logoBase64}" alt="Logo Metalma" class="relatorio-logo" />
+                <div class="relatorio-titulo">ORDEM DE SERVIÇO</div>
+                <div class="relatorio-info">Nº ${os.numero_os}</div>
+              </div>
+
+            <div class="relatorio-secao">
+              <div class="relatorio-grid">
+                <div>
+                  <h3>Dados da OS</h3>
+                  <div style="font-size: 11px; line-height: 1.6;">
+                    <div><strong>Número:</strong> ${os.numero_os}</div>
+                    <div><strong>Status:</strong> ${os.status.replace(/_/g, ' ').replace(/\\b\\w/g, (l) => l.toUpperCase())}</div>
+                    <div><strong>Data de Abertura:</strong> ${formatDate(os.data_abertura)}</div>
+                    ${os.data_fim ? `<div><strong>Data de Finalização:</strong> ${formatDate(os.data_fim)}</div>` : ''}
+                    <div><strong>Tempo Previsto:</strong> ${os.tempo_execucao_previsto || 0}h</div>
+                    <div><strong>Tempo Real:</strong> ${os.tempo_execucao_real || 0}h</div>
+                  </div>
+                </div>
+                <div>
+                  <h3>Dados do Cliente</h3>
+                  <div style="font-size: 11px; line-height: 1.6;">
+                    <div><strong>Nome:</strong> ${os.cliente?.nome || 'N/A'}</div>
+                    <div><strong>CPF/CNPJ:</strong> ${os.cliente?.cpf_cnpj || 'N/A'}</div>
+                    <div><strong>Telefone:</strong> ${os.cliente?.telefone || 'N/A'}</div>
+                    <div><strong>Email:</strong> ${os.cliente?.email || 'N/A'}</div>
+                    <div><strong>Endereço:</strong> ${os.cliente?.endereco || 'N/A'}</div>
+                    <div><strong>Cidade/UF:</strong> ${os.cliente?.cidade || 'N/A'} / ${os.cliente?.estado || 'N/A'}</div>
+                    <div><strong>CEP:</strong> ${os.cliente?.cep || 'N/A'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="relatorio-secao">
+              <h3>Descrição dos Serviços</h3>
+              <div style="background-color: #f9f9f9; padding: 10px; border: 1px solid #ccc; font-size: 11px;">
+                ${os.descricao.replace(/\\n/g, '<br>')}
+              </div>
+            </div>
+
+            <div class="relatorio-secao">
+              <h3>Produtos Utilizados</h3>
+              <div class="relatorio-tabela">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Descrição</th>
+                      <th>Qtd.</th>
+                      <th>Unidade</th>
+                      <th>Valor Unit.</th>
+                      <th>Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${os.produtos.map(produto => `
+                      <tr>
+                        <td>${produto.produtos?.nome || 'N/A'}</td>
+                        <td>${produto.produtos?.descricao || '-'}</td>
+                        <td style="text-align: center;">${produto.quantidade}</td>
+                        <td style="text-align: center;">${produto.produtos?.unidade || 'UN'}</td>
+                        <td style="text-align: right;">${formatCurrency(produto.preco_unitario)}</td>
+                        <td style="text-align: right; font-weight: bold;">${formatCurrency(produto.subtotal)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            ${os.colaboradores.length > 0 ? `
+            <div class="relatorio-secao">
+              <h3>Colaboradores Envolvidos</h3>
+              <div style="font-size: 11px;">
+                ${os.colaboradores.map(colab => colab.colaborador?.nome || 'N/A').join(', ')}
+              </div>
+            </div>
+            ` : ''}
+
+
+            ${os.observacoes ? `
+            <div class="relatorio-secao">
+              <h3>Observações</h3>
+              <div style="background-color: #f9f9f9; padding: 10px; border: 1px solid #ccc; font-size: 11px;">
+                ${os.observacoes.replace(/\\n/g, '<br>')}
+              </div>
+            </div>
+            ` : ''}
+
+            <div class="relatorio-rodape" style="text-align: center;">
+              Metalma Inox & Cia - Sistema de Controle de OS<br/>
+              Relatório gerado em: ${formatDate(new Date().toISOString())}
+            </div>
+          </div>
+        </body>
+        </html>
+        `);
+
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      };
+      
+      img.onerror = () => {
+        // Se a imagem não carregar, usar apenas texto
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>OS ${os.numero_os}</title>
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                margin: 0; 
+                padding: 20px; 
+                background: white; 
+                color: black; 
+              }
+              .relatorio-impressao { 
+                max-width: 800px; 
+                margin: 0 auto; 
+              }
+              .relatorio-cabecalho { 
+                text-align: center; 
+                margin-bottom: 30px; 
+                border-bottom: 2px solid #333; 
+                padding-bottom: 20px; 
+              }
+              .relatorio-titulo { 
+                font-size: 16px; 
+                font-weight: bold; 
+                margin: 0 0 10px 0; 
+                color: #333; 
+                text-transform: uppercase; 
+              }
+              .relatorio-info { 
+                font-size: 11px; 
+                color: #666; 
+                margin: 0; 
+              }
+              .relatorio-secao { 
+                margin: 20px 0; 
+              }
+              .relatorio-secao h3 { 
+                font-size: 14px; 
+                font-weight: bold; 
+                margin: 0 0 10px 0; 
+                color: #333; 
+                border-bottom: 1px solid #ccc; 
+                padding-bottom: 5px; 
+              }
+              .relatorio-grid { 
+                display: grid; 
+                grid-template-columns: 1fr 1fr; 
+                gap: 20px; 
+                margin: 15px 0; 
+              }
+              .relatorio-tabela { 
+                margin: 20px 0; 
+              }
+              .relatorio-tabela table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin: 0; 
+              }
+              .relatorio-tabela th, .relatorio-tabela td { 
+                border: 1px solid #333; 
+                padding: 8px; 
+                text-align: left; 
+                font-size: 11px; 
+              }
+              .relatorio-tabela th { 
+                background-color: #f0f0f0; 
+                font-weight: bold; 
+                color: #333; 
+              }
+              .relatorio-rodape { 
+                text-align: center; 
+                margin-top: 30px; 
+                padding-top: 20px; 
+                border-top: 1px solid #ccc; 
+                font-size: 10px; 
+                color: #666; 
+              }
+              @media print {
+                body { margin: 0; padding: 15px; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="relatorio-impressao">
+              <div class="relatorio-cabecalho">
+                <div class="relatorio-titulo">ORDEM DE SERVIÇO</div>
+                <div class="relatorio-info">Nº ${os.numero_os}</div>
+              </div>
+
+            <div class="relatorio-secao">
+              <div class="relatorio-grid">
+                <div>
+                  <h3>Dados da OS</h3>
+                  <div style="font-size: 11px; line-height: 1.6;">
+                    <div><strong>Número:</strong> ${os.numero_os}</div>
+                    <div><strong>Status:</strong> ${os.status.replace(/_/g, ' ').replace(/\\b\\w/g, (l) => l.toUpperCase())}</div>
+                    <div><strong>Data de Abertura:</strong> ${formatDate(os.data_abertura)}</div>
+                    ${os.data_fim ? `<div><strong>Data de Finalização:</strong> ${formatDate(os.data_fim)}</div>` : ''}
+                    <div><strong>Tempo Previsto:</strong> ${os.tempo_execucao_previsto || 0}h</div>
+                    <div><strong>Tempo Real:</strong> ${os.tempo_execucao_real || 0}h</div>
+                  </div>
+                </div>
+                <div>
+                  <h3>Dados do Cliente</h3>
+                  <div style="font-size: 11px; line-height: 1.6;">
+                    <div><strong>Nome:</strong> ${os.cliente?.nome || 'N/A'}</div>
+                    <div><strong>CPF/CNPJ:</strong> ${os.cliente?.cpf_cnpj || 'N/A'}</div>
+                    <div><strong>Telefone:</strong> ${os.cliente?.telefone || 'N/A'}</div>
+                    <div><strong>Email:</strong> ${os.cliente?.email || 'N/A'}</div>
+                    <div><strong>Endereço:</strong> ${os.cliente?.endereco || 'N/A'}</div>
+                    <div><strong>Cidade/UF:</strong> ${os.cliente?.cidade || 'N/A'} / ${os.cliente?.estado || 'N/A'}</div>
+                    <div><strong>CEP:</strong> ${os.cliente?.cep || 'N/A'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="relatorio-secao">
+              <h3>Descrição dos Serviços</h3>
+              <div style="background-color: #f9f9f9; padding: 10px; border: 1px solid #ccc; font-size: 11px;">
+                ${os.descricao.replace(/\\n/g, '<br>')}
+              </div>
+            </div>
+
+            <div class="relatorio-secao">
+              <h3>Produtos Utilizados</h3>
+              <div class="relatorio-tabela">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Descrição</th>
+                      <th>Qtd.</th>
+                      <th>Unidade</th>
+                      <th>Valor Unit.</th>
+                      <th>Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${os.produtos.map(produto => `
+                      <tr>
+                        <td>${produto.produtos?.nome || 'N/A'}</td>
+                        <td>${produto.produtos?.descricao || '-'}</td>
+                        <td style="text-align: center;">${produto.quantidade}</td>
+                        <td style="text-align: center;">${produto.produtos?.unidade || 'UN'}</td>
+                        <td style="text-align: right;">${formatCurrency(produto.preco_unitario)}</td>
+                        <td style="text-align: right; font-weight: bold;">${formatCurrency(produto.subtotal)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            ${os.colaboradores.length > 0 ? `
+            <div class="relatorio-secao">
+              <h3>Colaboradores Envolvidos</h3>
+              <div style="font-size: 11px;">
+                ${os.colaboradores.map(colab => colab.colaborador?.nome || 'N/A').join(', ')}
+              </div>
+            </div>
+            ` : ''}
+
+            ${os.observacoes ? `
+            <div class="relatorio-secao">
+              <h3>Observações</h3>
+              <div style="background-color: #f9f9f9; padding: 10px; border: 1px solid #ccc; font-size: 11px;">
+                ${os.observacoes.replace(/\\n/g, '<br>')}
+              </div>
+            </div>
+            ` : ''}
+
+            <div class="relatorio-rodape" style="text-align: center;">
+              Metalma Inox & Cia - Sistema de Controle de OS<br/>
+              Relatório gerado em: ${formatDate(new Date().toISOString())}
+            </div>
+          </div>
+        </body>
+        </html>
+        `);
+
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      };
+      
+      img.src = logo;
+    }
+  };
+
+  const handleExportPDFOSDetail = () => {
+    if (selectedOSDetail) {
+      try {
+        const os = selectedOSDetail;
+        const doc = new jsPDF();
+        
+        // Configurações da página
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        let yPosition = 20;
+
+        // Converter logo para base64 e adicionar ao PDF
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = () => {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx?.drawImage(img, 0, 0);
+          const logoBase64 = canvas.toDataURL('image/png');
+
+          // Adicionar logo ao PDF
+          doc.addImage(logoBase64, 'PNG', pageWidth / 2 - 30, yPosition, 60, 20);
+          yPosition += 35;
+
+          // Cabeçalho
+          doc.setFontSize(16);
+          doc.setFont('helvetica', 'bold');
+          doc.text('ORDEM DE SERVIÇO', pageWidth / 2, yPosition, { align: 'center' });
+          yPosition += 10;
+
+          doc.setFontSize(12);
+          doc.text(`Nº ${os.numero_os}`, pageWidth / 2, yPosition, { align: 'center' });
+          yPosition += 20;
+
+        // Dados da OS
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Dados da OS', 20, yPosition);
+        yPosition += 10;
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Número: ${os.numero_os}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Status: ${os.status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Data de Abertura: ${formatDate(os.data_abertura)}`, 20, yPosition);
+        yPosition += 6;
+        if (os.data_fim) {
+          doc.text(`Data de Finalização: ${formatDate(os.data_fim)}`, 20, yPosition);
+          yPosition += 6;
+        }
+        doc.text(`Tempo Previsto: ${os.tempo_execucao_previsto || 0}h`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Tempo Real: ${os.tempo_execucao_real || 0}h`, 20, yPosition);
+        yPosition += 15;
+
+        // Dados do Cliente
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Dados do Cliente', 20, yPosition);
+        yPosition += 10;
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Nome: ${os.cliente?.nome || 'N/A'}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`CPF/CNPJ: ${os.cliente?.cpf_cnpj || 'N/A'}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Telefone: ${os.cliente?.telefone || 'N/A'}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Email: ${os.cliente?.email || 'N/A'}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Endereço: ${os.cliente?.endereco || 'N/A'}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Cidade/UF: ${os.cliente?.cidade || 'N/A'} / ${os.cliente?.estado || 'N/A'}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`CEP: ${os.cliente?.cep || 'N/A'}`, 20, yPosition);
+        yPosition += 15;
+
+        // Descrição dos Serviços
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Descrição dos Serviços', 20, yPosition);
+        yPosition += 10;
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const descricaoLines = doc.splitTextToSize(os.descricao, pageWidth - 40);
+        doc.text(descricaoLines, 20, yPosition);
+        yPosition += descricaoLines.length * 5 + 10;
+
+        // Produtos
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Produtos Utilizados', 20, yPosition);
+        yPosition += 10;
+
+        // Tabela de produtos
+        const produtosData = os.produtos.map(produto => [
+          produto.produtos?.nome || 'N/A',
+          produto.produtos?.descricao || '-',
+          produto.quantidade.toString(),
+          produto.produtos?.unidade || 'UN',
+          formatCurrency(produto.preco_unitario),
+          formatCurrency(produto.subtotal)
+        ]);
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [['Produto', 'Descrição', 'Qtd.', 'Unidade', 'Valor Unit.', 'Subtotal']],
+          body: produtosData,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [240, 240, 240] },
+          columnStyles: {
+            2: { halign: 'center' },
+            3: { halign: 'center' },
+            4: { halign: 'right' },
+            5: { halign: 'right' }
+          }
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 15;
+
+        // Observações
+        if (os.observacoes) {
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Observações', 20, yPosition);
+          yPosition += 10;
+
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          const observacoesLines = doc.splitTextToSize(os.observacoes, pageWidth - 40);
+          doc.text(observacoesLines, 20, yPosition);
+        }
+
+        // Rodapé centralizado
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Metalma Inox & Cia - Sistema de Controle de OS', pageWidth / 2, pageHeight - 20, { align: 'center' });
+        doc.text(`Relatório gerado em: ${formatDate(new Date().toISOString())}`, pageWidth / 2, pageHeight - 15, { align: 'center' });
+
+          const fileName = `OS_${os.numero_os.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+          doc.save(fileName);
+        };
+        
+        img.src = logo;
+      } catch (error) {
+        console.error('Erro ao gerar PDF:', error);
+        alert('Erro ao gerar PDF: ' + error.message);
+      }
+    }
+  };
+
   const renderTableContent = () => {
     if (!reportData) return '';
 
@@ -630,6 +1332,16 @@ export default function Relatorios() {
           <th>Tempo Previsto</th>
           <th>Eficiência (%)</th>
           <th>Status</th>
+        `;
+      case 'emissao_os':
+        return `
+          <th>OS</th>
+          <th>Cliente</th>
+          <th>Data</th>
+          <th>Status</th>
+          <th>Valor Total</th>
+          <th>Desconto</th>
+          <th>Total Final</th>
         `;
       default:
         return '';
@@ -696,6 +1408,22 @@ export default function Relatorios() {
         `
           )
           .join('');
+      case 'emissao_os':
+        return reportData.data
+          .map(
+            (os, index) => `
+          <tr>
+            <td style="font-weight: bold;">${os.numero_os}</td>
+            <td>${os.cliente?.nome || 'N/A'}</td>
+            <td>${formatDate(os.data_abertura)}</td>
+            <td>${os.status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</td>
+            <td>${formatCurrency(os.valor_total)}</td>
+            <td>${os.desconto_valor ? formatCurrency(os.desconto_valor) : '-'}</td>
+            <td>${formatCurrency(os.valor_total_com_desconto || os.valor_total)}</td>
+          </tr>
+        `
+          )
+          .join('');
       default:
         return '';
     }
@@ -744,6 +1472,18 @@ export default function Relatorios() {
             <TableHead>Tempo Previsto</TableHead>
             <TableHead>Eficiência (%)</TableHead>
             <TableHead>Status</TableHead>
+          </>
+        );
+      case 'emissao_os':
+        return (
+          <>
+            <TableHead>OS</TableHead>
+            <TableHead>Cliente</TableHead>
+            <TableHead>Data</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Valor Total</TableHead>
+            <TableHead>Desconto</TableHead>
+            <TableHead>Total Final</TableHead>
           </>
         );
       default:
@@ -825,6 +1565,28 @@ export default function Relatorios() {
             </TableCell>
           </TableRow>
         ));
+      case 'emissao_os':
+        return reportData.data.map((os, index) => (
+          <TableRow key={index} className="cursor-pointer hover:bg-gray-50" onClick={() => setSelectedOSDetail(os)}>
+            <TableCell className="font-medium">{os.numero_os}</TableCell>
+            <TableCell>{os.cliente?.nome || 'N/A'}</TableCell>
+            <TableCell>{formatDate(os.data_abertura)}</TableCell>
+            <TableCell>
+              <Badge className={`status-${os.status.replace('_', '-')}`}>
+                {os.status
+                  .replace(/_/g, ' ')
+                  .replace(/\b\w/g, (l) => l.toUpperCase())}
+              </Badge>
+            </TableCell>
+            <TableCell>{formatCurrency(os.valor_total)}</TableCell>
+            <TableCell>
+              {os.desconto_valor ? formatCurrency(os.desconto_valor) : '-'}
+            </TableCell>
+            <TableCell className="font-medium">
+              {formatCurrency(os.valor_total_com_desconto || os.valor_total)}
+            </TableCell>
+          </TableRow>
+        ));
       default:
         return null;
     }
@@ -890,6 +1652,38 @@ export default function Relatorios() {
                 </SelectContent>
               </Select>
             </div>
+
+            {selectedReport === 'emissao_os' && (
+              <div className="space-y-2">
+                <Label>Número da OS</Label>
+                <Input
+                  placeholder="Ex: OS0001/2024"
+                  value={osNumberFilter}
+                  onChange={(e) => setOsNumberFilter(e.target.value)}
+                />
+              </div>
+            )}
+
+            {period === 'personalizado' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Data Início</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data Fim</Label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <Label>Colaborador</Label>
@@ -972,6 +1766,15 @@ export default function Relatorios() {
             </Table>
           </CardContent>
         </Card>
+      )}
+
+      {/* Relatório Detalhado de OS */}
+      {selectedOSDetail && (
+        <OSReportDetail
+          osData={selectedOSDetail}
+          onPrint={handlePrintOSDetail}
+          onExportPDF={handleExportPDFOSDetail}
+        />
       )}
     </div>
   );

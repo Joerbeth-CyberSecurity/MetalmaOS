@@ -138,6 +138,38 @@ export default function OSReportDetail({ osData, onPrint, onExportPDF }: OSRepor
           </div>
         </div>
 
+        {/* Resumo Financeiro */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">Resumo Financeiro</h3>
+          <div className="bg-gray-50 p-4 rounded border">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Valor Total:</span>
+                <span className="text-lg font-bold">{formatCurrency(totalProdutos)}</span>
+              </div>
+              {osData.desconto_valor && osData.desconto_valor > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Desconto:</span>
+                  <span className="text-lg font-bold text-red-600">
+                    {osData.desconto_tipo === 'percentual' 
+                      ? `${((osData.desconto_valor / totalProdutos) * 100).toFixed(2)}%`
+                      : formatCurrency(osData.desconto_valor)
+                    }
+                  </span>
+                </div>
+              )}
+              <div className="border-t pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-lg">Total com Desconto:</span>
+                  <span className="text-xl font-bold text-green-600">
+                    {formatCurrency(osData.valor_total_com_desconto || totalProdutos)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Colaboradores */}
         {osData.colaboradores.length > 0 && (
           <div className="mb-6">

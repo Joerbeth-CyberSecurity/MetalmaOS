@@ -62,6 +62,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import { ClientesResponsiveTable } from '@/components/ui/responsive-table';
 import { ReportTemplate } from '@/components/ui/ReportTemplate';
 
 // Função para aplicar máscara de CPF
@@ -302,10 +303,10 @@ export default function Clientes() {
 
   return (
     <div className="space-y-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
-          <p className="text-muted-foreground">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Clientes</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Gerencie os clientes da sua empresa.
           </p>
           <div className="mt-3 w-full max-w-sm">
@@ -316,100 +317,37 @@ export default function Clientes() {
             />
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={handleAddNew} type="button">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={handleAddNew} type="button" className="w-full sm:w-auto">
             <PlusCircle className="mr-2 h-4 w-4" />
-            Adicionar Cliente
+            <span className="hidden sm:inline">Adicionar Cliente</span>
+            <span className="sm:hidden">Novo Cliente</span>
           </Button>
           <Button
             onClick={() => setExportOpen(true)}
             type="button"
-            className="bg-primary font-semibold text-white shadow-soft transition hover:bg-primary/80"
+            className="bg-primary font-semibold text-white shadow-soft transition hover:bg-primary/80 w-full sm:w-auto"
           >
-            Imprimir / Exportar PDF
+            <span className="hidden sm:inline">Imprimir / Exportar PDF</span>
+            <span className="sm:hidden">Imprimir</span>
           </Button>
         </div>
       </div>
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Contato</TableHead>
-              <TableHead>Localização</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center">
-                  <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                </TableCell>
-              </TableRow>
-            ) : (
-              clientes
-                .filter((c) => {
-                  const term = (searchTerm || '').toLowerCase();
-                  if (!term) return true;
-                  const byName = (c.nome || '').toLowerCase().includes(term);
-                  const digitsTerm = onlyDigits(searchTerm);
-                  const byDoc = digitsTerm
-                    ? onlyDigits(c.cpf_cnpj || '').includes(digitsTerm)
-                    : false;
-                  return byName || byDoc;
-                })
-                .map((cliente) => (
-                <TableRow key={cliente.id}>
-                  <TableCell className="font-medium">{cliente.nome}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span>{cliente.email}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {cliente.telefone}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {cliente.cidade && cliente.estado
-                      ? `${cliente.cidade}, ${cliente.estado}`
-                      : 'N/A'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={cliente.ativo ? 'default' : 'destructive'}>
-                      {cliente.ativo ? 'Ativo' : 'Inativo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(cliente)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => setClienteToDelete(cliente)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <ClientesResponsiveTable
+        data={clientes.filter((c) => {
+          const term = (searchTerm || '').toLowerCase();
+          if (!term) return true;
+          const byName = (c.nome || '').toLowerCase().includes(term);
+          const digitsTerm = onlyDigits(searchTerm);
+          const byDoc = digitsTerm
+            ? onlyDigits(c.cpf_cnpj || '').includes(digitsTerm)
+            : false;
+          return byName || byDoc;
+        })}
+        loading={loading}
+        onEdit={handleEdit}
+        onDelete={setClienteToDelete}
+      />
       {/* Modal de exportação */}
       <Dialog open={exportOpen} onOpenChange={setExportOpen}>
         <DialogContent className="max-w-3xl p-0">
@@ -534,7 +472,7 @@ export default function Clientes() {
       </Dialog>
       {/* Painel Lateral (Sheet) para Adicionar/Editar Cliente */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="sm:max-w-lg">
+        <SheetContent className="w-full sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>
               {selectedCliente ? 'Editar Cliente' : 'Adicionar Novo Cliente'}

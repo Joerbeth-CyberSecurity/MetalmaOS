@@ -145,17 +145,17 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Visão geral do sistema de controle de ordens de serviço
         </p>
       </div>
 
       {/* Main Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="card-modern transition-all duration-200 hover:shadow-medium">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de OS</CardTitle>
@@ -216,7 +216,7 @@ export default function Dashboard() {
       </div>
 
       {/* Status Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="card-elevated">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -297,7 +297,7 @@ export default function Dashboard() {
             Funcionalidades principais do sistema
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
           <div
             onClick={handleNovaOS}
             className="flex cursor-pointer flex-col items-center rounded-lg border p-4 transition-colors hover:bg-secondary/50"

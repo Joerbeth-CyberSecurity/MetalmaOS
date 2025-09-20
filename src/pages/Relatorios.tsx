@@ -911,6 +911,33 @@ export default function Relatorios() {
               </div>
             </div>
 
+            <div class="relatorio-secao">
+              <h3>Resumo Financeiro</h3>
+              <div class="relatorio-resumo">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <span style="font-weight: bold;">Valor Total:</span>
+                  <span style="font-size: 16px; font-weight: bold;">${formatCurrency(totalProdutos)}</span>
+                </div>
+                ${os.desconto_valor && os.desconto_valor > 0 ? `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <span style="font-weight: bold;">Desconto:</span>
+                  <span style="font-size: 16px; font-weight: bold; color: #dc2626;">
+                    ${os.desconto_tipo === 'percentual' 
+                      ? `${((os.desconto_valor / totalProdutos) * 100).toFixed(2)}%`
+                      : formatCurrency(os.desconto_valor)
+                    }
+                  </span>
+                </div>
+                ` : ''}
+                <div class="total-final" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: bold; font-size: 18px;">Total com Desconto:</span>
+                  <span style="font-size: 20px; font-weight: bold; color: #059669;">
+                    ${formatCurrency(os.valor_total_com_desconto || totalProdutos)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             ${os.colaboradores.length > 0 ? `
             <div class="relatorio-secao">
               <h3>Colaboradores Envolvidos</h3>
@@ -1103,6 +1130,33 @@ export default function Relatorios() {
               </div>
             </div>
 
+            <div class="relatorio-secao">
+              <h3>Resumo Financeiro</h3>
+              <div class="relatorio-resumo">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <span style="font-weight: bold;">Valor Total:</span>
+                  <span style="font-size: 16px; font-weight: bold;">${formatCurrency(totalProdutos)}</span>
+                </div>
+                ${os.desconto_valor && os.desconto_valor > 0 ? `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                  <span style="font-weight: bold;">Desconto:</span>
+                  <span style="font-size: 16px; font-weight: bold; color: #dc2626;">
+                    ${os.desconto_tipo === 'percentual' 
+                      ? `${((os.desconto_valor / totalProdutos) * 100).toFixed(2)}%`
+                      : formatCurrency(os.desconto_valor)
+                    }
+                  </span>
+                </div>
+                ` : ''}
+                <div class="total-final" style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: bold; font-size: 18px;">Total com Desconto:</span>
+                  <span style="font-size: 20px; font-weight: bold; color: #059669;">
+                    ${formatCurrency(os.valor_total_com_desconto || totalProdutos)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
             ${os.colaboradores.length > 0 ? `
             <div class="relatorio-secao">
               <h3>Colaboradores Envolvidos</h3>
@@ -1265,6 +1319,34 @@ export default function Relatorios() {
         });
 
         yPosition = (doc as any).lastAutoTable.finalY + 15;
+
+        // Resumo Financeiro
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Resumo Financeiro', 20, yPosition);
+        yPosition += 10;
+
+        const totalProdutos = os.produtos.reduce(
+          (total, produto) => total + (produto.subtotal || 0),
+          0
+        );
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Valor Total: ${formatCurrency(totalProdutos)}`, 20, yPosition);
+        yPosition += 6;
+
+        if (os.desconto_valor && os.desconto_valor > 0) {
+          const descontoText = os.desconto_tipo === 'percentual' 
+            ? `${((os.desconto_valor / totalProdutos) * 100).toFixed(2)}%`
+            : formatCurrency(os.desconto_valor);
+          doc.text(`Desconto: ${descontoText}`, 20, yPosition);
+          yPosition += 6;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Total com Desconto: ${formatCurrency(os.valor_total_com_desconto || totalProdutos)}`, 20, yPosition);
+        yPosition += 15;
 
         // Observações
         if (os.observacoes) {

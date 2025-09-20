@@ -54,6 +54,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
+import { ColaboradoresResponsiveTable } from '@/components/ui/responsive-table';
 
 // Função para aplicar máscara de CPF
 function maskCPF(value: string) {
@@ -276,95 +277,31 @@ export default function Colaboradores() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Colaboradores</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Colaboradores</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Gerencie os colaboradores da sua equipe.
           </p>
         </div>
-        <Button onClick={handleAddNew}>
+        <Button onClick={handleAddNew} className="w-full sm:w-auto">
           <PlusCircle className="mr-2 h-4 w-4" />
-          Adicionar Colaborador
+          <span className="hidden sm:inline">Adicionar Colaborador</span>
+          <span className="sm:hidden">Novo Colaborador</span>
         </Button>
       </div>
 
       {/* Tabela de Colaboradores */}
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Cargo</TableHead>
-              <TableHead>Contato</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-12"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center">
-                  <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                </TableCell>
-              </TableRow>
-            ) : (
-              colaboradores.map((colaborador) => (
-                <TableRow key={colaborador.id}>
-                  <TableCell className="font-medium">
-                    {colaborador.nome}
-                  </TableCell>
-                  <TableCell>{colaborador.cargo || 'N/A'}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span>{colaborador.email}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {colaborador.telefone}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={colaborador.ativo ? 'default' : 'destructive'}
-                    >
-                      {colaborador.ativo ? 'Ativo' : 'Inativo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleEdit(colaborador)}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => setColaboradorToDelete(colaborador)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <ColaboradoresResponsiveTable
+        data={colaboradores}
+        loading={loading}
+        onEdit={handleEdit}
+        onDelete={setColaboradorToDelete}
+      />
 
       {/* Painel Lateral (Sheet) para Adicionar/Editar */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="overflow-y-auto sm:max-w-lg">
+        <SheetContent className="overflow-y-auto w-full sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>
               {selectedColaborador

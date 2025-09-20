@@ -89,6 +89,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
 import { Checkbox } from '@/components/ui/checkbox';
+import { OSResponsiveTable } from '@/components/ui/responsive-table';
 // Remover import do ReportTemplate se não for mais usado
 // import { ReportTemplate } from '@/components/ui/ReportTemplate';
 
@@ -809,36 +810,38 @@ export default function OrdensServico() {
 
   return (
     <div className="space-y-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             Ordens de Serviço
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Crie e gerencie as ordens de serviço.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={handleAddNew} type="button">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={handleAddNew} type="button" className="w-full sm:w-auto">
             <PlusCircle className="mr-2 h-4 w-4" />
-            Nova Ordem de Serviço
+            <span className="hidden sm:inline">Nova Ordem de Serviço</span>
+            <span className="sm:hidden">Nova OS</span>
           </Button>
           <Button
             onClick={() => window.print()}
             type="button"
-            className="bg-primary font-semibold text-white shadow-soft transition hover:bg-primary/80"
+            className="bg-primary font-semibold text-white shadow-soft transition hover:bg-primary/80 w-full sm:w-auto"
           >
-            Imprimir / Exportar PDF
+            <span className="hidden sm:inline">Imprimir / Exportar PDF</span>
+            <span className="sm:hidden">Imprimir</span>
           </Button>
         </div>
       </div>
-      <div className="mb-2 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <label className="text-foreground">Status:</label>
+      <div className="mb-4 flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <label className="text-sm font-medium text-foreground">Status:</label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded border border-border bg-background px-2 py-1 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="rounded border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 w-full sm:w-auto"
           >
             <option value="">Todos</option>
             <option value="aberta">Aberta</option>
@@ -849,12 +852,12 @@ export default function OrdensServico() {
             <option value="falta_material">Falta de material</option>
           </select>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-foreground">Desconto:</label>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <label className="text-sm font-medium text-foreground">Desconto:</label>
           <select
             value={descontoFilter}
             onChange={(e) => setDescontoFilter(e.target.value as any)}
-            className="rounded border border-border bg-background px-2 py-1 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="rounded border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 w-full sm:w-auto"
           >
             <option value="todos">Todos</option>
             <option value="com">Com desconto</option>
@@ -862,194 +865,26 @@ export default function OrdensServico() {
           </select>
         </div>
       </div>
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>OS</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Valor</TableHead>
-              <TableHead>Desconto</TableHead>
-              <TableHead>Total c/ desconto</TableHead>
-              <TableHead>Data</TableHead>
-              <TableHead>Colaboradores</TableHead>
-              <TableHead>Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center">
-                  <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredOrdens.map((os) => {
-                const temDesconto = (os.desconto_valor || 0) > 0;
-                const percCalculado = (os.desconto_valor || 0) > 0
-                  ? (((os.desconto_valor || 0) / (os.valor_total || 1)) * 100)
-                  : 0;
-                return (
-                <TableRow
-                  key={os.id}
-                  className={cn(
-                    temDesconto && 'bg-emerald-50/60 dark:bg-emerald-900/10'
-                  )}
-                >
-                  <TableCell className="font-medium">{os.numero_os}</TableCell>
-                  <TableCell>{os.clientes?.nome || 'N/A'}</TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {os.descricao}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`status-${os.status?.replace('_', '-')} rounded border px-2 py-1 text-xs font-semibold`}
-                    >
-                      {os.status
-                        ?.replace(/_/g, ' ')
-                        .replace(/\b\w/g, (l) => l.toUpperCase())}
-                    </span>
-                  </TableCell>
-                  <TableCell>{formatCurrency(os.valor_total)}</TableCell>
-                  <TableCell>
-                    {os.desconto_valor && os.desconto_valor > 0 ? (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="cursor-help underline decoration-dotted underline-offset-4">
-                              <span className="inline-flex items-center gap-1">
-                                {os.desconto_tipo === 'percentual'
-                                  ? `${percCalculado.toFixed(2)}%`
-                                  : formatCurrency(os.desconto_valor)}
-                                <Percent className="h-3.5 w-3.5 text-emerald-600" />
-                              </span>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="space-y-1">
-                              <div>Tipo: {os.desconto_tipo === 'percentual' ? 'Percentual' : 'Valor'}</div>
-                              <div>Valor original: {formatCurrency(os.valor_total || 0)}</div>
-                              <div>Desconto aplicado: {formatCurrency(os.desconto_valor || 0)}</div>
-                              <div>Percentual: {percCalculado.toFixed(2)}%</div>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {formatCurrency(
-                      os.valor_total_com_desconto ??
-                        Math.max(
-                          0,
-                          (os.valor_total || 0) - (os.desconto_valor || 0)
-                        )
-                    )}
-                  </TableCell>
-                  <TableCell>{formatDate(os.data_abertura)}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {os.os_colaboradores?.map((c) => (
-                        <Badge key={c.colaborador?.nome} variant="outline">
-                          {c.colaborador?.nome}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Abrir menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(os)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        {os.status === 'aberta' && (
-                          <>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedOs(os);
-                                setShowColaboradoresDialog(true);
-                              }}
-                            >
-                              <UserPlus className="mr-2 h-4 w-4" />
-                              Associar Colaboradores
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleStartOS(os)}
-                              disabled={isStarting}
-                            >
-                              <Play className="mr-2 h-4 w-4" />
-                              Iniciar OS
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {os.status === 'em_andamento' && (
-                          <>
-                            <DropdownMenuItem
-                              onClick={() => handlePauseOS(os)}
-                              disabled={isPausing}
-                            >
-                              <Pause className="mr-2 h-4 w-4" />
-                              Pausar OS
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedOs(os);
-                                setShowParadaDialog(true);
-                              }}
-                              disabled={isPausing}
-                              className="text-destructive"
-                            >
-                              <AlertTriangle className="mr-2 h-4 w-4" />
-                              Parada por Falta de Material
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleFinishOS(os)}
-                              disabled={isFinishing}
-                            >
-                              <CheckCircle className="mr-2 h-4 w-4" />
-                              Finalizar OS
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {os.status === 'pausada' && (
-                          <DropdownMenuItem
-                            onClick={() => handleStartOS(os)}
-                            disabled={isStarting}
-                          >
-                            <Play className="mr-2 h-4 w-4" />
-                            Retomar OS
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => setOsToDelete(os)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );})
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <OSResponsiveTable
+        data={filteredOrdens}
+        loading={loading}
+        onEdit={handleEdit}
+        onDelete={setOsToDelete}
+        onStart={handleStartOS}
+        onPause={handlePauseOS}
+        onFinish={handleFinishOS}
+        onAssociateColaboradores={(os) => {
+          setSelectedOs(os);
+          setShowColaboradoresDialog(true);
+        }}
+        onParadaMaterial={(os) => {
+          setSelectedOs(os);
+          setShowParadaDialog(true);
+        }}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col">
+        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col w-[95vw] sm:w-full">
           <DialogHeader>
             <DialogTitle>
               {selectedOs ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}

@@ -128,7 +128,7 @@ export function AppSidebar() {
     >
       <SidebarContent>
         {/* Header */}
-        <div className="border-b border-sidebar-border p-4">
+        <div className="border-b border-sidebar-border p-2 sm:p-4">
           <div className="flex w-full items-center justify-center">
             <Logo
               width={collapsed ? 32 : 120}
@@ -196,23 +196,25 @@ export function AppSidebar() {
         )}
 
         {/* Logout Button */}
-        <div className="mt-auto border-t border-sidebar-border p-4">
+        <div className="mt-auto border-t border-sidebar-border p-2 sm:p-4">
           {/* Sessão do usuário */}
-          <div className="mb-3">
-            <div className="flex flex-col gap-1 rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">
-              <div>
-                <span className="font-medium">Logon:</span>{' '}
-                {logonTime.toLocaleTimeString()}
-              </div>
-              <div>
-                <span className="font-medium">Tempo conectado:</span> {elapsed}
-              </div>
-              <div>
-                <span className="font-medium">Agora:</span>{' '}
-                {now.toLocaleString()}
+          {!collapsed && (
+            <div className="mb-3">
+              <div className="flex flex-col gap-1 rounded-md bg-muted/60 p-2 sm:p-3 text-xs text-muted-foreground">
+                <div>
+                  <span className="font-medium">Logon:</span>{' '}
+                  {logonTime.toLocaleTimeString()}
+                </div>
+                <div>
+                  <span className="font-medium">Tempo conectado:</span> {elapsed}
+                </div>
+                <div className="hidden sm:block">
+                  <span className="font-medium">Agora:</span>{' '}
+                  {now.toLocaleString()}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <Button
             onClick={signOut}

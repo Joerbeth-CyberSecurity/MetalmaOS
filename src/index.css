@@ -40,11 +40,12 @@
     --info-foreground: 0 0% 100%;
 
     /* Status colors for OS */
-    --status-aberta: 47.9 95.8% 53.1%;
-    --status-em-andamento: 217.2 91.2% 59.8%;
-    --status-pausada: 0 84.2% 60.2%; /* Vermelho para atenção */
-    --status-finalizada: 142.1 76.2% 36.3%;
-    --status-cancelada: 0 84.2% 60.2%;
+    --status-aberta: 45 93% 47%; /* Amarelo */
+    --status-em-andamento: 217 91% 60%; /* Azul */
+    --status-pausada: 320 70% 50%; /* Rosa */
+    --status-finalizada: 142 76% 36%; /* Verde */
+    --status-cancelada: 0 84% 60%; /* Vermelho */
+    --status-falta-material: 25 95% 53%; /* Laranja */
 
     /* Priority colors */
     --priority-baixa: 142.1 76.2% 36.3%;
@@ -122,31 +123,39 @@
 
   /* Status badge styles */
   .status-aberta {
-    @apply border border-status-aberta/20 bg-status-aberta/10 text-status-aberta;
+    background-color: hsl(45 93% 47% / 0.15) !important; /* Amarelo claro */
+    color: hsl(45 93% 30%) !important; /* Amarelo escuro */
+    border: 1px solid hsl(45 93% 47% / 0.3) !important;
   }
 
   .status-em-andamento {
-    @apply border border-status-em-andamento/20 bg-status-em-andamento/10 text-status-em-andamento;
+    background-color: hsl(217 91% 60% / 0.15) !important; /* Azul claro */
+    color: hsl(217 91% 30%) !important; /* Azul escuro */
+    border: 1px solid hsl(217 91% 60% / 0.3) !important;
   }
 
   .status-pausada {
-    background-color: #fce4ec !important; /* Fundo rosa claro */
-    color: #c2185b !important; /* Texto rosa forte */
-    border: 1px solid #e91e63 !important; /* Borda rosa forte */
+    background-color: hsl(320 70% 50% / 0.15) !important; /* Rosa claro */
+    color: hsl(320 70% 30%) !important; /* Rosa escuro */
+    border: 1px solid hsl(320 70% 50% / 0.3) !important;
   }
 
   .status-finalizada {
-    @apply border border-status-finalizada/20 bg-status-finalizada/10 text-status-finalizada;
+    background-color: hsl(142 76% 36% / 0.15) !important; /* Verde claro */
+    color: hsl(142 76% 20%) !important; /* Verde escuro */
+    border: 1px solid hsl(142 76% 36% / 0.3) !important;
   }
 
   .status-cancelada {
-    @apply border border-status-cancelada/20 bg-status-cancelada/10 text-status-cancelada;
+    background-color: hsl(0 84% 60% / 0.15) !important; /* Vermelho claro */
+    color: hsl(0 84% 30%) !important; /* Vermelho escuro */
+    border: 1px solid hsl(0 84% 60% / 0.3) !important;
   }
 
   .status-falta-material {
-    background-color: hsl(25 95% 53% / 0.1) !important;
-    color: hsl(25 95% 53%) !important;
-    border: 1px solid hsl(25 95% 53% / 0.2) !important;
+    background-color: hsl(25 95% 53% / 0.15) !important; /* Laranja claro */
+    color: hsl(25 95% 30%) !important; /* Laranja escuro */
+    border: 1px solid hsl(25 95% 53% / 0.3) !important;
   }
 
   /* Status badge styles for dark mode */

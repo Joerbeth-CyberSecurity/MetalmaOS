@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Card, CardContent } from './card';
 import { Badge } from './badge';
 import { Button } from './button';
-import { MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit, Trash2, UserPlus, Play, Pause, CheckCircle, AlertTriangle, StopCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +25,12 @@ interface ResponsiveTableProps {
     icon: React.ComponentType<any>;
     onClick: (item: any) => void;
     variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-  }[];
+  }[] | ((item: any) => {
+    label: string;
+    icon: React.ComponentType<any>;
+    onClick: (item: any) => void;
+    variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  }[]);
   loading?: boolean;
   emptyMessage?: string;
   onRowClick?: (item: any) => void;
@@ -92,33 +97,36 @@ export function ResponsiveTable({
                           : item[column.key]}
                       </TableCell>
                     ))}
-                    {actions.length > 0 && (
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Abrir menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {actions.map((action, actionIndex) => (
-                              <DropdownMenuItem
-                                key={actionIndex}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  action.onClick(item);
-                                }}
-                                className={action.variant === 'destructive' ? 'text-destructive' : ''}
-                              >
-                                <action.icon className="mr-2 h-4 w-4" />
-                                {action.label}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    )}
+                    {(() => {
+                      const itemActions = typeof actions === 'function' ? actions(item) : actions;
+                      return itemActions.length > 0 && (
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Abrir menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {itemActions.map((action, actionIndex) => (
+                                <DropdownMenuItem
+                                  key={actionIndex}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    action.onClick(item);
+                                  }}
+                                  className={action.variant === 'destructive' ? 'text-destructive' : ''}
+                                >
+                                  <action.icon className="mr-2 h-4 w-4" />
+                                  {action.label}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      );
+                    })()}
                   </TableRow>
                 ))}
               </TableBody>
@@ -156,25 +164,28 @@ export function ResponsiveTable({
                 </div>
 
                 {/* Actions */}
-                {actions.length > 0 && (
-                  <div className="flex gap-2 pt-2 border-t">
-                    {actions.map((action, actionIndex) => (
-                      <Button
-                        key={actionIndex}
-                        variant={action.variant || 'outline'}
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          action.onClick(item);
-                        }}
-                        className="flex-1"
-                      >
-                        <action.icon className="mr-2 h-4 w-4" />
-                        {action.label}
-                      </Button>
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  const itemActions = typeof actions === 'function' ? actions(item) : actions;
+                  return itemActions.length > 0 && (
+                    <div className="flex gap-2 pt-2 border-t">
+                      {itemActions.map((action, actionIndex) => (
+                        <Button
+                          key={actionIndex}
+                          variant={action.variant || 'outline'}
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            action.onClick(item);
+                          }}
+                          className="flex-1"
+                        >
+                          <action.icon className="mr-2 h-4 w-4" />
+                          {action.label}
+                        </Button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>
@@ -395,20 +406,22 @@ export function OSResponsiveTable({
       ? new Date(dateString).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
       : 'N/A';
 
-  const getStatusVariant = (
-    status: string | null
-  ): 'secondary' | 'default' | 'destructive' | 'outline' => {
+  const getStatusClass = (status: string | null): string => {
     switch (status) {
       case 'aberta':
-        return 'secondary';
+        return 'status-aberta';
       case 'em_andamento':
-        return 'default';
+        return 'status-em-andamento';
       case 'finalizada':
-        return 'default';
+        return 'status-finalizada';
       case 'cancelada':
-        return 'destructive';
+        return 'status-cancelada';
+      case 'pausada':
+        return 'status-pausada';
+      case 'falta_material':
+        return 'status-falta-material';
       default:
-        return 'outline';
+        return 'status-aberta';
     }
   };
 
@@ -437,7 +450,7 @@ export function OSResponsiveTable({
       key: 'status',
       label: 'Status',
       render: (value: any) => (
-        <Badge variant={getStatusVariant(value)}>
+        <Badge className={getStatusClass(value)}>
           {value?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
         </Badge>
       ),
@@ -496,16 +509,94 @@ export function OSResponsiveTable({
     },
   ];
 
-  const actions = [
-    ...(onEdit ? [{ label: 'Editar', icon: Edit, onClick: onEdit }] : []),
-    ...(onDelete ? [{ label: 'Excluir', icon: Trash2, onClick: onDelete, variant: 'destructive' as const }] : []),
-  ];
+  const getActionsForOS = (os: any) => {
+    const actions = [];
+    
+    // Ações baseadas no status da OS
+    if (os.status === 'aberta') {
+      if (onAssociateColaboradores) {
+        actions.push({ 
+          label: 'Apontar Colaboradores', 
+          icon: UserPlus, 
+          onClick: () => onAssociateColaboradores(os) 
+        });
+      }
+      if (onStart) {
+        actions.push({ 
+          label: 'Iniciar OS', 
+          icon: Play, 
+          onClick: () => onStart(os) 
+        });
+      }
+    }
+    
+    if (os.status === 'em_andamento') {
+      if (onPause) {
+        actions.push({ 
+          label: 'Pausar OS', 
+          icon: Pause, 
+          onClick: () => onPause(os) 
+        });
+      }
+      if (onParadaMaterial) {
+        actions.push({ 
+          label: 'Parar OS', 
+          icon: StopCircle, 
+          onClick: () => onParadaMaterial(os),
+          variant: 'destructive' as const
+        });
+      }
+      if (onFinish) {
+        actions.push({ 
+          label: 'Finalizar OS', 
+          icon: CheckCircle, 
+          onClick: () => onFinish(os) 
+        });
+      }
+    }
+    
+    if (os.status === 'pausada') {
+      if (onStart) {
+        actions.push({ 
+          label: 'Reiniciar OS', 
+          icon: Play, 
+          onClick: () => onStart(os) 
+        });
+      }
+      if (onFinish) {
+        actions.push({ 
+          label: 'Finalizar OS', 
+          icon: CheckCircle, 
+          onClick: () => onFinish(os) 
+        });
+      }
+    }
+    
+    // Ações sempre disponíveis
+    if (onEdit) {
+      actions.push({ 
+        label: 'Editar', 
+        icon: Edit, 
+        onClick: () => onEdit(os) 
+      });
+    }
+    if (onDelete) {
+      actions.push({ 
+        label: 'Excluir', 
+        icon: Trash2, 
+        onClick: () => onDelete(os), 
+        variant: 'destructive' as const 
+      });
+    }
+    
+    return actions;
+  };
 
   return (
     <ResponsiveTable
       data={data}
       columns={columns}
-      actions={actions}
+      actions={getActionsForOS}
       loading={loading}
       emptyMessage="Nenhuma ordem de serviço encontrada"
     />

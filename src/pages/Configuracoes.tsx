@@ -21,13 +21,16 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Shield, AlertTriangle, Users, Settings } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ReportTemplate } from '@/components/ui/ReportTemplate';
 import { useRef } from 'react';
 import ReactDOM from 'react-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PermissionGuard } from '@/components/PermissionGuard';
+import { usePermissions } from '@/hooks/usePermissions';
 
 // Esquema de validação
 const configSchema = z.object({
@@ -38,6 +41,10 @@ const configSchema = z.object({
     .number()
     .min(0, 'A meta de horas não pode ser negativa.'),
   prefixo_os: z.string().min(1, 'O prefixo é obrigatório.'),
+  tempo_tolerancia_pausa: z.coerce
+    .number()
+    .min(0, 'O tempo de tolerância não pode ser negativo.')
+    .max(1440, 'O tempo de tolerância não pode ser maior que 24 horas.'),
 });
 
 type ConfigFormData = z.infer<typeof configSchema>;
@@ -133,17 +140,26 @@ export default function Configuracoes() {
 
   // Função para buscar auditoria
   async function fetchAuditoria() {
-    if (!filtroDataInicio && !filtroDataFim) {
-      toast({ title: 'Informe pelo menos uma data para buscar auditoria.' });
-      setAuditoria([]);
-      return;
-    }
     setLoadingAuditoria(true);
     try {
+      console.log('Iniciando busca de auditoria...');
+      
       let query = supabase
         .from('auditoria_login')
-        .select('*')
-        .order('data_hora', { ascending: false });
+        .select(`
+          id,
+          user_id,
+          nome_usuario,
+          email_usuario,
+          tipo_evento,
+          data_hora,
+          ip_address,
+          user_agent,
+          event_details,
+          created_at
+        `)
+        .order('data_hora', { ascending: false })
+        .limit(100);
 
       // Aplicar filtros
       if (filtroUsuario) {
@@ -164,23 +180,34 @@ export default function Configuracoes() {
         query = query.eq('tipo_evento', filtroTipoEvento);
       }
 
+      console.log('Executando query de auditoria...');
       const { data, error } = await query;
 
       if (error) {
+        console.error('Erro na query de auditoria:', error);
         toast({
           title: 'Erro ao buscar auditoria',
           description: error.message,
           variant: 'destructive',
         });
+        setAuditoria([]);
       } else {
+        console.log('Dados de auditoria encontrados:', data);
+        console.log('Total de registros:', data?.length || 0);
         setAuditoria(data || []);
+        
+        if (!data || data.length === 0) {
+          console.log('Nenhum registro de auditoria encontrado');
+        }
       }
     } catch (error) {
+      console.error('Erro geral na auditoria:', error);
       toast({
         title: 'Erro ao buscar auditoria',
-        description: error.message,
+        description: 'Erro interno do sistema',
         variant: 'destructive',
       });
+      setAuditoria([]);
     } finally {
       setLoadingAuditoria(false);
     }
@@ -192,7 +219,10 @@ export default function Configuracoes() {
     setFiltroDataInicio('');
     setFiltroDataFim('');
     setFiltroTipoEvento('');
+    setAuditoria([]);
   }
+
+  // Função removida - não inserir mais dados fictícios na auditoria
 
   // Função para exportar auditoria
   function exportarAuditoria() {
@@ -253,10 +283,12 @@ export default function Configuracoes() {
       descricao: nivel.descricao,
       ativo: nivel.ativo,
     });
+    
+    // Buscar permissões e abrir modal
     fetchNivelPermissoes(nivel.id).then((permissoes) => {
       setSelectedNivelPermissoes(permissoes);
+      setShowNivelModal(true);
     });
-    setShowNivelModal(true);
   }
 
   function handleCloseNivelModal() {
@@ -393,6 +425,7 @@ export default function Configuracoes() {
       percentual_global_produtos: 0,
       meta_hora_padrao: 0,
       prefixo_os: 'OS',
+      tempo_tolerancia_pausa: 120, // 2 horas em minutos
     },
   });
 
@@ -444,6 +477,7 @@ export default function Configuracoes() {
   }
 
   function handleEditUser(user) {
+    console.log('handleEditUser chamado com:', user);
     setEditingUser(user);
     setUserForm({
       nome: user.nome,
@@ -454,7 +488,9 @@ export default function Configuracoes() {
       senha: '',
       confirmarSenha: '',
     });
+    console.log('Abrindo modal de usuário...');
     setShowUserModal(true);
+    console.log('showUserModal definido como true');
   }
 
   function handleCloseUserModal() {
@@ -702,6 +738,7 @@ export default function Configuracoes() {
         ),
         meta_hora_padrao: parseFloat(configMap.meta_hora_padrao || '0'),
         prefixo_os: configMap.prefixo_os || 'OS',
+        tempo_tolerancia_pausa: parseFloat(configMap.tempo_tolerancia_pausa || '120'),
       });
     }
     setLoading(false);
@@ -742,14 +779,38 @@ export default function Configuracoes() {
     document.body.appendChild(printDiv);
   }
 
+  const { isAdmin, canManageModule } = usePermissions();
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Configurações</h1>
         <p className="text-muted-foreground">
-          Ajuste os parâmetros globais do sistema.
+          Ajuste os parâmetros globais do sistema e gerencie segurança.
         </p>
       </div>
+
+      <Tabs defaultValue="system" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="system" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Sistema
+          </TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Usuários
+          </TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Segurança
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Auditoria
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="system" className="space-y-6">
 
       <Card>
         <CardHeader>
@@ -847,6 +908,39 @@ export default function Configuracoes() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="tempo_tolerancia_pausa"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tempo de Tolerância para Pausas (minutos)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="15"
+                          min="0"
+                          max="1440"
+                          value={field.value || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              field.onChange(120);
+                            } else {
+                              const numValue = parseFloat(value);
+                              field.onChange(isNaN(numValue) ? 120 : numValue);
+                            }
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                      <p className="text-sm text-muted-foreground">
+                        Tempo máximo que uma OS pode ficar pausada sem afetar produtividade e relatórios.
+                      </p>
+                    </FormItem>
+                  )}
+                />
                 <div className="flex justify-end">
                   <Button type="submit" disabled={isSaving}>
                     {isSaving && (
@@ -861,553 +955,10 @@ export default function Configuracoes() {
         </CardContent>
       </Card>
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Usuários</CardTitle>
-          <CardDescription>
-            Gerencie os usuários do sistema e seus níveis de acesso.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex justify-between">
-            <Button onClick={() => setShowUserModal(true)}>
-              + Novo Usuário
-            </Button>
-          </div>
-          {/* Tabela de usuários */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border text-sm">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="px-3 py-2 text-left">Nome</th>
-                  <th className="px-3 py-2 text-left">E-mail</th>
-                  <th className="px-3 py-2 text-left">Tipo</th>
-                  <th className="px-3 py-2 text-left">Ativo</th>
-                  <th className="px-3 py-2 text-left">Nível de Acesso</th>
-                  <th className="px-3 py-2 text-left">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usuarios.map((user) => (
-                  <tr key={user.id} className="border-b">
-                    <td className="px-3 py-2">{user.nome}</td>
-                    <td className="px-3 py-2">{user.email}</td>
-                    <td className="px-3 py-2">
-                      {user.tipo_usuario === 'admin'
-                        ? 'Administrador'
-                        : 'Usuário'}
-                    </td>
-                    <td className="px-3 py-2">{user.ativo ? 'Sim' : 'Não'}</td>
-                    <td className="px-3 py-2">
-                      {user.nivel_id ? 'Nível ID: ' + user.nivel_id : 'N/A'}
-                    </td>
-                    <td className="flex gap-2 px-3 py-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEditUser(user)}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
-                        Excluir
-                      </Button>
-                      {user.user_id && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleResendEmail(user)}
-                        >
-                          Reenviar Email
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {usuarios.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="py-4 text-center text-muted-foreground"
-                    >
-                      Nenhum usuário cadastrado.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Níveis de Acesso</CardTitle>
-          <CardDescription>
-            Gerencie os níveis de acesso e suas permissões no sistema.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex justify-between">
-            <Button onClick={() => setShowNivelModal(true)}>
-              + Novo Nível
-            </Button>
-          </div>
 
-          {/* Tabela de níveis */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border text-sm">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="px-3 py-2 text-left">Nome</th>
-                  <th className="px-3 py-2 text-left">Descrição</th>
-                  <th className="px-3 py-2 text-left">Ativo</th>
-                  <th className="px-3 py-2 text-left">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {niveis.map((nivel) => (
-                  <tr key={nivel.id} className="border-b">
-                    <td className="px-3 py-2">{nivel.nome}</td>
-                    <td className="px-3 py-2">{nivel.descricao}</td>
-                    <td className="px-3 py-2">{nivel.ativo ? 'Sim' : 'Não'}</td>
-                    <td className="flex gap-2 px-3 py-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEditNivel(nivel)}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeleteNivel(nivel.id)}
-                      >
-                        Excluir
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {niveis.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="py-4 text-center text-muted-foreground"
-                    >
-                      Nenhum nível cadastrado.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle>Auditoria de Login/Logout</CardTitle>
-          <CardDescription>
-            Monitore todos os acessos ao sistema com filtros avançados.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Filtros */}
-          <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg bg-muted/30 p-4 md:grid-cols-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Usuário</label>
-              <Input
-                placeholder="Nome ou email"
-                value={filtroUsuario}
-                onChange={(e) => setFiltroUsuario(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">
-                Data Início
-              </label>
-              <Input
-                type="date"
-                value={filtroDataInicio}
-                onChange={(e) => setFiltroDataInicio(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Data Fim</label>
-              <Input
-                type="date"
-                value={filtroDataFim}
-                onChange={(e) => setFiltroDataFim(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">
-                Tipo de Evento
-              </label>
-              <select
-                className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
-                value={filtroTipoEvento}
-                onChange={(e) => setFiltroTipoEvento(e.target.value)}
-              >
-                <option value="">Todos</option>
-                <option value="login">Login</option>
-                <option value="logout">Logout</option>
-              </select>
-            </div>
-          </div>
 
-          {/* Botões de ação */}
-          <div className="mb-4 flex justify-between">
-            <div className="flex gap-2">
-              <Button onClick={fetchAuditoria} disabled={loadingAuditoria}>
-                {loadingAuditoria && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Buscar
-              </Button>
-              <Button variant="outline" onClick={limparFiltros}>
-                Limpar Filtros
-              </Button>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={exportarAuditoria}
-                disabled={auditoria.length === 0}
-              >
-                Exportar CSV
-              </Button>
-            </div>
-          </div>
-
-          {/* Tabela de auditoria */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full border text-sm">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="px-3 py-2 text-left">Usuário</th>
-                  <th className="px-3 py-2 text-left">Email</th>
-                  <th className="px-3 py-2 text-left">Evento</th>
-                  <th className="px-3 py-2 text-left">Data/Hora</th>
-                  <th className="px-3 py-2 text-left">User Agent</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingAuditoria ? (
-                  <tr>
-                    <td colSpan={5} className="py-4 text-center">
-                      <Loader2 className="mx-auto h-6 w-6 animate-spin" />
-                    </td>
-                  </tr>
-                ) : auditoria.length > 0 ? (
-                  auditoria.map((item) => (
-                    <tr key={item.id} className="border-b">
-                      <td className="px-3 py-2 font-medium">
-                        {item.nome_usuario}
-                      </td>
-                      <td className="px-3 py-2">{item.email_usuario}</td>
-                      <td className="px-3 py-2">
-                        <span
-                          className={`rounded px-2 py-1 text-xs ${
-                            item.tipo_evento === 'login'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          {item.tipo_evento === 'login' ? 'Login' : 'Logout'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">
-                        {new Date(item.data_hora).toLocaleString('pt-BR')}
-                      </td>
-                      <td className="max-w-xs truncate px-3 py-2 text-xs text-muted-foreground">
-                        {item.user_agent}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="py-4 text-center text-muted-foreground"
-                    >
-                      Nenhum registro de auditoria encontrado.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Estatísticas */}
-          {auditoria.length > 0 && (
-            <div className="mt-4 rounded-lg bg-muted/30 p-4">
-              <h4 className="mb-2 font-medium">Estatísticas</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-                <div>
-                  <span className="text-muted-foreground">
-                    Total de registros:
-                  </span>
-                  <div className="font-medium">{auditoria.length}</div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Logins:</span>
-                  <div className="font-medium text-green-600">
-                    {
-                      auditoria.filter((item) => item.tipo_evento === 'login')
-                        .length
-                    }
-                  </div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Logouts:</span>
-                  <div className="font-medium text-red-600">
-                    {
-                      auditoria.filter((item) => item.tipo_evento === 'logout')
-                        .length
-                    }
-                  </div>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">
-                    Usuários únicos:
-                  </span>
-                  <div className="font-medium">
-                    {new Set(auditoria.map((item) => item.email_usuario)).size}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Modal de cadastro/edição de usuário */}
-      {showUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-lg">
-            <h2 className="mb-4 text-lg font-bold">
-              {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
-            </h2>
-            <form onSubmit={handleSubmitUser} className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Nome</label>
-                <Input
-                  value={userForm.nome}
-                  onChange={(e) =>
-                    setUserForm((f) => ({ ...f, nome: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">E-mail</label>
-                <Input
-                  type="email"
-                  value={userForm.email}
-                  onChange={(e) =>
-                    setUserForm((f) => ({ ...f, email: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Tipo</label>
-                <select
-                  className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
-                  value={userForm.tipo_usuario}
-                  onChange={(e) =>
-                    setUserForm((f) => ({ ...f, tipo_usuario: e.target.value }))
-                  }
-                >
-                  <option value="admin">Administrador</option>
-                  <option value="colaborador">Usuário</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Nível de Acesso
-                </label>
-                <select
-                  className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
-                  value={userForm.nivel_id}
-                  onChange={(e) =>
-                    setUserForm((f) => ({ ...f, nivel_id: e.target.value }))
-                  }
-                >
-                  <option value="">Selecione um nível</option>
-                  {niveis.map((nivel) => (
-                    <option key={nivel.id} value={nivel.id}>
-                      {nivel.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Campos de senha apenas na edição */}
-              {editingUser && (
-                <>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">
-                      Nova Senha (deixe em branco para manter a atual)
-                    </label>
-                    <Input
-                      type="password"
-                      value={userForm.senha}
-                      onChange={(e) =>
-                        setUserForm((f) => ({ ...f, senha: e.target.value }))
-                      }
-                      placeholder="Digite a nova senha"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">
-                      Confirmar Nova Senha
-                    </label>
-                    <Input
-                      type="password"
-                      value={userForm.confirmarSenha}
-                      onChange={(e) =>
-                        setUserForm((f) => ({
-                          ...f,
-                          confirmarSenha: e.target.value,
-                        }))
-                      }
-                      placeholder="Confirme a nova senha"
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="ativo"
-                  checked={userForm.ativo}
-                  onChange={(e) =>
-                    setUserForm((f) => ({ ...f, ativo: e.target.checked }))
-                  }
-                />
-                <label htmlFor="ativo" className="text-sm">
-                  Ativo
-                </label>
-              </div>
-              <div className="mt-4 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCloseUserModal}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit">Salvar</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de cadastro/edição de nível */}
-      {showNivelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-card p-6 shadow-lg">
-            <h2 className="mb-4 text-lg font-bold">
-              {editingNivel ? 'Editar Nível' : 'Novo Nível'}
-            </h2>
-            <form onSubmit={handleSubmitNivel} className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Nome</label>
-                <Input
-                  value={nivelForm.nome}
-                  onChange={(e) =>
-                    setNivelForm((f) => ({ ...f, nome: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">
-                  Descrição
-                </label>
-                <Textarea
-                  className="h-20"
-                  value={nivelForm.descricao}
-                  onChange={(e) =>
-                    setNivelForm((f) => ({ ...f, descricao: e.target.value }))
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="nivel_ativo"
-                  checked={nivelForm.ativo}
-                  onChange={(e) =>
-                    setNivelForm((f) => ({ ...f, ativo: e.target.checked }))
-                  }
-                />
-                <label htmlFor="nivel_ativo" className="text-sm">
-                  Ativo
-                </label>
-              </div>
-
-              {/* Seção de permissões */}
-              <div>
-                <label className="mb-2 block text-sm font-medium">
-                  Permissões
-                </label>
-                <div className="grid max-h-60 grid-cols-2 gap-4 overflow-y-auto rounded border p-3">
-                  {permissoes.map((permissao) => (
-                    <div key={permissao.id} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id={`perm_${permissao.id}`}
-                        checked={selectedNivelPermissoes.includes(permissao.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedNivelPermissoes((prev) => [
-                              ...prev,
-                              permissao.id,
-                            ]);
-                          } else {
-                            setSelectedNivelPermissoes((prev) =>
-                              prev.filter((id) => id !== permissao.id)
-                            );
-                          }
-                        }}
-                      />
-                      <label
-                        htmlFor={`perm_${permissao.id}`}
-                        className="text-sm"
-                      >
-                        <div className="font-medium">{permissao.nome}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {permissao.descricao}
-                        </div>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCloseNivelModal}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit">Salvar</Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Relatório de Auditoria para Impressão - SEMPRE PRESENTE NO DOM */}
       <div className="only-print">
@@ -1510,6 +1061,589 @@ export default function Configuracoes() {
         input[type="date"]:-ms-input-placeholder { color: #fff; opacity: 1; }
         input[type="date"]::placeholder { color: #fff; opacity: 1; }
       `}</style>
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-6">
+          <PermissionGuard permission="usuario_gerenciar">
+            <Card>
+              <CardHeader>
+                <CardTitle>Usuários</CardTitle>
+                <CardDescription>
+                  Gerencie os usuários do sistema e seus níveis de acesso.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 flex justify-between">
+                  <Button onClick={() => setShowUserModal(true)}>
+                    + Novo Usuário
+                  </Button>
+                </div>
+                {/* Tabela de usuários existente */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border text-sm">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-3 py-2 text-left">Nome</th>
+                        <th className="px-3 py-2 text-left">E-mail</th>
+                        <th className="px-3 py-2 text-left">Tipo</th>
+                        <th className="px-3 py-2 text-left">Ativo</th>
+                        <th className="px-3 py-2 text-left">Nível de Acesso</th>
+                        <th className="px-3 py-2 text-left">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usuarios.map((user) => (
+                        <tr key={user.id} className="border-b">
+                          <td className="px-3 py-2">{user.nome}</td>
+                          <td className="px-3 py-2">{user.email}</td>
+                          <td className="px-3 py-2">
+                            {user.tipo_usuario === 'admin'
+                              ? 'Administrador'
+                              : 'Usuário'}
+                          </td>
+                          <td className="px-3 py-2">{user.ativo ? 'Sim' : 'Não'}</td>
+                          <td className="px-3 py-2">
+                            {user.nivel_id ? 'Nível ID: ' + user.nivel_id : 'N/A'}
+                          </td>
+                          <td className="flex gap-2 px-3 py-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditUser(user)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteUser(user.id)}
+                            >
+                              Excluir
+                            </Button>
+                            {user.user_id && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleResendEmail(user)}
+                              >
+                                Reenviar Email
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {usuarios.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="py-4 text-center text-muted-foreground"
+                          >
+                            Nenhum usuário cadastrado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Seção de Níveis de Acesso */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Níveis de Acesso</CardTitle>
+                <CardDescription>
+                  Gerencie os níveis de acesso e suas permissões no sistema.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 flex justify-between">
+                  <Button onClick={() => setShowNivelModal(true)}>
+                    + Novo Nível
+                  </Button>
+                </div>
+
+                {/* Tabela de níveis */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border text-sm">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-3 py-2 text-left">Nome</th>
+                        <th className="px-3 py-2 text-left">Descrição</th>
+                        <th className="px-3 py-2 text-left">Ativo</th>
+                        <th className="px-3 py-2 text-left">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {niveis.map((nivel) => (
+                        <tr key={nivel.id} className="border-b">
+                          <td className="px-3 py-2">{nivel.nome}</td>
+                          <td className="px-3 py-2">{nivel.descricao}</td>
+                          <td className="px-3 py-2">{nivel.ativo ? 'Sim' : 'Não'}</td>
+                          <td className="flex gap-2 px-3 py-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditNivel(nivel)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteNivel(nivel.id)}
+                            >
+                              Excluir
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                      {niveis.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="py-4 text-center text-muted-foreground"
+                          >
+                            Nenhum nível cadastrado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Modal de cadastro/edição de usuário */}
+            {showUserModal && (
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+                <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-lg">
+                  <h2 className="mb-4 text-lg font-bold">
+                    {editingUser ? 'Editar Usuário' : 'Novo Usuário'}
+                  </h2>
+                  <form onSubmit={handleSubmitUser} className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Nome</label>
+                      <Input
+                        value={userForm.nome}
+                        onChange={(e) =>
+                          setUserForm((f) => ({ ...f, nome: e.target.value }))
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">E-mail</label>
+                      <Input
+                        type="email"
+                        value={userForm.email}
+                        onChange={(e) =>
+                          setUserForm((f) => ({ ...f, email: e.target.value }))
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Tipo</label>
+                      <select
+                        className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
+                        value={userForm.tipo_usuario}
+                        onChange={(e) =>
+                          setUserForm((f) => ({ ...f, tipo_usuario: e.target.value }))
+                        }
+                      >
+                        <option value="admin">Administrador</option>
+                        <option value="colaborador">Usuário</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">
+                        Nível de Acesso
+                      </label>
+                      <select
+                        className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
+                        value={userForm.nivel_id}
+                        onChange={(e) =>
+                          setUserForm((f) => ({ ...f, nivel_id: e.target.value }))
+                        }
+                      >
+                        <option value="">Selecione um nível</option>
+                        {niveis.map((nivel) => (
+                          <option key={nivel.id} value={nivel.id}>
+                            {nivel.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Campos de senha apenas na edição */}
+                    {editingUser && (
+                      <>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium">
+                            Nova Senha (deixe em branco para manter a atual)
+                          </label>
+                          <Input
+                            type="password"
+                            value={userForm.senha}
+                            onChange={(e) =>
+                              setUserForm((f) => ({ ...f, senha: e.target.value }))
+                            }
+                            placeholder="Digite a nova senha"
+                            autoComplete="new-password"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium">
+                            Confirmar Nova Senha
+                          </label>
+                          <Input
+                            type="password"
+                            value={userForm.confirmarSenha}
+                            onChange={(e) =>
+                              setUserForm((f) => ({
+                                ...f,
+                                confirmarSenha: e.target.value,
+                              }))
+                            }
+                            placeholder="Confirme a nova senha"
+                            autoComplete="new-password"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="ativo"
+                        checked={userForm.ativo}
+                        onChange={(e) =>
+                          setUserForm((f) => ({ ...f, ativo: e.target.checked }))
+                        }
+                      />
+                      <label htmlFor="ativo" className="text-sm">
+                        Ativo
+                      </label>
+                    </div>
+                    <div className="mt-4 flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCloseUserModal}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="submit">Salvar</Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Modal de cadastro/edição de nível */}
+            {showNivelModal && (
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-card p-6 shadow-lg">
+                  <h2 className="mb-4 text-lg font-bold">
+                    {editingNivel ? 'Editar Nível' : 'Novo Nível'}
+                  </h2>
+                  <form onSubmit={handleSubmitNivel} className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Nome</label>
+                      <Input
+                        value={nivelForm.nome}
+                        onChange={(e) =>
+                          setNivelForm((f) => ({ ...f, nome: e.target.value }))
+                        }
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">
+                        Descrição
+                      </label>
+                      <Textarea
+                        className="h-20"
+                        value={nivelForm.descricao}
+                        onChange={(e) =>
+                          setNivelForm((f) => ({ ...f, descricao: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="nivel_ativo"
+                        checked={nivelForm.ativo}
+                        onChange={(e) =>
+                          setNivelForm((f) => ({ ...f, ativo: e.target.checked }))
+                        }
+                      />
+                      <label htmlFor="nivel_ativo" className="text-sm">
+                        Ativo
+                      </label>
+                    </div>
+
+                    {/* Seção de permissões */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium">
+                        Permissões
+                      </label>
+                      <div className="grid max-h-60 grid-cols-2 gap-4 overflow-y-auto rounded border p-3">
+                        {permissoes.map((permissao) => (
+                          <div key={permissao.id} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`perm_${permissao.id}`}
+                              checked={selectedNivelPermissoes.includes(permissao.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedNivelPermissoes((prev) => [
+                                    ...prev,
+                                    permissao.id,
+                                  ]);
+                                } else {
+                                  setSelectedNivelPermissoes((prev) =>
+                                    prev.filter((id) => id !== permissao.id)
+                                  );
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`perm_${permissao.id}`}
+                              className="text-sm"
+                            >
+                              <div className="font-medium">{permissao.nome}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {permissao.descricao}
+                              </div>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCloseNivelModal}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="submit">Salvar</Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </PermissionGuard>
+        </TabsContent>
+
+        <TabsContent value="security" className="space-y-6">
+          <PermissionGuard permission="usuario_gerenciar">
+            <Card>
+              <CardHeader>
+                <CardTitle>Configurações de Segurança</CardTitle>
+                <CardDescription>
+                  Configure as políticas de segurança do sistema.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-muted-foreground">
+                  <Shield className="mx-auto h-12 w-12 mb-4" />
+                  <p>Configurações de segurança em desenvolvimento.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </PermissionGuard>
+        </TabsContent>
+
+        <TabsContent value="audit" className="space-y-6">
+          <PermissionGuard permission="auditoria_visualizar">
+            <Card>
+              <CardHeader>
+                <CardTitle>Auditoria de Login/Logout</CardTitle>
+                <CardDescription>
+                  Monitore todos os acessos ao sistema com filtros avançados.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Filtros */}
+                <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg bg-muted/30 p-4 md:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Usuário</label>
+                    <Input
+                      placeholder="Nome ou email"
+                      value={filtroUsuario}
+                      onChange={(e) => setFiltroUsuario(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Data Início
+                    </label>
+                    <Input
+                      type="date"
+                      value={filtroDataInicio}
+                      onChange={(e) => setFiltroDataInicio(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Data Fim</label>
+                    <Input
+                      type="date"
+                      value={filtroDataFim}
+                      onChange={(e) => setFiltroDataFim(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Tipo de Evento
+                    </label>
+                    <select
+                      className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
+                      value={filtroTipoEvento}
+                      onChange={(e) => setFiltroTipoEvento(e.target.value)}
+                    >
+                      <option value="">Todos</option>
+                      <option value="login">Login</option>
+                      <option value="logout">Logout</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Botões de ação */}
+                <div className="mb-4 flex justify-between">
+                  <div className="flex gap-2">
+                    <Button onClick={fetchAuditoria} disabled={loadingAuditoria}>
+                      {loadingAuditoria && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Buscar
+                    </Button>
+                    <Button variant="outline" onClick={limparFiltros}>
+                      Limpar Filtros
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={exportarAuditoria}
+                      disabled={auditoria.length === 0}
+                    >
+                      Exportar CSV
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Tabela de auditoria */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border text-sm">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-3 py-2 text-left">Usuário</th>
+                        <th className="px-3 py-2 text-left">Email</th>
+                        <th className="px-3 py-2 text-left">Evento</th>
+                        <th className="px-3 py-2 text-left">Data/Hora</th>
+                        <th className="px-3 py-2 text-left">User Agent</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingAuditoria ? (
+                        <tr>
+                          <td colSpan={5} className="py-4 text-center">
+                            <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                          </td>
+                        </tr>
+                      ) : auditoria.length > 0 ? (
+                        auditoria.map((item) => (
+                          <tr key={item.id} className="border-b">
+                            <td className="px-3 py-2 font-medium">
+                              {item.nome_usuario}
+                            </td>
+                            <td className="px-3 py-2">{item.email_usuario}</td>
+                            <td className="px-3 py-2">
+                              <span
+                                className={`rounded px-2 py-1 text-xs ${
+                                  item.tipo_evento === 'login'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {item.tipo_evento === 'login' ? 'Login' : 'Logout'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">
+                              {item.data_hora 
+                                ? new Date(item.data_hora).toLocaleString('pt-BR')
+                                : 'Data não disponível'
+                              }
+                            </td>
+                            <td className="max-w-xs truncate px-3 py-2 text-xs text-muted-foreground">
+                              {item.user_agent}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="py-4 text-center text-muted-foreground"
+                          >
+                            Nenhum registro de auditoria encontrado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Estatísticas */}
+                {auditoria.length > 0 && (
+                  <div className="mt-4 rounded-lg bg-muted/30 p-4">
+                    <h4 className="mb-2 font-medium">Estatísticas</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                      <div>
+                        <span className="text-muted-foreground">
+                          Total de registros:
+                        </span>
+                        <div className="font-medium">{auditoria.length}</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Logins:</span>
+                        <div className="font-medium text-green-600">
+                          {
+                            auditoria.filter((item) => item.tipo_evento === 'login')
+                              .length
+                          }
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Logouts:</span>
+                        <div className="font-medium text-red-600">
+                          {
+                            auditoria.filter((item) => item.tipo_evento === 'logout')
+                              .length
+                          }
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">
+                          Usuários únicos:
+                        </span>
+                        <div className="font-medium">
+                          {new Set(auditoria.map((item) => item.email_usuario)).size}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </PermissionGuard>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -90,6 +90,7 @@ import { cn } from '@/lib/utils';
 import { Database } from '@/integrations/supabase/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { OSResponsiveTable } from '@/components/ui/responsive-table';
+import { JustificativaDialog } from '@/components/JustificativaDialog';
 // Remover import do ReportTemplate se não for mais usado
 // import { ReportTemplate } from '@/components/ui/ReportTemplate';
 
@@ -172,20 +173,22 @@ const formatDate = (dateString: string | null) =>
   dateString
     ? new Date(dateString).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
     : 'N/A';
-const getStatusVariant = (
-  status: string | null
-): 'secondary' | 'default' | 'destructive' | 'outline' => {
+const getStatusClass = (status: string | null): string => {
   switch (status) {
     case 'aberta':
-      return 'secondary';
+      return 'status-aberta';
     case 'em_andamento':
-      return 'default';
+      return 'status-em-andamento';
     case 'finalizada':
-      return 'default';
+      return 'status-finalizada';
     case 'cancelada':
-      return 'destructive';
+      return 'status-cancelada';
+    case 'pausada':
+      return 'status-pausada';
+    case 'falta_material':
+      return 'status-falta-material';
     default:
-      return 'outline';
+      return 'status-aberta';
   }
 };
 
@@ -220,6 +223,10 @@ export default function OrdensServico() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [produtoSearch, setProdutoSearch] = useState('');
   const [descontoFilter, setDescontoFilter] = useState<'todos' | 'com' | 'sem'>('todos');
+  const [showJustificativaDialog, setShowJustificativaDialog] = useState(false);
+  const [justificativaTipo, setJustificativaTipo] = useState<'pausa' | 'parada'>('pausa');
+  const [osParaJustificativa, setOsParaJustificativa] = useState<OrdemServicoComRelacoes | null>(null);
+  const [tempoTolerancia, setTempoTolerancia] = useState<number>(120);
 
   const form = useForm<OsFormData>({
     resolver: zodResolver(osSchema),
@@ -242,7 +249,24 @@ export default function OrdensServico() {
     fetchClientes();
     fetchProdutos();
     fetchColaboradores();
+    fetchTempoTolerancia();
   }, []);
+
+  const fetchTempoTolerancia = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('configuracoes')
+        .select('valor')
+        .eq('chave', 'tempo_tolerancia_pausa')
+        .single();
+
+      if (data) {
+        setTempoTolerancia(parseInt(data.valor) || 120);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar tempo de tolerância:', error);
+    }
+  };
 
   useEffect(() => {
     if (dialogOpen) {
@@ -574,17 +598,28 @@ export default function OrdensServico() {
     }
   };
 
-  const handlePauseOS = async (
-    os: OrdemServicoComRelacoes,
-    tipo: 'pausa' | 'parada_material' = 'pausa'
-  ) => {
+  const handlePauseOS = (os: OrdemServicoComRelacoes) => {
+    setOsParaJustificativa(os);
+    setJustificativaTipo('pausa');
+    setShowJustificativaDialog(true);
+  };
+
+  const handlePararOS = (os: OrdemServicoComRelacoes) => {
+    setOsParaJustificativa(os);
+    setJustificativaTipo('parada');
+    setShowJustificativaDialog(true);
+  };
+
+  const handleConfirmJustificativa = async (justificativa: string) => {
+    if (!osParaJustificativa) return;
+
     setIsPausing(true);
     try {
       // Encontrar o registro de tempo atual sem data_fim
       const { data: tempoAtual } = await supabase
         .from('os_tempo')
         .select('*')
-        .eq('os_id', os.id)
+        .eq('os_id', osParaJustificativa.id)
         .is('data_fim', null)
         .single();
 
@@ -598,53 +633,44 @@ export default function OrdensServico() {
         if (updateError) throw updateError;
       }
 
-      if (tipo === 'parada_material') {
-        // Buscar colaboradores ativos na OS
-        const { data: colaboradoresOS, error: colabError } = await supabase
-          .from('os_colaboradores')
-          .select('colaborador_id')
-          .eq('os_id', os.id)
-          .eq('ativo', true);
+      // Buscar colaboradores ativos na OS
+      const { data: colaboradoresOS, error: colabError } = await supabase
+        .from('os_colaboradores')
+        .select('colaborador_id')
+        .eq('os_id', osParaJustificativa.id)
+        .eq('ativo', true);
 
-        if (colabError) throw colabError;
-        if (!colaboradoresOS || colaboradoresOS.length === 0)
-          throw new Error('Nenhum colaborador ativo na OS.');
+      if (colabError) throw colabError;
+      if (!colaboradoresOS || colaboradoresOS.length === 0)
+        throw new Error('Nenhum colaborador ativo na OS.');
 
-        // Inserir um registro de parada para cada colaborador
-        const registrosParada = colaboradoresOS.map(({ colaborador_id }) => ({
-          os_id: os.id,
-          colaborador_id,
-          tipo: 'parada_material',
-          data_inicio: new Date().toISOString(),
-          motivo: motivoParada,
-        }));
-        const { error: pausaError } = await supabase
-          .from('os_tempo')
-          .insert(registrosParada);
-        if (pausaError) throw pausaError;
-      } else {
-        // Registrar pausa normal para todos os colaboradores ativos
-        const { data: colaboradoresOS, error: colabError } = await supabase
-          .from('os_colaboradores')
-          .select('colaborador_id')
-          .eq('os_id', os.id)
-          .eq('ativo', true);
+      // Inserir registro de pausa/parada para cada colaborador
+      const registrosTempo = colaboradoresOS.map(({ colaborador_id }) => ({
+        os_id: osParaJustificativa.id,
+        colaborador_id,
+        tipo: justificativaTipo === 'pausa' ? 'pausa' : 'parada_material',
+        data_inicio: new Date().toISOString(),
+        motivo: justificativa,
+      }));
 
-        if (colabError) throw colabError;
-        if (colaboradoresOS && colaboradoresOS.length > 0) {
-          const registrosPausa = colaboradoresOS.map(({ colaborador_id }) => ({
-            os_id: os.id,
-            colaborador_id,
-            tipo: tipo,
-            data_inicio: new Date().toISOString(),
-            motivo: null,
-          }));
-          const { error: pausaError } = await supabase
-            .from('os_tempo')
-            .insert(registrosPausa);
-          if (pausaError) throw pausaError;
-        }
-      }
+      const { error: tempoError } = await supabase
+        .from('os_tempo')
+        .insert(registrosTempo);
+
+      if (tempoError) throw tempoError;
+
+      // Salvar justificativa na tabela de justificativas
+      const { error: justificativaError } = await supabase
+        .from('justificativas_os')
+        .insert({
+          os_id: osParaJustificativa.id,
+          tipo: justificativaTipo,
+          justificativa: justificativa,
+          colaborador_id: colaboradoresOS[0]?.colaborador_id, // Usar o primeiro colaborador como referência
+          tempo_tolerancia_minutos: justificativaTipo === 'pausa' ? tempoTolerancia : 0,
+        });
+
+      if (justificativaError) throw justificativaError;
 
       // Atualizar status da OS
       const { error: osError } = await supabase
@@ -652,34 +678,25 @@ export default function OrdensServico() {
         .update({
           status: 'pausada',
         })
-        .eq('id', os.id);
+        .eq('id', osParaJustificativa.id);
+
       if (osError) throw osError;
 
-      // Atualizar contador de paradas para cada colaborador (se for parada_material)
-      if (tipo === 'parada_material') {
-        const { data: colaboradoresOS } = await supabase
-          .from('os_colaboradores')
-          .select('colaborador_id')
-          .eq('os_id', os.id)
-          .eq('ativo', true);
-        if (colaboradoresOS && colaboradoresOS.length > 0) {
-          const updatePromises = colaboradoresOS.map(({ colaborador_id }) =>
-            supabase.rpc('increment_paradas_material', { colaborador_id })
-          );
-          await Promise.all(updatePromises);
-        }
+      // Atualizar contador de paradas para cada colaborador (se for parada)
+      if (justificativaTipo === 'parada') {
+        const updatePromises = colaboradoresOS.map(({ colaborador_id }) =>
+          supabase.rpc('increment_paradas_material', { colaborador_id })
+        );
+        await Promise.all(updatePromises);
       }
 
       toast({
-        title:
-          tipo === 'pausa'
-            ? 'OS pausada com sucesso!'
-            : 'Parada por falta de material registrada!',
-        description:
-          tipo === 'parada_material'
-            ? 'Os colaboradores foram notificados e o tempo será contabilizado.'
-            : undefined,
+        title: justificativaTipo === 'pausa' ? 'OS pausada com sucesso!' : 'OS parada com sucesso!',
+        description: justificativaTipo === 'pausa' 
+          ? `OS pausada. Tempo de tolerância: ${tempoTolerancia} minutos.`
+          : 'A parada foi registrada e afetará a produtividade.',
       });
+
       fetchOrdensServico();
     } catch (error) {
       let msg = '';
@@ -694,14 +711,14 @@ export default function OrdensServico() {
         msg = String(error);
       }
       toast({
-        title: 'Erro ao pausar OS',
+        title: `Erro ao ${justificativaTipo === 'pausa' ? 'pausar' : 'parar'} OS`,
         description: msg || 'Erro desconhecido',
         variant: 'destructive',
       });
     } finally {
       setIsPausing(false);
-      setShowParadaDialog(false);
-      setMotivoParada('');
+      setShowJustificativaDialog(false);
+      setOsParaJustificativa(null);
     }
   };
 
@@ -877,10 +894,7 @@ export default function OrdensServico() {
           setSelectedOs(os);
           setShowColaboradoresDialog(true);
         }}
-        onParadaMaterial={(os) => {
-          setSelectedOs(os);
-          setShowParadaDialog(true);
-        }}
+        onParadaMaterial={handlePararOS}
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -1386,6 +1400,16 @@ export default function OrdensServico() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <JustificativaDialog
+        open={showJustificativaDialog}
+        onOpenChange={setShowJustificativaDialog}
+        onConfirm={handleConfirmJustificativa}
+        tipo={justificativaTipo}
+        osNumero={osParaJustificativa?.numero_os || ''}
+        tempoTolerancia={justificativaTipo === 'pausa' ? tempoTolerancia : undefined}
+        loading={isPausing}
+      />
     </div>
   );
 }

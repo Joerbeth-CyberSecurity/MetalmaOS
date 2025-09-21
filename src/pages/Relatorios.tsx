@@ -3,6 +3,7 @@ import { supabase } from '../integrations/supabase/client';
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from '../components/ui/card';
@@ -25,6 +26,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   Loader2,
   FileText,
@@ -34,6 +36,9 @@ import {
   BarChart3,
   Clock,
   AlertTriangle,
+  DollarSign,
+  Shield,
+  Activity,
 } from 'lucide-react';
 import {
   format,
@@ -47,6 +52,8 @@ import logo from '../assets/logo2.png';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import OSReportDetail from '../components/OSReportDetail';
+import RelatoriosFinanceiros from './RelatoriosFinanceiros';
+import { PermissionGuard } from '../components/PermissionGuard';
 
 export default function Relatorios() {
   const [selectedReport, setSelectedReport] = useState('produtividade');
@@ -61,6 +68,7 @@ export default function Relatorios() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedOSDetail, setSelectedOSDetail] = useState(null);
+  const [justificativaFilter, setJustificativaFilter] = useState('todos');
 
   const reportTypes = [
     {
@@ -126,58 +134,358 @@ export default function Relatorios() {
     }
   };
 
+  const fetchProdutividadeReport = async () => {
+    setLoading(true);
+    try {
+      // Buscar dados de tempo dos colaboradores
+      const { data: tempoData } = await supabase
+        .from('os_tempo')
+        .select(`
+          *,
+          colaborador:colaboradores(nome),
+          os:ordens_servico(numero_os, status)
+        `)
+        .eq('tipo', 'trabalho');
+
+      // Buscar OS concluídas
+      const { data: osData } = await supabase
+        .from('ordens_servico')
+        .select(`
+          *,
+          os_colaboradores(
+            colaborador:colaboradores(nome)
+          )
+        `)
+        .in('status', ['finalizada', 'em_andamento']);
+
+      // Processar dados
+      const colaboradoresMap = new Map();
+      
+      // Processar tempo trabalhado
+      tempoData?.forEach(item => {
+        const colabId = item.colaborador_id;
+        const colabNome = item.colaborador?.nome || 'Desconhecido';
+        
+        if (!colaboradoresMap.has(colabId)) {
+          colaboradoresMap.set(colabId, {
+            id: colabId,
+            nome: colabNome,
+            horasTrabalhadas: 0,
+            osConcluidas: 0,
+            totalOS: 0
+          });
+        }
+        
+        const colaborador = colaboradoresMap.get(colabId);
+        if (item.data_fim) {
+          const inicio = new Date(item.data_inicio);
+          const fim = new Date(item.data_fim);
+          const horas = (fim.getTime() - inicio.getTime()) / (1000 * 60 * 60);
+          colaborador.horasTrabalhadas += horas;
+        }
+      });
+
+      // Processar OS
+      osData?.forEach(os => {
+        os.os_colaboradores?.forEach(oc => {
+          const colabId = oc.colaborador_id;
+          const colabNome = oc.colaborador?.nome || 'Desconhecido';
+          
+          if (!colaboradoresMap.has(colabId)) {
+            colaboradoresMap.set(colabId, {
+              id: colabId,
+              nome: colabNome,
+              horasTrabalhadas: 0,
+              osConcluidas: 0,
+              totalOS: 0
+            });
+          }
+          
+          const colaborador = colaboradoresMap.get(colabId);
+          colaborador.totalOS++;
+          if (os.status === 'finalizada') {
+            colaborador.osConcluidas++;
+          }
+        });
+      });
+
+      // Calcular métricas
+      const colaboradores = Array.from(colaboradoresMap.values());
+      const totalHoras = colaboradores.reduce((sum, colab) => sum + colab.horasTrabalhadas, 0);
+      const totalOS = colaboradores.reduce((sum, colab) => sum + colab.totalOS, 0);
+      const osConcluidas = colaboradores.reduce((sum, colab) => sum + colab.osConcluidas, 0);
+      
+      colaboradores.forEach(colab => {
+        colab.eficiencia = colab.totalOS > 0 ? (colab.osConcluidas / colab.totalOS) * 100 : 0;
+        colab.mediaDiaria = colab.horasTrabalhadas / Math.max(1, Math.ceil(colab.horasTrabalhadas / 8));
+      });
+
+      const eficienciaGeral = totalOS > 0 ? (osConcluidas / totalOS) * 100 : 0;
+      const mediaDiaria = colaboradores.length > 0 ? totalHoras / colaboradores.length : 0;
+
+      setReportData({
+        produtividade: {
+          colaboradores,
+          totalHoras,
+          totalDias: Math.ceil(totalHoras / 8),
+          mediaDiaria,
+          eficienciaGeral,
+          osConcluidas,
+          totalOS
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório de produtividade:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearFilters = () => {
+    setPeriod('mes');
+    setColabFilter('todos');
+    setClienteFilter('todos');
+    setOsNumberFilter('');
+    setStartDate('');
+    setEndDate('');
+    setReportData(null);
+  };
+
+  const exportProdutividadePDF = () => {
+    if (!reportData?.produtividade) return;
+
+    const doc = new jsPDF();
+    
+    // Logo
+    doc.addImage(logo, 'PNG', 15, 10, 30, 20);
+    
+    // Título
+    doc.setFontSize(20);
+    doc.text('Relatório de Produtividade', 50, 25);
+    
+    // Data
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 15, 40);
+    
+    // Métricas gerais
+    doc.setFontSize(14);
+    doc.text('Métricas Gerais', 15, 55);
+    
+    doc.setFontSize(10);
+    doc.text(`Total de Horas: ${reportData.produtividade.totalHoras.toFixed(1)}h`, 15, 65);
+    doc.text(`Média Diária: ${reportData.produtividade.mediaDiaria.toFixed(1)}h`, 15, 70);
+    doc.text(`Eficiência Geral: ${reportData.produtividade.eficienciaGeral.toFixed(1)}%`, 15, 75);
+    doc.text(`OS Concluídas: ${reportData.produtividade.osConcluidas}/${reportData.produtividade.totalOS}`, 15, 80);
+    
+    // Tabela de colaboradores
+    doc.setFontSize(14);
+    doc.text('Produtividade por Colaborador', 15, 95);
+    
+    const tableData = reportData.produtividade.colaboradores.map(colab => [
+      colab.nome,
+      `${colab.horasTrabalhadas.toFixed(1)}h`,
+      colab.osConcluidas.toString(),
+      `${colab.eficiencia.toFixed(1)}%`,
+      `${colab.mediaDiaria.toFixed(1)}h`
+    ]);
+    
+    autoTable(doc, {
+      head: [['Colaborador', 'Horas', 'OS Concluídas', 'Eficiência', 'Média Diária']],
+      body: tableData,
+      startY: 100,
+      styles: { fontSize: 8 }
+    });
+    
+    doc.save('relatorio-produtividade.pdf');
+  };
+
+  const fetchSegurancaReport = async () => {
+    setLoading(true);
+    try {
+      // Buscar dados de auditoria
+      const { data: auditoriaData } = await supabase
+        .from('auditoria_login')
+        .select('*')
+        .order('data_hora', { ascending: false })
+        .limit(100);
+
+      if (!auditoriaData) {
+        setReportData({
+          seguranca: {
+            totalAcessos: 0,
+            loginsSucesso: 0,
+            loginsFalha: 0,
+            percentualSucesso: 0,
+            percentualFalha: 0,
+            usuariosUnicos: 0,
+            logs: []
+          }
+        });
+        return;
+      }
+
+      // Processar dados
+      const totalAcessos = auditoriaData.length;
+      const loginsSucesso = auditoriaData.filter(log => 
+        log.tipo_evento === 'login' || log.tipo_evento === 'logout'
+      ).length;
+      const loginsFalha = auditoriaData.filter(log => 
+        log.tipo_evento === 'failed_login'
+      ).length;
+      
+      const percentualSucesso = totalAcessos > 0 ? (loginsSucesso / totalAcessos) * 100 : 0;
+      const percentualFalha = totalAcessos > 0 ? (loginsFalha / totalAcessos) * 100 : 0;
+      
+      const usuariosUnicos = new Set(
+        auditoriaData
+          .filter(log => log.nome_usuario)
+          .map(log => log.nome_usuario)
+      ).size;
+
+      setReportData({
+        seguranca: {
+          totalAcessos,
+          loginsSucesso,
+          loginsFalha,
+          percentualSucesso,
+          percentualFalha,
+          usuariosUnicos,
+          logs: auditoriaData
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório de segurança:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportSegurancaPDF = () => {
+    if (!reportData?.seguranca) return;
+
+    const doc = new jsPDF();
+    
+    // Logo
+    doc.addImage(logo, 'PNG', 15, 10, 30, 20);
+    
+    // Título
+    doc.setFontSize(20);
+    doc.text('Relatório de Segurança', 50, 25);
+    
+    // Data
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 15, 40);
+    
+    // Métricas gerais
+    doc.setFontSize(14);
+    doc.text('Métricas de Segurança', 15, 55);
+    
+    doc.setFontSize(10);
+    doc.text(`Total de Acessos: ${reportData.seguranca.totalAcessos}`, 15, 65);
+    doc.text(`Logins Bem-sucedidos: ${reportData.seguranca.loginsSucesso} (${reportData.seguranca.percentualSucesso.toFixed(1)}%)`, 15, 70);
+    doc.text(`Tentativas Falhadas: ${reportData.seguranca.loginsFalha} (${reportData.seguranca.percentualFalha.toFixed(1)}%)`, 15, 75);
+    doc.text(`Usuários Únicos: ${reportData.seguranca.usuariosUnicos}`, 15, 80);
+    
+    // Tabela de logs
+    doc.setFontSize(14);
+    doc.text('Log de Auditoria', 15, 95);
+    
+    const tableData = reportData.seguranca.logs.slice(0, 20).map(log => [
+      log.nome_usuario || 'N/A',
+      log.email_usuario || 'N/A',
+      log.tipo_evento === 'login' ? 'Login' : 
+      log.tipo_evento === 'logout' ? 'Logout' : 'Tentativa Falhada',
+      log.data_hora ? new Date(log.data_hora).toLocaleString('pt-BR') : 'N/A',
+      log.ip_address || 'N/A'
+    ]);
+    
+    autoTable(doc, {
+      head: [['Usuário', 'Email', 'Evento', 'Data/Hora', 'IP']],
+      body: tableData,
+      startY: 100,
+      styles: { fontSize: 8 }
+    });
+    
+    doc.save('relatorio-seguranca.pdf');
+  };
+
   const getDateRange = () => {
     const now = new Date();
+    console.log('Calculando período para:', period);
+    console.log('Data atual:', now);
+    console.log('startDate:', startDate);
+    console.log('endDate:', endDate);
+    
     if (period === 'mes') {
-      return {
+      const result = {
         start: startOfMonth(now).toISOString(),
         end: endOfMonth(now).toISOString(),
       };
+      console.log('Período mensal:', result);
+      return result;
     } else if (period === 'semana') {
-      return {
+      const result = {
         start: startOfWeek(now, { weekStartsOn: 1 }).toISOString(),
         end: endOfWeek(now, { weekStartsOn: 1 }).toISOString(),
       };
+      console.log('Período semanal:', result);
+      return result;
     } else if (period === 'personalizado') {
-      return {
+      const result = {
         start: startDate ? new Date(startDate).toISOString() : startOfMonth(now).toISOString(),
         end: endDate ? new Date(endDate).toISOString() : endOfMonth(now).toISOString(),
       };
+      console.log('Período personalizado:', result);
+      return result;
     } else {
-      return {
+      const result = {
         start: startOfMonth(now).toISOString(),
         end: endOfMonth(now).toISOString(),
       };
+      console.log('Período padrão (mensal):', result);
+      return result;
     }
   };
 
   const generateReport = async () => {
+    console.log('Iniciando geração de relatório...');
+    console.log('Tipo de relatório selecionado:', selectedReport);
     setLoading(true);
 
     try {
       const { start, end } = getDateRange();
+      console.log('Período calculado:', { start, end });
 
       switch (selectedReport) {
         case 'produtividade':
+          console.log('Gerando relatório de produtividade...');
           await generateProdutividadeReport(start, end);
           break;
         case 'paradas':
+          console.log('Gerando relatório de paradas...');
           await generateParadasReport(start, end);
           break;
         case 'os_status':
+          console.log('Gerando relatório de status...');
           await generateOsStatusReport(start, end);
           break;
         case 'tempo':
+          console.log('Gerando relatório de tempo...');
           await generateTempoReport(start, end);
           break;
         case 'emissao_os':
+          console.log('Gerando relatório de emissão de OS...');
           await generateEmissaoOSReport(start, end);
           break;
+        default:
+          console.log('Tipo de relatório não reconhecido:', selectedReport);
       }
     } catch (error) {
       console.error('Erro ao gerar relatório:', error);
+      alert('Erro ao gerar relatório: ' + error.message);
     } finally {
       setLoading(false);
+      console.log('Geração de relatório finalizada');
     }
   };
 
@@ -442,6 +750,10 @@ export default function Relatorios() {
 
   const generateEmissaoOSReport = async (start, end) => {
     try {
+      console.log('Iniciando geração do relatório de emissão de OS...');
+      console.log('Período:', { start, end });
+      console.log('Filtros:', { osNumberFilter, clienteFilter, justificativaFilter });
+
       let query = supabase
         .from('ordens_servico')
         .select(`
@@ -466,6 +778,14 @@ export default function Relatorios() {
           ),
           os_colaboradores (
             colaborador:colaboradores(nome)
+          ),
+          justificativas_os (
+            id,
+            tipo,
+            justificativa,
+            data_justificativa,
+            tempo_tolerancia_minutos,
+            excedeu_tolerancia
           )
         `)
         .gte('data_abertura', start)
@@ -481,15 +801,19 @@ export default function Relatorios() {
         query = query.eq('cliente_id', clienteFilter);
       }
 
+      console.log('Executando query...');
       const { data: ordens, error } = await query;
 
       if (error) {
         console.error('Erro ao buscar OS:', error);
+        alert('Erro ao buscar dados: ' + error.message);
         return;
       }
 
+      console.log('Dados retornados:', ordens?.length || 0, 'ordens encontradas');
+
       // Processar dados para o relatório
-      const osData = (ordens || []).map((os) => ({
+      let osData = (ordens || []).map((os) => ({
         numero_os: os.numero_os,
         cliente: os.clientes,
         descricao: os.descricao,
@@ -505,21 +829,40 @@ export default function Relatorios() {
         observacoes: os.observacoes,
         produtos: os.os_produtos || [],
         colaboradores: os.os_colaboradores || [],
+        justificativas: os.justificativas_os || [],
+        tem_justificativa: (os.justificativas_os || []).length > 0,
       }));
 
-      setReportData({
+      console.log('Dados processados:', osData.length, 'OS processadas');
+
+      // Aplicar filtro de justificativa
+      if (justificativaFilter === 'com') {
+        osData = osData.filter(os => os.tem_justificativa);
+        console.log('Após filtro de justificativa (com):', osData.length, 'OS');
+      } else if (justificativaFilter === 'sem') {
+        osData = osData.filter(os => !os.tem_justificativa);
+        console.log('Após filtro de justificativa (sem):', osData.length, 'OS');
+      }
+
+      const reportData = {
         type: 'emissao_os',
         data: osData,
         period: { start, end },
         filters: { 
           cliente: clienteFilter,
           osNumber: osNumberFilter,
+          justificativa: justificativaFilter,
           startDate,
           endDate
         },
-      });
+      };
+
+      console.log('Definindo reportData:', reportData);
+      setReportData(reportData);
+      console.log('Relatório de emissão de OS gerado com sucesso!');
     } catch (error) {
       console.error('Erro ao gerar relatório de emissão de OS:', error);
+      alert('Erro ao gerar relatório: ' + error.message);
     }
   };
 
@@ -718,16 +1061,8 @@ export default function Relatorios() {
         0
       );
 
-      // Converter logo para base64
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
-        const logoBase64 = canvas.toDataURL('image/png');
+      // Usar logo diretamente como URL
+      const logoUrl = logo;
 
         printWindow.document.write(`
           <!DOCTYPE html>
@@ -841,7 +1176,7 @@ export default function Relatorios() {
           <body>
             <div class="relatorio-impressao">
               <div class="relatorio-cabecalho">
-                <img src="${logoBase64}" alt="Logo Metalma" class="relatorio-logo" />
+                <img src="${logoUrl}" alt="Logo Metalma" class="relatorio-logo" />
                 <div class="relatorio-titulo">ORDEM DE SERVIÇO</div>
                 <div class="relatorio-info">Nº ${os.numero_os}</div>
               </div>
@@ -1188,9 +1523,6 @@ export default function Relatorios() {
         printWindow.focus();
         printWindow.print();
         printWindow.close();
-      };
-      
-      img.src = logo;
     }
   };
 
@@ -1205,19 +1537,8 @@ export default function Relatorios() {
         const pageHeight = doc.internal.pageSize.getHeight();
         let yPosition = 20;
 
-        // Converter logo para base64 e adicionar ao PDF
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
-        
-        img.onload = () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx?.drawImage(img, 0, 0);
-          const logoBase64 = canvas.toDataURL('image/png');
-
-          // Adicionar logo ao PDF
-          doc.addImage(logoBase64, 'PNG', pageWidth / 2 - 30, yPosition, 60, 20);
+        // Adicionar logo ao PDF
+        doc.addImage(logo, 'PNG', pageWidth / 2 - 30, yPosition, 60, 20);
           yPosition += 35;
 
           // Cabeçalho
@@ -1367,11 +1688,8 @@ export default function Relatorios() {
         doc.text('Metalma Inox & Cia - Sistema de Controle de OS', pageWidth / 2, pageHeight - 20, { align: 'center' });
         doc.text(`Relatório gerado em: ${formatDate(new Date().toISOString())}`, pageWidth / 2, pageHeight - 15, { align: 'center' });
 
-          const fileName = `OS_${os.numero_os.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-          doc.save(fileName);
-        };
-        
-        img.src = logo;
+        const fileName = `OS_${os.numero_os.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+        doc.save(fileName);
       } catch (error) {
         console.error('Erro ao gerar PDF:', error);
         alert('Erro ao gerar PDF: ' + error.message);
@@ -1424,6 +1742,7 @@ export default function Relatorios() {
           <th>Valor Total</th>
           <th>Desconto</th>
           <th>Total Final</th>
+          <th>Justificativas</th>
         `;
       default:
         return '';
@@ -1502,6 +1821,10 @@ export default function Relatorios() {
             <td>${formatCurrency(os.valor_total)}</td>
             <td>${os.desconto_valor ? formatCurrency(os.desconto_valor) : '-'}</td>
             <td>${formatCurrency(os.valor_total_com_desconto || os.valor_total)}</td>
+            <td>${os.justificativas && os.justificativas.length > 0 
+              ? os.justificativas.map(j => `${j.tipo === 'pausa' ? 'Pausa' : 'Parada'}: ${j.justificativa}`).join('; ')
+              : '-'
+            }</td>
           </tr>
         `
           )
@@ -1566,6 +1889,7 @@ export default function Relatorios() {
             <TableHead>Valor Total</TableHead>
             <TableHead>Desconto</TableHead>
             <TableHead>Total Final</TableHead>
+            <TableHead>Justificativas</TableHead>
           </>
         );
       default:
@@ -1667,6 +1991,30 @@ export default function Relatorios() {
             <TableCell className="font-medium">
               {formatCurrency(os.valor_total_com_desconto || os.valor_total)}
             </TableCell>
+            <TableCell>
+              {os.justificativas && os.justificativas.length > 0 ? (
+                <div className="space-y-1">
+                  {os.justificativas.map((just, idx) => (
+                    <div key={idx} className="text-xs">
+                      <Badge 
+                        variant={just.tipo === 'pausa' ? 'secondary' : 'destructive'}
+                        className="text-xs"
+                      >
+                        {just.tipo === 'pausa' ? 'Pausa' : 'Parada'}
+                      </Badge>
+                      <div className="mt-1 text-muted-foreground">
+                        {just.justificativa.length > 30 
+                          ? `${just.justificativa.substring(0, 30)}...` 
+                          : just.justificativa
+                        }
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-muted-foreground text-sm">-</span>
+              )}
+            </TableCell>
           </TableRow>
         ));
       default:
@@ -1683,6 +2031,28 @@ export default function Relatorios() {
           Visualize os dados e o desempenho da sua operação
         </p>
       </div>
+
+      <Tabs defaultValue="operacionais" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="operacionais" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Operacionais
+          </TabsTrigger>
+          <TabsTrigger value="financeiros" className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Financeiros
+          </TabsTrigger>
+          <TabsTrigger value="produtividade" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Produtividade
+          </TabsTrigger>
+          <TabsTrigger value="seguranca" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Segurança
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="operacionais" className="space-y-6">
 
       {/* Seleção de Relatório */}
       <Card>
@@ -1736,14 +2106,29 @@ export default function Relatorios() {
             </div>
 
             {selectedReport === 'emissao_os' && (
-              <div className="space-y-2">
-                <Label>Número da OS</Label>
-                <Input
-                  placeholder="Ex: OS0001/2024"
-                  value={osNumberFilter}
-                  onChange={(e) => setOsNumberFilter(e.target.value)}
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label>Número da OS</Label>
+                  <Input
+                    placeholder="Ex: OS0001/2024"
+                    value={osNumberFilter}
+                    onChange={(e) => setOsNumberFilter(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Justificativa</Label>
+                  <Select value={justificativaFilter} onValueChange={setJustificativaFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas as OS" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todas as OS</SelectItem>
+                      <SelectItem value="com">Com Justificativa</SelectItem>
+                      <SelectItem value="sem">Sem Justificativa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
             )}
 
             {period === 'personalizado' && (
@@ -1858,6 +2243,450 @@ export default function Relatorios() {
           onExportPDF={handleExportPDFOSDetail}
         />
       )}
+        </TabsContent>
+
+        <TabsContent value="financeiros">
+          <RelatoriosFinanceiros />
+        </TabsContent>
+
+        <TabsContent value="produtividade" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Relatórios de Produtividade</CardTitle>
+              <CardDescription>
+                Análise de performance e eficiência dos colaboradores
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Filtros */}
+              <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg bg-muted/30 p-4 md:grid-cols-4">
+                <div>
+                  <Label htmlFor="period">Período</Label>
+                  <Select value={period} onValueChange={setPeriod}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hoje">Hoje</SelectItem>
+                      <SelectItem value="semana">Esta Semana</SelectItem>
+                      <SelectItem value="mes">Este Mês</SelectItem>
+                      <SelectItem value="trimestre">Este Trimestre</SelectItem>
+                      <SelectItem value="ano">Este Ano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="colabFilter">Colaborador</Label>
+                  <Select value={colabFilter} onValueChange={setColabFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      {colaboradores.map((colab) => (
+                        <SelectItem key={colab.id} value={colab.id}>
+                          {colab.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="startDate">Data Início</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="endDate">Data Fim</Label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Botões de ação */}
+              <div className="mb-4 flex justify-between">
+                <div className="flex gap-2">
+                  <Button onClick={fetchProdutividadeReport} disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Gerar Relatório
+                  </Button>
+                  <Button variant="outline" onClick={clearFilters}>
+                    Limpar Filtros
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={exportProdutividadePDF}
+                    disabled={!reportData}
+                    variant="outline"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar PDF
+                  </Button>
+                </div>
+              </div>
+
+              {/* Resultados */}
+              {reportData && reportData.produtividade && (
+                <div className="space-y-6">
+                  {/* Cards de métricas */}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Total de Horas
+                        </CardTitle>
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {reportData.produtividade.totalHoras.toFixed(1)}h
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {reportData.produtividade.totalDias} dias trabalhados
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Média Diária
+                        </CardTitle>
+                        <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {reportData.produtividade.mediaDiaria.toFixed(1)}h
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          por colaborador
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Eficiência
+                        </CardTitle>
+                        <Activity className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {reportData.produtividade.eficienciaGeral.toFixed(1)}%
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          média geral
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          OS Concluídas
+                        </CardTitle>
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {reportData.produtividade.osConcluidas}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          de {reportData.produtividade.totalOS} total
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Tabela de colaboradores */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Produtividade por Colaborador</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Colaborador</TableHead>
+                            <TableHead>Horas Trabalhadas</TableHead>
+                            <TableHead>OS Concluídas</TableHead>
+                            <TableHead>Eficiência</TableHead>
+                            <TableHead>Média Diária</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {reportData.produtividade.colaboradores.map((colab, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="font-medium">{colab.nome}</TableCell>
+                              <TableCell>{colab.horasTrabalhadas.toFixed(1)}h</TableCell>
+                              <TableCell>{colab.osConcluidas}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    colab.eficiencia >= 80
+                                      ? 'default'
+                                      : colab.eficiencia >= 60
+                                        ? 'secondary'
+                                        : 'destructive'
+                                  }
+                                >
+                                  {colab.eficiencia.toFixed(1)}%
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{colab.mediaDiaria.toFixed(1)}h</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {!reportData && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Configure os filtros e clique em "Gerar Relatório" para ver os dados</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="seguranca" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Relatórios de Segurança</CardTitle>
+              <CardDescription>
+                Monitoramento de acessos e atividades do sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Filtros */}
+              <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg bg-muted/30 p-4 md:grid-cols-4">
+                <div>
+                  <Label htmlFor="period">Período</Label>
+                  <Select value={period} onValueChange={setPeriod}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hoje">Hoje</SelectItem>
+                      <SelectItem value="semana">Esta Semana</SelectItem>
+                      <SelectItem value="mes">Este Mês</SelectItem>
+                      <SelectItem value="trimestre">Este Trimestre</SelectItem>
+                      <SelectItem value="ano">Este Ano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="startDate">Data Início</Label>
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="endDate">Data Fim</Label>
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="eventType">Tipo de Evento</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="login">Login</SelectItem>
+                      <SelectItem value="logout">Logout</SelectItem>
+                      <SelectItem value="failed_login">Tentativa de Login</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Botões de ação */}
+              <div className="mb-4 flex justify-between">
+                <div className="flex gap-2">
+                  <Button onClick={fetchSegurancaReport} disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Gerar Relatório
+                  </Button>
+                  <Button variant="outline" onClick={clearFilters}>
+                    Limpar Filtros
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={exportSegurancaPDF}
+                    disabled={!reportData}
+                    variant="outline"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar PDF
+                  </Button>
+                </div>
+              </div>
+
+              {/* Resultados */}
+              {reportData && reportData.seguranca && (
+                <div className="space-y-6">
+                  {/* Cards de métricas */}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Total de Acessos
+                        </CardTitle>
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {reportData.seguranca.totalAcessos}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          no período
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Logins Bem-sucedidos
+                        </CardTitle>
+                        <Activity className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-green-600">
+                          {reportData.seguranca.loginsSucesso}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {reportData.seguranca.percentualSucesso.toFixed(1)}% do total
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Tentativas Falhadas
+                        </CardTitle>
+                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-red-600">
+                          {reportData.seguranca.loginsFalha}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {reportData.seguranca.percentualFalha.toFixed(1)}% do total
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Usuários Únicos
+                        </CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          {reportData.seguranca.usuariosUnicos}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          ativos no período
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Tabela de auditoria */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Log de Auditoria</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Usuário</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Evento</TableHead>
+                            <TableHead>Data/Hora</TableHead>
+                            <TableHead>IP</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {reportData.seguranca.logs.map((log, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="font-medium">{log.nome_usuario || 'N/A'}</TableCell>
+                              <TableCell>{log.email_usuario || 'N/A'}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    log.tipo_evento === 'login'
+                                      ? 'default'
+                                      : log.tipo_evento === 'logout'
+                                        ? 'secondary'
+                                        : 'destructive'
+                                  }
+                                >
+                                  {log.tipo_evento === 'login' ? 'Login' : 
+                                   log.tipo_evento === 'logout' ? 'Logout' : 
+                                   'Tentativa Falhada'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {log.data_hora 
+                                  ? new Date(log.data_hora).toLocaleString('pt-BR')
+                                  : 'N/A'
+                                }
+                              </TableCell>
+                              <TableCell>{log.ip_address || 'N/A'}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    log.tipo_evento === 'login' || log.tipo_evento === 'logout'
+                                      ? 'default'
+                                      : 'destructive'
+                                  }
+                                >
+                                  {log.tipo_evento === 'login' || log.tipo_evento === 'logout'
+                                    ? 'Sucesso'
+                                    : 'Falha'
+                                  }
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {!reportData && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Configure os filtros e clique em "Gerar Relatório" para ver os dados</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

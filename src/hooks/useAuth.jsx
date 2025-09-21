@@ -95,7 +95,6 @@ export function AuthProvider({ children }) {
     try {
       const { error } = await supabase.from('auditoria_login').insert({
         user_id: user.id,
-        admin_id: profile?.id,
         nome_usuario: profile?.nome || user.email,
         email_usuario: user.email,
         tipo_evento: 'login',
@@ -123,7 +122,6 @@ export function AuthProvider({ children }) {
     try {
       const { error } = await supabase.from('auditoria_login').insert({
         user_id: user?.id,
-        admin_id: profile?.id,
         nome_usuario: profile?.nome || user?.email,
         email_usuario: user?.email,
         tipo_evento: 'logout',

@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ClipboardList,
   Users,
@@ -18,8 +19,14 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
+  BarChart3,
+  Activity,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import AdvancedDashboard from '@/components/AdvancedDashboard';
+import { NotificationCenter } from '@/components/NotificationCenter';
+import { useDashboardStats } from '@/hooks/useSupabaseQuery';
+import { useCache } from '@/hooks/useCache';
 
 interface DashboardStats {
   totalOS: number;
@@ -147,12 +154,30 @@ export default function Dashboard() {
   return (
     <div className="animate-fade-in space-y-4 sm:space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          Visão geral do sistema de controle de ordens de serviço
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Visão geral do sistema de controle de ordens de serviço
+          </p>
+        </div>
+        <NotificationCenter />
       </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Visão Geral
+          </TabsTrigger>
+          <TabsTrigger value="advanced" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Dashboard Avançado
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
 
       {/* Main Stats Cards */}
       <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
@@ -328,6 +353,12 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="advanced">
+          <AdvancedDashboard />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

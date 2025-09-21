@@ -67,12 +67,7 @@ export default function OSReportDetail({ osData, onPrint, onExportPDF }: OSRepor
             <div className="space-y-2 text-sm">
               <div><span className="font-medium">Número:</span> {osData.numero_os}</div>
               <div><span className="font-medium">Status:</span> 
-                <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
-                  osData.status === 'finalizada' ? 'bg-green-100 text-green-800' :
-                  osData.status === 'em_andamento' ? 'bg-blue-100 text-blue-800' :
-                  osData.status === 'cancelada' ? 'bg-red-100 text-red-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
+                <span className={`ml-2 px-2 py-1 rounded text-xs font-medium status-${osData.status?.replace('_', '-')}`}>
                   {osData.status.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                 </span>
               </div>

@@ -3,10 +3,12 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { useAuth } from '@/hooks/useAuth.jsx';
 import { Button } from '@/components/ui/button';
-import { User, Bell } from 'lucide-react';
+import { User } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { DarkModeToggle } from '@/components/ui/DarkModeToggle';
 import { MobileNavigation } from '@/components/MobileNavigation';
+import { NotificationCenter } from '@/components/NotificationCenter';
+import { usePausasExcedidas } from '@/hooks/usePausasExcedidas';
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,6 +16,9 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { user, userProfile, refreshUserProfile } = useAuth();
+  
+  // Hook para verificar pausas excedidas
+  usePausasExcedidas();
 
   const handleRefreshProfile = async () => {
     await refreshUserProfile();
@@ -40,13 +45,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="hidden sm:flex transition-colors hover:bg-muted/30 hover:text-foreground"
-              >
-                <Bell className="h-4 w-4" />
-              </Button>
+              <NotificationCenter />
               <DarkModeToggle />
               <Button
                 variant="ghost"

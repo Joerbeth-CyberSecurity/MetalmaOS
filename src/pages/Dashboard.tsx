@@ -165,17 +165,21 @@ export default function Dashboard() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue="advanced" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Visão Geral
-          </TabsTrigger>
           <TabsTrigger value="advanced" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Dashboard Avançado
           </TabsTrigger>
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Visão Geral
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="advanced">
+          <AdvancedDashboard />
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-4 sm:space-y-6">
 
@@ -353,10 +357,6 @@ export default function Dashboard() {
           </div>
         </CardContent>
       </Card>
-        </TabsContent>
-
-        <TabsContent value="advanced">
-          <AdvancedDashboard />
         </TabsContent>
       </Tabs>
     </div>

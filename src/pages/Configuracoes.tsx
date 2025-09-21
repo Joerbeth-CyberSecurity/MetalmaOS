@@ -155,7 +155,6 @@ export default function Configuracoes() {
           data_hora,
           ip_address,
           user_agent,
-          event_details,
           created_at
         `)
         .order('data_hora', { ascending: false })

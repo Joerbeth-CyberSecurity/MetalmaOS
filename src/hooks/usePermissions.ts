@@ -114,23 +114,15 @@ export function usePermissions() {
   };
 
   const isAdmin = (): boolean => {
-    return accessLevel?.nome === 'admin';
+    return accessLevel?.nome === 'Administrador';
   };
 
   const isManager = (): boolean => {
-    return accessLevel?.nome === 'gerente' || isAdmin();
-  };
-
-  const isSupervisor = (): boolean => {
-    return accessLevel?.nome === 'supervisor' || isManager();
+    return accessLevel?.nome === 'Gerente' || isAdmin();
   };
 
   const isCollaborator = (): boolean => {
-    return accessLevel?.nome === 'colaborador' || isSupervisor();
-  };
-
-  const isViewer = (): boolean => {
-    return accessLevel?.nome === 'visualizador' || isCollaborator();
+    return accessLevel?.nome === 'Colaborador' || isManager();
   };
 
   return {
@@ -144,9 +136,7 @@ export function usePermissions() {
     canManageModule,
     isAdmin,
     isManager,
-    isSupervisor,
     isCollaborator,
-    isViewer,
     refreshPermissions: fetchUserPermissions
   };
 }

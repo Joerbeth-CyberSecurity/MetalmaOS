@@ -23,25 +23,25 @@ const mobileItems = [
     title: 'Clientes',
     url: '/clientes',
     icon: Users,
-    permission: 'clientes_visualizar',
+    permission: 'cliente_visualizar',
   },
   {
     title: 'Colaboradores',
     url: '/colaboradores',
     icon: UserCheck,
-    permission: 'colaboradores_visualizar',
+    permission: 'colaborador_visualizar',
   },
   {
     title: 'Produtos',
     url: '/produtos',
     icon: Package,
-    permission: 'produtos_visualizar',
+    permission: 'produto_visualizar',
   },
   {
     title: 'Relatórios',
     url: '/relatorios',
     icon: BarChart3,
-    permission: 'relatorios_visualizar',
+    permission: 'relatorio_visualizar',
   },
 ];
 

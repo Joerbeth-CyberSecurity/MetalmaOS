@@ -38,25 +38,25 @@ const items = [
     title: 'Clientes',
     url: '/clientes',
     icon: Users,
-    permission: 'clientes_visualizar',
+    permission: 'cliente_visualizar',
   },
   {
     title: 'Colaboradores',
     url: '/colaboradores',
     icon: UserCheck,
-    permission: 'colaboradores_visualizar',
+    permission: 'colaborador_visualizar',
   },
   {
     title: 'Produtos',
     url: '/produtos',
     icon: Package,
-    permission: 'produtos_visualizar',
+    permission: 'produto_visualizar',
   },
   {
     title: 'Relatórios',
     url: '/relatorios',
     icon: BarChart3,
-    permission: 'relatorios_visualizar',
+    permission: 'relatorio_visualizar',
   },
 ];
 
@@ -65,13 +65,13 @@ const adminItems = [
     title: 'Configurações',
     url: '/configuracoes',
     icon: Settings,
-    permission: 'configuracoes_visualizar',
+    permission: 'config_visualizar',
   },
   {
     title: 'Ajuda',
     url: 'https://joerbeth-cybersecurity.github.io/ajudaMetalmaOS/', // Link correto do GitHub Pages
     icon: BarChart3, // Pode trocar por um ícone mais apropriado
-    permission: 'configuracoes_visualizar',
+    permission: 'config_visualizar',
     external: true, // Garante que abra em nova aba
   },
 ];

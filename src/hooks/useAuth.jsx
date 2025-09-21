@@ -100,11 +100,6 @@ export function AuthProvider({ children }) {
         tipo_evento: 'login',
         ip_address: null, // Será capturado pelo backend se necessário
         user_agent: navigator.userAgent,
-        event_details: {
-          action: 'login',
-          timestamp: new Date().toISOString(),
-          success: true,
-        },
       });
 
       if (error) {
@@ -127,11 +122,6 @@ export function AuthProvider({ children }) {
         tipo_evento: 'logout',
         ip_address: null,
         user_agent: navigator.userAgent,
-        event_details: {
-          action: 'logout',
-          timestamp: new Date().toISOString(),
-          success: true,
-        },
       });
 
       if (error) {
@@ -160,9 +150,12 @@ export function AuthProvider({ children }) {
 
             // Buscar permissões se tiver nível de acesso
             if (profile?.nivel_id) {
+              console.log('Buscando permissões para nível:', profile.nivel_id);
               const permissions = await fetchUserPermissions(profile.nivel_id);
               setUserPermissions(permissions);
               console.log('Permissões carregadas:', permissions);
+            } else {
+              console.log('Usuário sem nível de acesso');
             }
           } catch (error) {
             console.error('Erro ao buscar perfil:', error);
@@ -195,9 +188,12 @@ export function AuthProvider({ children }) {
 
             // Buscar permissões se tiver nível de acesso
             if (profile?.nivel_id) {
+              console.log('Buscando permissões para nível:', profile.nivel_id);
               const permissions = await fetchUserPermissions(profile.nivel_id);
               setUserPermissions(permissions);
               console.log('Permissões carregadas:', permissions);
+            } else {
+              console.log('Usuário sem nível de acesso');
             }
           } catch (error) {
             console.error('Erro ao buscar perfil:', error);
@@ -330,7 +326,11 @@ export function AuthProvider({ children }) {
 
   // Função para verificar se o usuário tem uma permissão específica
   const hasPermission = (permissionName) => {
-    return userPermissions.includes(permissionName);
+    console.log('Verificando permissão:', permissionName);
+    console.log('Permissões do usuário:', userPermissions);
+    const hasAccess = userPermissions.includes(permissionName);
+    console.log('Tem acesso:', hasAccess);
+    return hasAccess;
   };
 
   return (

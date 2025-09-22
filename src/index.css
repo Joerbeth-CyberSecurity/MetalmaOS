@@ -97,6 +97,97 @@
     --status-finalizada: 142.1 70.6% 45.3%;
     --status-cancelada: 0 62.8% 30.6%;
   }
+  
+  /* Brand themes aligned with Metalma logo palette */
+  .theme-metalma-classic {
+    --primary: 120 100% 20%; /* #006516 */
+    --accent: 142 44% 41%; /* #39964D approx */
+    --foreground: 0 0% 0%; /* black */
+    --background: 0 0% 100%;
+    --card: 0 0% 100%;
+    --secondary: 120 25% 96%;
+    --muted: 0 0% 74%; /* #bdbdbb approx for soft lines */
+    --muted-foreground: 0 0% 35%;
+    --ring: 120 100% 20%;
+    --border: 120 20% 86%;
+    --input: 120 20% 96%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-primary: 120 100% 20%;
+    --sidebar-accent: 142 44% 41%;
+    --gradient-primary: linear-gradient(90deg, #006516 0%, #39964D 100%);
+  }
+
+  .theme-metalma-deep {
+    --primary: 120 100% 18%;
+    --accent: 120 35% 30%;
+    --foreground: 220 13% 18%;
+    --background: 0 0% 100%;
+    --card: 0 0% 100%;
+    --secondary: 120 20% 96%;
+    --muted: 0 0% 70%;
+    --muted-foreground: 0 0% 34%;
+    --ring: 120 100% 18%;
+    --border: 120 18% 84%;
+    --input: 120 18% 96%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-primary: 120 100% 18%;
+    --sidebar-accent: 120 35% 30%;
+    --gradient-primary: linear-gradient(90deg, #004e11 0%, #2c6e3a 100%);
+  }
+
+  .theme-metalma-light {
+    --primary: 142 44% 45%; /* slightly lighter green */
+    --accent: 120 30% 35%;
+    --foreground: 220 13% 18%;
+    --background: 0 0% 100%;
+    --card: 0 0% 100%;
+    --secondary: 120 30% 97%;
+    --muted: 0 0% 72%;
+    --muted-foreground: 0 0% 33%;
+    --ring: 142 44% 45%;
+    --border: 120 20% 88%;
+    --input: 120 20% 97%;
+    --sidebar-background: 0 0% 99%;
+    --sidebar-primary: 142 44% 45%;
+    --sidebar-accent: 120 30% 35%;
+    --gradient-primary: linear-gradient(90deg, #3fa35a 0%, #2a5d34 100%);
+  }
+
+  .theme-metalma-contrast {
+    --primary: 120 100% 20%;
+    --accent: 0 0% 0%; /* black accents */
+    --foreground: 0 0% 0%;
+    --background: 0 0% 100%;
+    --card: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --muted: 0 0% 54%;
+    --muted-foreground: 0 0% 28%;
+    --ring: 0 0% 0%;
+    --border: 0 0% 30%;
+    --input: 0 0% 98%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-primary: 0 0% 0%;
+    --sidebar-accent: 120 100% 20%;
+    --gradient-primary: linear-gradient(90deg, #000000 0%, #006516 100%);
+  }
+
+  .theme-metalma-gray {
+    --primary: 120 55% 28%;
+    --accent: 0 0% 54%; /* #898987 */
+    --foreground: 220 13% 18%;
+    --background: 0 0% 100%;
+    --card: 0 0% 100%;
+    --secondary: 0 0% 97%;
+    --muted: 0 0% 80%;
+    --muted-foreground: 0 0% 38%;
+    --ring: 120 55% 28%;
+    --border: 0 0% 70%;
+    --input: 0 0% 98%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-primary: 120 55% 28%;
+    --sidebar-accent: 0 0% 54%;
+    --gradient-primary: linear-gradient(90deg, #265a31 0%, #898987 100%);
+  }
 }
 
 @layer base {
@@ -467,6 +558,92 @@
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* Theme overrides - must come LAST to win the cascade over :root/.dark defaults */
+:root.theme-metalma-classic {
+  --primary: 120 100% 20%;
+  --accent: 142 44% 41%;
+  --foreground: 0 0% 100%;
+  --background: 0 0% 7%;
+  --card: 0 0% 12%;
+  --secondary: 120 20% 15%;
+  --muted: 120 10% 20%;
+  --muted-foreground: 0 0% 80%;
+  --ring: 120 100% 20%;
+  --border: 0 0% 20%;
+  --input: 0 0% 15%;
+  --sidebar-background: 0 0% 5%;
+  --sidebar-primary: 120 100% 20%;
+  --sidebar-accent: 142 44% 41%;
+}
+
+:root.theme-metalma-deep { 
+  --primary: 120 100% 18%;
+  --accent: 120 35% 30%;
+  --foreground: 0 0% 100%;
+  --background: 0 0% 7%;
+  --card: 0 0% 12%;
+  --secondary: 120 18% 14%;
+  --muted: 120 10% 20%;
+  --muted-foreground: 0 0% 80%;
+  --ring: 120 100% 18%;
+  --border: 0 0% 20%;
+  --input: 0 0% 15%;
+  --sidebar-background: 0 0% 5%;
+  --sidebar-primary: 120 100% 18%;
+  --sidebar-accent: 120 35% 30%;
+}
+
+:root.theme-metalma-light {
+  --primary: 142 44% 45%;
+  --accent: 120 30% 35%;
+  --foreground: 220 13% 18%;
+  --background: 0 0% 100%;
+  --card: 0 0% 100%;
+  --secondary: 120 30% 97%;
+  --muted: 0 0% 72%;
+  --muted-foreground: 0 0% 33%;
+  --ring: 142 44% 45%;
+  --border: 120 20% 88%;
+  --input: 120 20% 97%;
+  --sidebar-background: 0 0% 99%;
+  --sidebar-primary: 142 44% 45%;
+  --sidebar-accent: 120 30% 35%;
+}
+
+:root.theme-metalma-contrast {
+  --primary: 120 100% 20%;
+  --accent: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --background: 0 0% 7%;
+  --card: 0 0% 12%;
+  --secondary: 0 0% 12%;
+  --muted: 0 0% 20%;
+  --muted-foreground: 0 0% 80%;
+  --ring: 0 0% 0%;
+  --border: 0 0% 20%;
+  --input: 0 0% 15%;
+  --sidebar-background: 0 0% 5%;
+  --sidebar-primary: 0 0% 0%;
+  --sidebar-accent: 120 100% 20%;
+}
+
+:root.theme-metalma-gray {
+  --primary: 120 55% 28%;
+  --accent: 0 0% 54%;
+  --foreground: 220 13% 18%;
+  --background: 0 0% 100%;
+  --card: 0 0% 100%;
+  --secondary: 0 0% 97%;
+  --muted: 0 0% 80%;
+  --muted-foreground: 0 0% 38%;
+  --ring: 120 55% 28%;
+  --border: 0 0% 70%;
+  --input: 0 0% 98%;
+  --sidebar-background: 0 0% 98%;
+  --sidebar-primary: 120 55% 28%;
+  --sidebar-accent: 0 0% 54%;
 }
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 

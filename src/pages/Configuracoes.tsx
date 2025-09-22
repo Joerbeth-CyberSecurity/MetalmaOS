@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Shield, AlertTriangle, Users, Settings } from 'lucide-react';
+import { Loader2, Shield, AlertTriangle, Users, Settings, Paintbrush } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -31,6 +31,7 @@ import ReactDOM from 'react-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useTheme } from '@/components/ThemeProvider';
 
 // Esquema de validação
 const configSchema = z.object({
@@ -531,10 +532,36 @@ export default function Configuracoes() {
             setIsSaving(false);
             return;
           }
-          if (userForm.senha.length < 6) {
+          // Buscar limites de segurança e validar tamanho
+          let minLen = 8;
+          let maxLen = 128;
+          try {
+            const { data } = await supabase
+              .from('configuracoes')
+              .select('chave, valor')
+              .in('chave', ['security_min_password', 'security_max_password']);
+            if (data && Array.isArray(data)) {
+              const map = Object.fromEntries(data.map((r) => [r.chave, r.valor]));
+              minLen = map.security_min_password ? Number(map.security_min_password) : minLen;
+              maxLen = map.security_max_password ? Number(map.security_max_password) : maxLen;
+            }
+          } catch {}
+          if (userForm.senha.length < minLen || userForm.senha.length > maxLen) {
             toast({
               title: 'Erro',
-              description: 'A senha deve ter pelo menos 6 caracteres',
+              description: `A senha deve ter entre ${minLen} e ${maxLen} caracteres`,
+              variant: 'destructive',
+            });
+            setIsSaving(false);
+            return;
+          }
+
+          // Complexidade: 1 minúscula, 1 maiúscula, 1 número, 1 especial
+          const complexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).+$/;
+          if (!complexityRegex.test(userForm.senha)) {
+            toast({
+              title: 'Erro',
+              description: 'A senha deve conter ao menos 1 letra minúscula, 1 letra maiúscula, 1 número e 1 caractere especial.',
               variant: 'destructive',
             });
             setIsSaving(false);
@@ -779,6 +806,93 @@ export default function Configuracoes() {
   }
 
   const { isAdmin, canManageModule } = usePermissions();
+  const { theme } = useTheme();
+  const [appTheme, setAppTheme] = useState<string>(() => localStorage.getItem('app-theme') || 'theme-metalma-classic');
+
+  const themes = [
+    { key: 'theme-metalma-classic', name: 'Metalma Clássico', colors: ['#006516', '#39964D', '#000000', '#898987'] },
+    { key: 'theme-metalma-deep', name: 'Metalma Profundo', colors: ['#004e11', '#2c6e3a', '#000000', '#7a7a78'] },
+    { key: 'theme-metalma-light', name: 'Metalma Claro', colors: ['#3fa35a', '#2a5d34', '#222222', '#9a9a98'] },
+    { key: 'theme-metalma-contrast', name: 'Metalma Contraste', colors: ['#006516', '#000000', '#000000', '#898987'] },
+    { key: 'theme-metalma-gray', name: 'Metalma Cinza', colors: ['#265a31', '#898987', '#222222', '#b5b5b4'] },
+  ];
+
+  const applyTheme = (key: string) => {
+    setAppTheme(key);
+    localStorage.setItem('app-theme', key);
+    // Aplica imediatamente via classe no html (ThemeProvider já sincroniza também)
+    const root = document.documentElement;
+    const toRemove: string[] = [];
+    root.classList.forEach((cls) => { if (cls.startsWith('theme-')) toRemove.push(cls); });
+    toRemove.forEach((cls) => root.classList.remove(cls));
+    root.classList.add(key);
+    // Feedback visual
+    toast({ title: 'Tema aplicado', description: themes.find(t => t.key === key)?.name });
+  };
+
+  // Estado da área de Segurança (persistência simples em configuracoes)
+  const [securityForm, setSecurityForm] = useState({
+    min_password: 8,
+    max_password: 128,
+    rl_window_min: 15,
+    rl_max_requests: 100,
+    xss_enabled: true,
+    csrf_enabled: true,
+  });
+
+  useEffect(() => {
+    // Carregar valores persistidos se existirem
+    supabase
+      .from('configuracoes')
+      .select('chave, valor')
+      .in('chave', [
+        'security_min_password',
+        'security_max_password',
+        'security_rate_limit_window_min',
+        'security_rate_limit_max_requests',
+        'security_xss_enabled',
+        'security_csrf_enabled',
+      ])
+      .then(({ data }) => {
+        if (!data) return;
+        const map = Object.fromEntries(data.map((r: any) => [r.chave, r.valor]));
+        setSecurityForm((prev) => ({
+          ...prev,
+          min_password: map.security_min_password ? Number(map.security_min_password) : prev.min_password,
+          max_password: map.security_max_password ? Number(map.security_max_password) : prev.max_password,
+          rl_window_min: map.security_rate_limit_window_min ? Number(map.security_rate_limit_window_min) : prev.rl_window_min,
+          rl_max_requests: map.security_rate_limit_max_requests ? Number(map.security_rate_limit_max_requests) : prev.rl_max_requests,
+          xss_enabled: map.security_xss_enabled ? map.security_xss_enabled === 'true' : prev.xss_enabled,
+          csrf_enabled: map.security_csrf_enabled ? map.security_csrf_enabled === 'true' : prev.csrf_enabled,
+        }));
+      });
+  }, []);
+
+  const saveSecurity = async () => {
+    if (!isAdmin()) {
+      toast({ title: 'Acesso negado', description: 'Apenas Administradores podem salvar segurança.', variant: 'destructive' });
+      return;
+    }
+    const entries: Array<{ chave: string; valor: string }> = [
+      { chave: 'security_min_password', valor: String(securityForm.min_password) },
+      { chave: 'security_max_password', valor: String(securityForm.max_password) },
+      { chave: 'security_rate_limit_window_min', valor: String(securityForm.rl_window_min) },
+      { chave: 'security_rate_limit_max_requests', valor: String(securityForm.rl_max_requests) },
+      { chave: 'security_xss_enabled', valor: String(securityForm.xss_enabled) },
+      { chave: 'security_csrf_enabled', valor: String(securityForm.csrf_enabled) },
+    ];
+
+    // Upsert por chave
+    const results = await Promise.all(entries.map((e) =>
+      supabase.from('configuracoes').upsert({ chave: e.chave, valor: e.valor }, { onConflict: 'chave' })
+    ));
+    const hasError = results.some((r) => r.error);
+    if (hasError) {
+      toast({ title: 'Erro ao salvar segurança', description: 'Tente novamente.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Configurações de segurança salvas' });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -951,6 +1065,39 @@ export default function Configuracoes() {
               </form>
             </Form>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Seção de Temas */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Paintbrush className="h-5 w-5" /> Temas do Sistema</CardTitle>
+          <CardDescription>
+            Selecione um tema baseado nas cores da marca (verde #006516, verde #39964D, preto, cinza #898987).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            {themes.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => applyTheme(t.key)}
+                className={`rounded-lg border p-4 text-left transition ${appTheme === t.key ? 'border-primary ring-2 ring-primary/30' : 'hover:border-primary/40'}`}
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="font-medium">{t.name}</div>
+                  {appTheme === t.key && (
+                    <span className="text-xs text-primary">Ativo</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {t.colors.map((c, idx) => (
+                    <span key={idx} className="h-6 w-6 rounded border" style={{ backgroundColor: c }} />
+                  ))}
+                </div>
+              </button>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -1441,22 +1588,76 @@ export default function Configuracoes() {
         </TabsContent>
 
         <TabsContent value="security" className="space-y-6">
-          <PermissionGuard permission="usuario_gerenciar">
+          {/* Somente Administrador pode editar/salvar. Demais perfis veem leitura. */}
             <Card>
               <CardHeader>
                 <CardTitle>Configurações de Segurança</CardTitle>
                 <CardDescription>
-                  Configure as políticas de segurança do sistema.
+                  Configure políticas alinhadas ao que já existe no sistema (validações, CSRF, XSS, rate limiting).
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Shield className="mx-auto h-12 w-12 mb-4" />
-                  <p>Configurações de segurança em desenvolvimento.</p>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">Requisitos de Senha</div>
+                        <div className="text-sm text-muted-foreground">Mínimo, complexidade e limite máximo</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="min_password">Mínimo de caracteres</Label>
+                        <Input id="min_password" type="number" value={securityForm.min_password} onChange={(e) => setSecurityForm((p) => ({ ...p, min_password: Number(e.target.value) }))} disabled={!isAdmin()} />
+                      </div>
+                      <div>
+                        <Label htmlFor="max_password">Máximo de caracteres</Label>
+                        <Input id="max_password" type="number" value={securityForm.max_password} onChange={(e) => setSecurityForm((p) => ({ ...p, max_password: Number(e.target.value) }))} disabled={!isAdmin()} />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Definido pelo código para segurança. Para alterar, solicite implementação.</p>
+                  </div>
+
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div className="font-medium">Rate Limiting</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor="rl_window">Janela (min)</Label>
+                        <Input id="rl_window" type="number" value={securityForm.rl_window_min} onChange={(e) => setSecurityForm((p) => ({ ...p, rl_window_min: Number(e.target.value) }))} disabled={!isAdmin()} />
+                      </div>
+                      <div>
+                        <Label htmlFor="rl_max">Máx. requisições</Label>
+                        <Input id="rl_max" type="number" value={securityForm.rl_max_requests} onChange={(e) => setSecurityForm((p) => ({ ...p, rl_max_requests: Number(e.target.value) }))} disabled={!isAdmin()} />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Controlado internamente via utilitário de segurança.</p>
+                  </div>
+
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div className="font-medium">Proteções de XSS e Sanitização</div>
+                    <p className="text-sm text-muted-foreground">Sanitização de HTML e detecção de padrões perigosos já ativa no sistema.</p>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" checked={securityForm.xss_enabled} onChange={(e) => setSecurityForm((p) => ({ ...p, xss_enabled: e.target.checked }))} id="xss_protection" disabled={!isAdmin()} />
+                      <Label htmlFor="xss_protection">Ativado</Label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div className="font-medium">CSRF</div>
+                    <p className="text-sm text-muted-foreground">Tokens gerados e validados pelo hook de segurança.</p>
+                    <div className="flex items-center gap-2">
+                      <input type="checkbox" checked={securityForm.csrf_enabled} onChange={(e) => setSecurityForm((p) => ({ ...p, csrf_enabled: e.target.checked }))} id="csrf_enabled" disabled={!isAdmin()} />
+                      <Label htmlFor="csrf_enabled">Ativado</Label>
+                    </div>
+                  </div>
                 </div>
+                {isAdmin() && (
+                  <div className="mt-4 flex justify-end">
+                    <Button onClick={saveSecurity}>Salvar Segurança</Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          </PermissionGuard>
         </TabsContent>
 
         <TabsContent value="audit" className="space-y-6">

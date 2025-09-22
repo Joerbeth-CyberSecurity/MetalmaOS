@@ -313,7 +313,7 @@ export default function OrdensServico() {
         *,
         clientes ( nome ),
         os_produtos ( *, produtos ( nome ) ),
-        os_colaboradores ( colaborador:colaboradores(nome) ),
+        os_colaboradores ( id, colaborador_id, colaborador:colaboradores(nome) ),
         os_tempo ( tipo, data_inicio, data_fim, colaborador:colaboradores(nome) )
       `
       )

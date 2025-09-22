@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../integrations/supabase/client';
+import { validatePassword as validatePasswordComplexity } from '@/lib/security';
 
 const AuthContext = createContext();
 
@@ -9,6 +10,10 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
   const [userPermissions, setUserPermissions] = useState([]);
+  const [securityConfig, setSecurityConfig] = useState({
+    minPassword: 8,
+    maxPassword: 128,
+  });
 
   // Função para buscar dados do usuário na tabela admins
   const fetchUserProfile = async (userId) => {
@@ -135,6 +140,22 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
+    // Carregar configurações de segurança (mín/max caracteres senha)
+    supabase
+      .from('configuracoes')
+      .select('chave, valor')
+      .in('chave', ['security_min_password', 'security_max_password'])
+      .then(({ data }) => {
+        if (data && Array.isArray(data)) {
+          const map = Object.fromEntries(data.map((r) => [r.chave, r.valor]));
+          setSecurityConfig({
+            minPassword: map.security_min_password ? Number(map.security_min_password) : 8,
+            maxPassword: map.security_max_password ? Number(map.security_max_password) : 128,
+          });
+        }
+      })
+      .catch(() => {});
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -262,6 +283,29 @@ export function AuthProvider({ children }) {
 
   const signUp = async (email, password, nome) => {
     setLoading(true);
+    // Validar tamanho da senha conforme configuração
+    try {
+      if (
+        typeof password !== 'string' ||
+        password.length < securityConfig.minPassword ||
+        password.length > securityConfig.maxPassword
+      ) {
+        const err = new Error(
+          `A senha deve ter entre ${securityConfig.minPassword} e ${securityConfig.maxPassword} caracteres.`
+        );
+        setLoading(false);
+        return { error: err };
+      }
+      // Validar complexidade (mín: 1 minúscula, 1 maiúscula, 1 número, 1 especial)
+      const complexity = validatePasswordComplexity(password);
+      if (!complexity.isValid) {
+        const err = new Error(
+          'A senha deve conter: ao menos 1 letra minúscula, 1 letra maiúscula, 1 número e 1 caractere especial.'
+        );
+        setLoading(false);
+        return { error: err };
+      }
+    } catch (_) {}
     const redirectUrl = `${window.location.origin}/`;
     const { error } = await supabase.auth.signUp({
       email,
@@ -346,6 +390,7 @@ export function AuthProvider({ children }) {
         userPermissions,
         refreshUserProfile,
         hasPermission,
+          securityConfig,
       }}
     >
       {children}

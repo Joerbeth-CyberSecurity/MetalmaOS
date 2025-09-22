@@ -1,4 +1,5 @@
 import React from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table';
 import { Card, CardContent } from './card';
 import { Badge } from './badge';
@@ -25,11 +26,13 @@ interface ResponsiveTableProps {
     icon: React.ComponentType<any>;
     onClick: (item: any) => void;
     variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+    disabled?: boolean;
   }[] | ((item: any) => {
     label: string;
     icon: React.ComponentType<any>;
     onClick: (item: any) => void;
     variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+    disabled?: boolean;
   }[]);
   loading?: boolean;
   emptyMessage?: string;
@@ -114,8 +117,9 @@ export function ResponsiveTable({
                                   key={actionIndex}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    action.onClick(item);
+                                    if (!action.disabled) action.onClick(item);
                                   }}
+                                  disabled={!!action.disabled}
                                   className={action.variant === 'destructive' ? 'text-destructive' : ''}
                                 >
                                   <action.icon className="mr-2 h-4 w-4" />
@@ -175,9 +179,9 @@ export function ResponsiveTable({
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            action.onClick(item);
+                            if (!action.disabled) action.onClick(item);
                           }}
-                          className="flex-1"
+                          className={`flex-1 ${action.disabled ? 'opacity-50 pointer-events-none' : ''}`}
                         >
                           <action.icon className="mr-2 h-4 w-4" />
                           {action.label}
@@ -381,6 +385,7 @@ export function OSResponsiveTable({
   onFinish,
   onAssociateColaboradores,
   onParadaMaterial,
+  onRemoveColaborador,
   loading = false,
 }: {
   data: any[];
@@ -391,6 +396,7 @@ export function OSResponsiveTable({
   onFinish?: (item: any) => void;
   onAssociateColaboradores?: (item: any) => void;
   onParadaMaterial?: (item: any) => void;
+  onRemoveColaborador?: (os: any, colaboracao: any) => void;
   loading?: boolean;
 }) {
   const formatCurrency = (value: number | null | undefined) => {
@@ -496,12 +502,46 @@ export function OSResponsiveTable({
     {
       key: 'os_colaboradores',
       label: 'Colaboradores',
-      render: (value: any) => (
+      render: (value: any, item: any) => (
         <div className="flex flex-wrap gap-1">
           {value?.map((c: any, index: number) => (
-            <Badge key={index} variant="outline" className="text-xs">
-              {c.colaborador?.nome}
-            </Badge>
+            <div key={index} className="flex items-center gap-1">
+              <Badge variant="outline" className="text-xs">
+                {c.colaborador?.nome}
+              </Badge>
+              <button
+                type="button"
+                aria-label="Remover colaborador"
+                className={`inline-flex h-5 w-5 items-center justify-center rounded border transition border-border text-muted-foreground hover:text-destructive hover:border-destructive`}
+                title={'Remover colaborador'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onRemoveColaborador) {
+                    onRemoveColaborador(item, c);
+                    return;
+                  }
+                  // Remoção padrão: tenta excluir o vínculo em os_colaboradores e recarrega a lista
+                  const proceed = window.confirm('Remover este colaborador da OS?');
+                  if (!proceed) return;
+                  const id = (c && (c.id)) as string | undefined;
+                  if (!id) {
+                    console.warn('ID da colaboração não encontrado. Garanta que a query seleciona os_colaboradores.id.');
+                    return;
+                  }
+                  supabase
+                    .from('os_colaboradores')
+                    .delete()
+                    .eq('id', id)
+                    .then(() => {
+                      // Atualização simples via reload para refletir estado da lista
+                      window.location.reload();
+                    })
+                    .catch((err) => console.error('Erro ao remover colaborador:', err));
+                }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
           ))}
         </div>
       ),
@@ -522,10 +562,12 @@ export function OSResponsiveTable({
         });
       }
       if (onStart) {
+        const hasColaboradores = Array.isArray(os.os_colaboradores) && os.os_colaboradores.length > 0;
         actions.push({ 
           label: 'Iniciar OS', 
           icon: Play, 
-          onClick: () => onStart(os) 
+          onClick: () => onStart(os),
+          disabled: !hasColaboradores,
         });
       }
     }

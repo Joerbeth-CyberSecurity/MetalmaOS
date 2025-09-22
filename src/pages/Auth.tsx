@@ -16,8 +16,10 @@ import { Loader2, Building2 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 
 export default function Auth() {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn, signUp, securityConfig } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const complexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).+$/;
 
   // Redirect if already authenticated
   if (user) {
@@ -53,7 +55,25 @@ export default function Auth() {
     const password = formData.get('password') as string;
     const nome = formData.get('nome') as string;
 
-    await signUp(email, password, nome);
+    setPasswordError(null);
+    if (
+      typeof password !== 'string' ||
+      password.length < (securityConfig?.minPassword ?? 8) ||
+      password.length > (securityConfig?.maxPassword ?? 128)
+    ) {
+      setPasswordError(
+        `A senha deve ter entre ${securityConfig?.minPassword ?? 8} e ${securityConfig?.maxPassword ?? 128} caracteres.`
+      );
+      setIsLoading(false);
+      return;
+    }
+    if (!complexityRegex.test(password)) {
+      setPasswordError('A senha deve conter: ao menos 1 letra minúscula, 1 letra maiúscula, 1 número e 1 caractere especial.');
+      setIsLoading(false);
+      return;
+    }
+    const { error } = await signUp(email, password, nome);
+    if (error) setPasswordError(error.message || 'Erro ao criar conta');
     setIsLoading(false);
   };
 
@@ -98,6 +118,9 @@ export default function Auth() {
                   className="input-modern"
                 />
               </div>
+              {passwordError && (
+                <p className="text-sm text-destructive">{passwordError}</p>
+              )}
               <Button
                 type="submit"
                 className="btn-gradient w-full"

@@ -48,6 +48,33 @@ export function ThemeProvider({
     root.classList.add(theme);
   }, [theme]);
 
+  // Apply custom brand theme class saved in localStorage (independent of light/dark)
+  useEffect(() => {
+    const root = window.document.documentElement;
+
+    const applyCustomThemeClass = () => {
+      const stored = localStorage.getItem('app-theme');
+      // Remove any previous theme-* classes
+      const toRemove: string[] = [];
+      root.classList.forEach((cls) => {
+        if (cls.startsWith('theme-')) toRemove.push(cls);
+      });
+      toRemove.forEach((cls) => root.classList.remove(cls));
+      if (stored && stored.startsWith('theme-')) {
+        root.classList.add(stored);
+      }
+    };
+
+    applyCustomThemeClass();
+
+    // Listen to storage changes (other tabs) to keep in sync
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'app-theme') applyCustomThemeClass();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const value = {
     theme,
     setTheme: (theme: Theme) => {

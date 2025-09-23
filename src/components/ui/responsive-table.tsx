@@ -438,6 +438,11 @@ export function OSResponsiveTable({
       className: 'font-medium',
     },
     {
+      key: 'fabrica',
+      label: 'Fábrica',
+      hideOnMobile: true,
+    },
+    {
       key: 'clientes',
       label: 'Cliente',
       render: (value: any) => value?.nome || 'N/A',

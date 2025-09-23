@@ -71,6 +71,7 @@ export default function OSReportDetail({ osData, onPrint, onExportPDF }: OSRepor
                   {osData.status.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                 </span>
               </div>
+              <div><span className="font-medium">Fábrica:</span> {osData.fabrica || 'N/A'}</div>
               <div><span className="font-medium">Data de Abertura:</span> {formatDateTime(osData.data_abertura)}</div>
               {osData.data_fim && (
                 <div><span className="font-medium">Data de Finalização:</span> {formatDateTime(osData.data_fim)}</div>

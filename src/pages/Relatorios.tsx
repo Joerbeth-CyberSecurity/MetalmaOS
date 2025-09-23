@@ -65,6 +65,7 @@ export default function Relatorios() {
   const [colabFilter, setColabFilter] = useState('todos');
   const [clienteFilter, setClienteFilter] = useState('todos');
   const [osNumberFilter, setOsNumberFilter] = useState('');
+  const [fabricaFilter, setFabricaFilter] = useState('todas');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedOSDetail, setSelectedOSDetail] = useState(null);
@@ -801,6 +802,10 @@ export default function Relatorios() {
         query = query.eq('cliente_id', clienteFilter);
       }
 
+      if (fabricaFilter !== 'todas') {
+        query = query.eq('fabrica', fabricaFilter);
+      }
+
       console.log('Executando query...');
       const { data: ordens, error } = await query;
 
@@ -815,6 +820,7 @@ export default function Relatorios() {
       // Processar dados para o relatório
       let osData = (ordens || []).map((os) => ({
         numero_os: os.numero_os,
+        fabrica: (os as any).fabrica,
         cliente: os.clientes,
         descricao: os.descricao,
         status: os.status,
@@ -852,6 +858,7 @@ export default function Relatorios() {
           cliente: clienteFilter,
           osNumber: osNumberFilter,
           justificativa: justificativaFilter,
+          fabrica: fabricaFilter,
           startDate,
           endDate
         },
@@ -1188,6 +1195,7 @@ export default function Relatorios() {
                   <div style="font-size: 11px; line-height: 1.6;">
                     <div><strong>Número:</strong> ${os.numero_os}</div>
                     <div><strong>Status:</strong> ${os.status.replace(/_/g, ' ').replace(/\\b\\w/g, (l) => l.toUpperCase())}</div>
+                    <div><strong>Fábrica:</strong> ${os.fabrica || 'N/A'}</div>
                     <div><strong>Data de Abertura:</strong> ${formatDate(os.data_abertura)}</div>
                     ${os.data_fim ? `<div><strong>Data de Finalização:</strong> ${formatDate(os.data_fim)}</div>` : ''}
                     <div><strong>Tempo Previsto:</strong> ${os.tempo_execucao_previsto || 0}h</div>
@@ -1407,6 +1415,7 @@ export default function Relatorios() {
                   <div style="font-size: 11px; line-height: 1.6;">
                     <div><strong>Número:</strong> ${os.numero_os}</div>
                     <div><strong>Status:</strong> ${os.status.replace(/_/g, ' ').replace(/\\b\\w/g, (l) => l.toUpperCase())}</div>
+                    <div><strong>Fábrica:</strong> ${os.fabrica || 'N/A'}</div>
                     <div><strong>Data de Abertura:</strong> ${formatDate(os.data_abertura)}</div>
                     ${os.data_fim ? `<div><strong>Data de Finalização:</strong> ${formatDate(os.data_fim)}</div>` : ''}
                     <div><strong>Tempo Previsto:</strong> ${os.tempo_execucao_previsto || 0}h</div>
@@ -1562,6 +1571,8 @@ export default function Relatorios() {
         doc.text(`Número: ${os.numero_os}`, 20, yPosition);
         yPosition += 6;
         doc.text(`Status: ${os.status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}`, 20, yPosition);
+        yPosition += 6;
+        doc.text(`Fábrica: ${os.fabrica || 'N/A'}`, 20, yPosition);
         yPosition += 6;
         doc.text(`Data de Abertura: ${formatDate(os.data_abertura)}`, 20, yPosition);
         yPosition += 6;
@@ -1736,6 +1747,7 @@ export default function Relatorios() {
       case 'emissao_os':
         return `
           <th>OS</th>
+          <th>Fábrica</th>
           <th>Cliente</th>
           <th>Data</th>
           <th>Status</th>
@@ -1815,6 +1827,7 @@ export default function Relatorios() {
             (os, index) => `
           <tr>
             <td style="font-weight: bold;">${os.numero_os}</td>
+            <td>${os.fabrica || 'N/A'}</td>
             <td>${os.cliente?.nome || 'N/A'}</td>
             <td>${formatDate(os.data_abertura)}</td>
             <td>${os.status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</td>
@@ -1883,6 +1896,7 @@ export default function Relatorios() {
         return (
           <>
             <TableHead>OS</TableHead>
+            <TableHead>Fábrica</TableHead>
             <TableHead>Cliente</TableHead>
             <TableHead>Data</TableHead>
             <TableHead>Status</TableHead>
@@ -1975,6 +1989,7 @@ export default function Relatorios() {
         return reportData.data.map((os, index) => (
           <TableRow key={index} className="cursor-pointer hover:bg-gray-50" onClick={() => setSelectedOSDetail(os)}>
             <TableCell className="font-medium">{os.numero_os}</TableCell>
+            <TableCell>{os.fabrica || 'N/A'}</TableCell>
             <TableCell>{os.cliente?.nome || 'N/A'}</TableCell>
             <TableCell>{formatDate(os.data_abertura)}</TableCell>
             <TableCell>
@@ -2114,6 +2129,19 @@ export default function Relatorios() {
                     value={osNumberFilter}
                     onChange={(e) => setOsNumberFilter(e.target.value)}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fábrica</Label>
+                  <Select value={fabricaFilter} onValueChange={setFabricaFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todas as fábricas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      <SelectItem value="Metalma">Metalma</SelectItem>
+                      <SelectItem value="Galpão">Galpão</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Justificativa</Label>

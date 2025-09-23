@@ -112,7 +112,10 @@ const osProdutoSchema = z.object({
     .number()
     .min(1, 'A quantidade deve ser pelo menos 1.')
     .default(1),
-  preco_unitario: z.number(),
+  preco_unitario: z
+    .number()
+    .min(0, 'Valor unitário não pode ser negativo.')
+    .max(1_000_000, 'Valor unitário muito alto.'),
   nome: z.string(), // Campo obrigatório para exibição
 });
 
@@ -123,6 +126,7 @@ const osSchema = z.object({
     .string()
     .min(5, { message: 'A descrição deve ter pelo menos 5 caracteres.' }),
   status: z.string().default('aberta'),
+  fabrica: z.string().optional(),
   produtos: z
     .array(osProdutoSchema)
     .min(1, 'Adicione pelo menos um produto à OS.'),
@@ -192,6 +196,41 @@ const getStatusClass = (status: string | null): string => {
   }
 };
 
+// Converte strings como "R$ 1.234,56" ou "1234,56" para número 1234.56
+const parseCurrencyToNumber = (input: string): number => {
+  if (!input) return 0;
+  const cleaned = input
+    .replace(/\s/g, '')
+    .replace(/R\$\s?/i, '')
+    .replace(/\./g, '')
+    .replace(',', '.');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+};
+
+// Mantém apenas dígitos e vírgula, remove pontos de milhar e limita a 2 casas decimais
+const sanitizeCurrencyInput = (raw: string): string => {
+  if (!raw) return '';
+  // remove tudo que não for dígito, vírgula ou ponto
+  let s = raw.replace(/[^0-9.,]/g, '');
+  // remove pontos (milhar)
+  s = s.replace(/\./g, '');
+  // mantém apenas a primeira vírgula
+  const parts = s.split(',');
+  if (parts.length > 1) {
+    const dec = parts.slice(1).join('');
+    s = parts[0] + ',' + dec;
+  }
+  // limita a 2 casas decimais se houver vírgula
+  const [intPart, decPart] = s.split(',');
+  if (typeof decPart !== 'undefined') {
+    s = intPart + ',' + decPart.slice(0, 2);
+  }
+  // remove zeros à esquerda excessivos no inteiro
+  const intSan = intPart.replace(/^0+(\d)/, '$1');
+  return typeof decPart === 'undefined' ? intSan : intSan + ',' + decPart?.slice(0, 2);
+};
+
 export default function OrdensServico() {
   const [ordens, setOrdens] = useState<OrdemServicoComRelacoes[]>([]);
   const [clientes, setClientes] = useState<ClienteRow[]>([]);
@@ -227,10 +266,14 @@ export default function OrdensServico() {
   const [justificativaTipo, setJustificativaTipo] = useState<'pausa' | 'parada'>('pausa');
   const [osParaJustificativa, setOsParaJustificativa] = useState<OrdemServicoComRelacoes | null>(null);
   const [tempoTolerancia, setTempoTolerancia] = useState<number>(120);
+  // Controla o texto exibido no input de preço por linha enquanto o usuário digita
+  const [priceInputs, setPriceInputs] = useState<Record<number, string>>({});
+  const setPriceDisplay = (idx: number, text: string) =>
+    setPriceInputs((prev) => ({ ...prev, [idx]: text }));
 
   const form = useForm<OsFormData>({
     resolver: zodResolver(osSchema),
-    defaultValues: { status: 'aberta', produtos: [] },
+    defaultValues: { status: 'aberta', produtos: [], fabrica: 'Metalma' },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -291,6 +334,7 @@ export default function OrdensServico() {
           cliente_id: selectedOs.cliente_id ?? '',
           descricao: selectedOs.descricao,
           status: selectedOs.status ?? 'aberta',
+          fabrica: (selectedOs as any).fabrica || 'Metalma',
           produtos: produtosComNome,
         });
       } else {
@@ -298,6 +342,7 @@ export default function OrdensServico() {
           descricao: '',
           cliente_id: '',
           status: 'aberta',
+          fabrica: 'Metalma',
           produtos: [],
         });
       }
@@ -417,6 +462,7 @@ export default function OrdensServico() {
             cliente_id: values.cliente_id,
             descricao: values.descricao,
             status: values.status,
+            fabrica: (values as any).fabrica || null,
             valor_total: valorTotalOS,
             tempo_execucao_previsto: values.tempo_execucao_previsto,
             // meta_hora removido do envio ao banco
@@ -469,6 +515,7 @@ export default function OrdensServico() {
             descricao: values.descricao,
             cliente_id: values.cliente_id,
             status: values.status,
+            fabrica: (values as any).fabrica || null,
             valor_total: valorTotalOS,
             tempo_execucao_previsto: values.tempo_execucao_previsto,
             // meta_hora removido do envio ao banco
@@ -481,6 +528,69 @@ export default function OrdensServico() {
         if (osError || !newOs) throw osError || new Error('Falha ao criar OS');
 
         console.log('OS criada:', newOs);
+
+        // Gerar número sequencial baseado na configuração 'prefixo_os'
+        try {
+          // 1) Busca primeiro em 'prefixo_os'; se não existir, tenta 'proxima_os'
+          let atual = '';
+          {
+            const { data: cfgPrefixo } = await supabase
+              .from('configuracoes')
+              .select('valor')
+              .eq('chave', 'prefixo_os')
+              .single();
+            atual = (cfgPrefixo?.valor || '').trim();
+            if (!atual) {
+              const { data: cfgProx } = await supabase
+                .from('configuracoes')
+                .select('valor')
+                .eq('chave', 'proxima_os')
+                .single();
+              atual = (cfgProx?.valor || '').trim();
+            }
+          }
+
+          // 2) Se vier no formato "NNN-YY" usa como número da OS atual e incrementa apenas a parte NNN
+          //    Se vier apenas "NNN", mantém sem sufixo.
+          let numeroFinal = atual;
+          let proximo = '';
+          const match = atual.match(/^(\d+)(?:-(\d+))?$/);
+          if (match) {
+            const parteNumerica = parseInt(match[1], 10);
+            const sufixo = match[2] ? `-${match[2]}` : '';
+            numeroFinal = `${parteNumerica}${sufixo}`;
+            proximo = `${parteNumerica + 1}${sufixo}`;
+          }
+
+          if (!numeroFinal) {
+            // fallback seguro
+            numeroFinal = newOs.id.slice(0, 8).toUpperCase();
+          }
+
+          // Atualiza OS com numero_final
+          await supabase
+            .from('ordens_servico')
+            .update({ numero_os: numeroFinal })
+            .eq('id', newOs.id);
+
+          // Atualiza configuração para o próximo
+          if (proximo) {
+            // Atualiza preferencialmente 'prefixo_os'; se não existir, tenta 'proxima_os'
+            const { error: updPrefixoError, count } = await supabase
+              .from('configuracoes')
+              .update({ valor: proximo })
+              .eq('chave', 'prefixo_os');
+            if (updPrefixoError) {
+              // tenta chave alternativa sem falhar a operação principal
+              await supabase
+                .from('configuracoes')
+                .update({ valor: proximo })
+                .eq('chave', 'proxima_os');
+            }
+          }
+        } catch (e) {
+          console.warn('Falha ao gerar número de OS pela configuração proxima_os:', e);
+        }
 
         const produtosToSave: Database['public']['Tables']['os_produtos']['Insert'][] =
           produtosForm.map((p) => ({
@@ -914,7 +1024,7 @@ export default function OrdensServico() {
               onSubmit={form.handleSubmit(onSubmit)}
               className="flex flex-grow flex-col space-y-4 overflow-y-auto pb-4"
             >
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <FormField
                   name="cliente_id"
                   control={form.control}
@@ -950,7 +1060,7 @@ export default function OrdensServico() {
                               <CommandGroup>
                                 {clientes.map((c) => (
                                   <CommandItem
-                                    value={c.id}
+                                    value={c.nome}
                                     key={c.id}
                                     onSelect={() => {
                                       form.setValue('cliente_id', c.id);
@@ -987,6 +1097,30 @@ export default function OrdensServico() {
                     </FormItem>
                   )}
                 />
+
+                {/* Campo Fábrica (no topo) */}
+                <FormField
+                  name="fabrica"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fábrica</FormLabel>
+                      <FormControl>
+                        <select
+                          className="border rounded h-9 px-3 text-sm bg-background"
+                          value={field.value || 'Metalma'}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                        >
+                          <option value="Metalma">Metalma</option>
+                          <option value="Galpão">Galpão</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <FormField
@@ -1005,6 +1139,8 @@ export default function OrdensServico() {
                   </FormItem>
                 )}
               />
+
+              
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
@@ -1147,7 +1283,63 @@ export default function OrdensServico() {
                               />
                             </TableCell>
                             <TableCell>
-                              {formatCurrency(field.preco_unitario)}
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                className="h-8"
+                                value={
+                                  priceInputs[index] ?? String(
+                                    (form.watch(`produtos.${index}.preco_unitario`) as number) ?? field.preco_unitario ?? ''
+                                  )
+                                }
+                                placeholder="0,00"
+                                onChange={(e) => {
+                                  const raw = sanitizeCurrencyInput(e.target.value);
+                                  setPriceDisplay(index, raw);
+                                  if (raw === '') {
+                                    form.setValue(
+                                      `produtos.${index}.preco_unitario`,
+                                      0,
+                                      { shouldDirty: true }
+                                    );
+                                    return;
+                                  }
+                                  let numValue = parseCurrencyToNumber(raw);
+                                  if (numValue < 0) numValue = 0;
+                                  if (numValue > 1000000) numValue = 1000000;
+                                  form.setValue(
+                                    `produtos.${index}.preco_unitario`,
+                                    numValue,
+                                    { shouldDirty: true }
+                                  );
+                                }}
+                                onBlur={(e) => {
+                                  const raw = e.target.value;
+                                  if (raw === '') {
+                                    setPriceDisplay(index, '');
+                                    form.setValue(
+                                      `produtos.${index}.preco_unitario`,
+                                      0,
+                                      { shouldValidate: true, shouldDirty: true }
+                                    );
+                                    return;
+                                  }
+                                  let numValue = parseCurrencyToNumber(raw);
+                                  if (numValue < 0) numValue = 0;
+                                  if (numValue > 1000000) numValue = 1000000;
+                                  const normalized = Number(numValue.toFixed(2));
+                                  form.setValue(
+                                    `produtos.${index}.preco_unitario`,
+                                    normalized,
+                                    { shouldValidate: true, shouldDirty: true }
+                                  );
+                                  // após normalizar, atualiza o texto exibido para o número simples com vírgula
+                                  setPriceDisplay(
+                                    index,
+                                    normalized.toFixed(2).replace('.', ',')
+                                  );
+                                }}
+                              />
                             </TableCell>
                             <TableCell>
                               {formatCurrency(
@@ -1309,7 +1501,7 @@ export default function OrdensServico() {
             <Button
               variant="destructive"
               onClick={() =>
-                selectedOs && handlePauseOS(selectedOs, 'parada_material')
+                selectedOs && handlePararOS(selectedOs)
               }
               disabled={!motivoParada.trim() || !selectedOs}
             >

@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Shield, AlertTriangle, Users, Settings, Paintbrush } from 'lucide-react';
+import { Loader2, Shield, AlertTriangle, Users, Settings, Paintbrush, Database, Download, Archive } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -98,6 +98,12 @@ export default function Configuracoes() {
   const [filtroDataInicio, setFiltroDataInicio] = useState('');
   const [filtroDataFim, setFiltroDataFim] = useState('');
   const [filtroTipoEvento, setFiltroTipoEvento] = useState('');
+
+  // =============================
+  // Numeração da Próxima OS
+  // =============================
+  const [nextOsNumber, setNextOsNumber] = useState<string>('');
+  const [savingNextOs, setSavingNextOs] = useState<boolean>(false);
 
   useEffect(() => {
     fetchConfiguracoes();
@@ -766,6 +772,9 @@ export default function Configuracoes() {
         prefixo_os: configMap.prefixo_os || 'OS',
         tempo_tolerancia_pausa: parseFloat(configMap.tempo_tolerancia_pausa || '120'),
       });
+
+      // Carregar numeração da próxima OS (se existir)
+      setNextOsNumber(configMap.proxima_os || '');
     }
     setLoading(false);
   };
@@ -840,6 +849,19 @@ export default function Configuracoes() {
     csrf_enabled: true,
   });
 
+  // Estado da área de Backup
+  const [backupForm, setBackupForm] = useState({
+    include_policies_schema: true,
+    zip_enabled: false,
+    filename_pattern: 'metalmaos-backup-YYYY-MM-DD_HH-mm',
+    destination: 'local',
+    storage_bucket: '',
+    output_format: 'csv' as 'json' | 'csv',
+    csv_table: '',
+  });
+  // Restore (desativado por solicitação): estados e handlers removidos
+  const [isGeneratingBackup, setIsGeneratingBackup] = useState(false);
+
   useEffect(() => {
     // Carregar valores persistidos se existirem
     supabase
@@ -852,6 +874,12 @@ export default function Configuracoes() {
         'security_rate_limit_max_requests',
         'security_xss_enabled',
         'security_csrf_enabled',
+        'backup_include_policies_schema',
+        'backup_zip_enabled',
+        'backup_filename_pattern',
+        'backup_destination',
+        'backup_storage_bucket',
+        'backup_output_format',
       ])
       .then(({ data }) => {
         if (!data) return;
@@ -864,6 +892,15 @@ export default function Configuracoes() {
           rl_max_requests: map.security_rate_limit_max_requests ? Number(map.security_rate_limit_max_requests) : prev.rl_max_requests,
           xss_enabled: map.security_xss_enabled ? map.security_xss_enabled === 'true' : prev.xss_enabled,
           csrf_enabled: map.security_csrf_enabled ? map.security_csrf_enabled === 'true' : prev.csrf_enabled,
+        }));
+        setBackupForm((prev) => ({
+          ...prev,
+          include_policies_schema: map.backup_include_policies_schema ? map.backup_include_policies_schema === 'true' : prev.include_policies_schema,
+          zip_enabled: map.backup_zip_enabled ? map.backup_zip_enabled === 'true' : prev.zip_enabled,
+          filename_pattern: map.backup_filename_pattern || prev.filename_pattern,
+          destination: map.backup_destination || prev.destination,
+          storage_bucket: map.backup_storage_bucket || prev.storage_bucket,
+          output_format: (map.backup_output_format === 'csv' ? 'csv' : 'json'),
         }));
       });
   }, []);
@@ -894,6 +931,105 @@ export default function Configuracoes() {
     }
   };
 
+  const saveBackupConfig = async () => {
+    if (!isAdmin()) {
+      toast({ title: 'Acesso negado', description: 'Apenas Administradores podem salvar configurações de backup.', variant: 'destructive' });
+      return;
+    }
+    const entries: Array<{ chave: string; valor: string }> = [
+      { chave: 'backup_include_policies_schema', valor: String(backupForm.include_policies_schema) },
+      { chave: 'backup_zip_enabled', valor: String(backupForm.zip_enabled) },
+      { chave: 'backup_filename_pattern', valor: backupForm.filename_pattern },
+      { chave: 'backup_destination', valor: backupForm.destination },
+      { chave: 'backup_storage_bucket', valor: backupForm.storage_bucket },
+      { chave: 'backup_output_format', valor: 'json' },
+    ];
+
+    const results = await Promise.all(entries.map((e) =>
+      supabase.from('configuracoes').upsert({ chave: e.chave, valor: e.valor }, { onConflict: 'chave' })
+    ));
+    const hasError = results.some((r) => r.error);
+    if (hasError) {
+      toast({ title: 'Erro ao salvar configurações de backup', description: 'Tente novamente.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Configurações de backup salvas' });
+    }
+  };
+
+  const generateBackup = async () => {
+    if (!isAdmin()) {
+      toast({ title: 'Acesso negado', description: 'Apenas Administradores podem gerar backups.', variant: 'destructive' });
+      return;
+    }
+
+    setIsGeneratingBackup(true);
+    try {
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+      const response = await fetch(
+        'https://mezwwjzchbvfpptljmya.supabase.co/functions/v1/export-backup',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${anonKey}`,
+          },
+          body: JSON.stringify({
+            include_policies_schema: backupForm.include_policies_schema,
+            zip_enabled: false,
+            filename_pattern: backupForm.filename_pattern,
+            destination: 'local',
+            storage_bucket: backupForm.storage_bucket,
+            output_format: 'json',
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Erro ao gerar backup');
+      }
+
+      // Se for download direto
+      if (backupForm.destination === 'local' || backupForm.destination === 'both') {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Extrair nome do arquivo do header ou usar padrão
+        const contentDisposition = response.headers.get('content-disposition');
+        let filename = 'metalmaos-backup';
+        filename = 'metalmaos-backup.json';
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        }
+        
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+
+      toast({
+        title: 'Backup gerado com sucesso!',
+        description: backupForm.destination === 'local' ? 'Arquivo baixado para seu computador.' : 'Backup salvo no storage.',
+      });
+    } catch (error) {
+      console.error('Erro ao gerar backup:', error);
+      toast({
+        title: 'Erro ao gerar backup',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingBackup(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -921,6 +1057,7 @@ export default function Configuracoes() {
             <AlertTriangle className="h-4 w-4" />
             Auditoria
           </TabsTrigger>
+          
         </TabsList>
 
         <TabsContent value="system" className="space-y-6">
@@ -1101,9 +1238,189 @@ export default function Configuracoes() {
         </CardContent>
       </Card>
 
+      {/* Seção de Backup do Sistema */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" /> Backup do Sistema</CardTitle>
+          <CardDescription>
+            Configure e gere backups completos dos dados do Supabase. Os backups são compactados em ZIP com data+hora.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {/* Informações de Conexão (somente leitura) */}
+            <div className="rounded-lg border p-4 bg-muted/30">
+              <h4 className="font-medium mb-3">Informações de Conexão</h4>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label>URL do Projeto</Label>
+                  <Input 
+                    value={import.meta.env.VITE_SUPABASE_URL || 'Não configurado'} 
+                    readOnly 
+                    className="bg-muted"
+                  />
+                </div>
+                <div>
+                  <Label>Anon Key</Label>
+                  <Input 
+                    value={import.meta.env.VITE_SUPABASE_ANON_KEY ? '***' + import.meta.env.VITE_SUPABASE_ANON_KEY.slice(-8) : 'Não configurado'} 
+                    readOnly 
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+            </div>
 
+            {/* Configurações de Backup */}
+            <div className="space-y-4">
+              <h4 className="font-medium">Configurações de Backup</h4>
+              
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="include_policies"
+                      checked={backupForm.include_policies_schema}
+                      onChange={(e) => setBackupForm(prev => ({ ...prev, include_policies_schema: e.target.checked }))}
+                      disabled={!isAdmin()}
+                    />
+                    <Label htmlFor="include_policies">Incluir Políticas e Esquema</Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Inclui definições de RLS, políticas e metadados do banco (opcional)</p>
+                </div>
+              </div>
 
+              <div>
+                <Label htmlFor="filename_pattern">Padrão do Nome do Arquivo</Label>
+                <Input
+                  id="filename_pattern"
+                  value={backupForm.filename_pattern}
+                  onChange={(e) => setBackupForm(prev => ({ ...prev, filename_pattern: e.target.value }))}
+                  disabled={!isAdmin()}
+                  placeholder="metalmaos-backup-YYYY-MM-DD_HH-mm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use YYYY-MM-DD_HH-mm para data/hora automática
+                </p>
+              </div>
 
+              {/* Destino fixo em Download Local */}
+              <div>
+                <Label>Destino do Backup</Label>
+                <Input readOnly value="Download Local" className="bg-muted" />
+              </div>
+
+              <div>
+                <Label htmlFor="output_format">Formato do Backup</Label>
+                <Input id="output_format" readOnly value="JSON geral (todas as tabelas)" className="bg-muted" />
+              </div>
+
+              
+
+              {backupForm.destination === 'storage' || backupForm.destination === 'both' ? (
+                <div>
+                  <Label htmlFor="storage_bucket">Bucket do Storage (opcional)</Label>
+                  <Input
+                    id="storage_bucket"
+                    value={backupForm.storage_bucket}
+                    onChange={(e) => setBackupForm(prev => ({ ...prev, storage_bucket: e.target.value }))}
+                    disabled={!isAdmin()}
+                    placeholder="backups"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Deixe vazio para usar bucket padrão
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="flex gap-3 pt-4 border-t">
+              {isAdmin() && (
+                <Button onClick={saveBackupConfig} variant="outline">
+                  Salvar Configurações
+                </Button>
+              )}
+              <Button 
+                onClick={generateBackup} 
+                disabled={isGeneratingBackup || !isAdmin()}
+                className="flex items-center gap-2"
+              >
+                {isGeneratingBackup ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Archive className="h-4 w-4" />
+                )}
+                {isGeneratingBackup ? 'Gerando Backup...' : 'Gerar Backup Agora'}
+              </Button>
+              
+            </div>
+
+            {/* Aviso de Segurança */}
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-800 dark:text-amber-200">Importante:</p>
+                  <p className="text-amber-700 dark:text-amber-300">
+                    O backup é gerado via Edge Function no Supabase usando Service Role Key. 
+                    Certifique-se de que a função 'export-backup' está configurada com os secrets necessários.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Seção: Numeração da Próxima OS */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Sistema</CardTitle>
+          <CardDescription>Configurações gerais do sistema</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div className="col-span-2">
+              <Label htmlFor="proxima_os">Numeração da Próxima OS</Label>
+              <Input
+                id="proxima_os"
+                placeholder="346-25"
+                value={nextOsNumber}
+                onChange={(e) => setNextOsNumber(e.target.value)}
+                disabled={!isAdmin()}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Ex.: 346-25 → a próxima criada será 347-25.
+              </p>
+            </div>
+            <div>
+              <Button
+                onClick={async () => {
+                  if (!isAdmin()) return;
+                  try {
+                    setSavingNextOs(true);
+                    const { error } = await supabase
+                      .from('configuracoes')
+                      .update({ valor: String(nextOsNumber || '') })
+                      .eq('chave', 'proxima_os');
+                    if (error) throw error;
+                    toast({ title: 'Numeração da próxima OS salva' });
+                  } catch (e) {
+                    toast({ title: 'Erro ao salvar', description: String((e as any)?.message || e), variant: 'destructive' });
+                  } finally {
+                    setSavingNextOs(false);
+                  }
+                }}
+                disabled={savingNextOs || !isAdmin()}
+              >
+                {savingNextOs ? 'Salvando...' : 'Salvar Próxima OS'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
 
       {/* Relatório de Auditoria para Impressão - SEMPRE PRESENTE NO DOM */}
@@ -1208,6 +1525,8 @@ export default function Configuracoes() {
         input[type="date"]::placeholder { color: #fff; opacity: 1; }
       `}</style>
         </TabsContent>
+
+      
 
         <TabsContent value="users" className="space-y-6">
           <PermissionGuard permission="usuario_gerenciar">

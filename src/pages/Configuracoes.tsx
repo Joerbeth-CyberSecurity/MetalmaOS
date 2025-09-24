@@ -824,6 +824,15 @@ export default function Configuracoes() {
     { key: 'theme-metalma-light', name: 'Metalma Claro', colors: ['#3fa35a', '#2a5d34', '#222222', '#9a9a98'] },
     { key: 'theme-metalma-contrast', name: 'Metalma Contraste', colors: ['#006516', '#000000', '#000000', '#898987'] },
     { key: 'theme-metalma-gray', name: 'Metalma Cinza', colors: ['#265a31', '#898987', '#222222', '#b5b5b4'] },
+    // Novos temas
+    { key: 'theme-metalma-emerald', name: 'Metalma Esmeralda', colors: ['#0a7f3f', '#34c759', '#0f172a', '#94a3b8'] },
+    { key: 'theme-metalma-forest', name: 'Metalma Floresta', colors: ['#064e3b', '#16a34a', '#0b0f0e', '#6b7280'] },
+    { key: 'theme-metalma-slate', name: 'Metalma Ardósia', colors: ['#1f2937', '#10b981', '#111827', '#9ca3af'] },
+    { key: 'theme-metalma-sunrise', name: 'Metalma Amanhecer', colors: ['#3f9142', '#f59e0b', '#111827', '#9ca3af'] },
+    { key: 'theme-metalma-ocean', name: 'Metalma Oceano', colors: ['#006516', '#0ea5e9', '#0b1220', '#94a3b8'] },
+    // Adicionais solicitados
+    { key: 'theme-metalma-dark-pure', name: 'Metalma Escuro puro', colors: ['#000000', '#006516', '#FFFFFF', '#6b7280'] },
+    { key: 'theme-metalma-high-contrast', name: 'Alto contraste acessível', colors: ['#000000', '#FFFFFF', '#00ff00', '#ffd700'] },
   ];
 
   const applyTheme = (key: string) => {

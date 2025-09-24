@@ -532,7 +532,7 @@ export default function Relatorios() {
       });
 
       // Calcular eficiência
-      Object.values(colabMap).forEach((colab) => {
+      Object.values(colabMap as any).forEach((colab: any) => {
         colab.eficiencia =
           colab.meta_hora > 0
             ? Math.min(100, (colab.horas_trabalhadas / colab.meta_hora) * 100)
@@ -571,8 +571,8 @@ export default function Relatorios() {
         .order('data_inicio', { ascending: false });
 
       const paradasData = (paradas || []).map((p) => ({
-        os_numero: p.os?.numero_os || 'N/A',
-        colaborador: p.colaborador?.nome || 'N/A',
+        os_numero: (p as any).os?.numero_os || 'N/A',
+        colaborador: (p as any).colaborador?.nome || 'N/A',
         motivo: p.motivo || 'Falta de material',
         data_inicio: p.data_inicio,
         data_fim: p.data_fim,
@@ -598,7 +598,7 @@ export default function Relatorios() {
     try {
       const { data: ordens } = await supabase
         .from('ordens_servico')
-        .select('status, data_abertura')
+        .select('id, status, data_abertura')
         .gte('data_abertura', start)
         .lte('data_abertura', end);
 
@@ -616,7 +616,7 @@ export default function Relatorios() {
             .replace(/_/g, ' ')
             .replace(/\b\w/g, (l) => l.toUpperCase()),
           quantidade,
-          percentual: total > 0 ? (quantidade / total) * 100 : 0,
+          percentual: total > 0 ? (Number(quantidade) / total) * 100 : 0,
         })
       );
 
@@ -678,9 +678,9 @@ export default function Relatorios() {
       }
 
       // Processar dados combinando informações das duas tabelas
-      const tempoData = (ordens || []).map((os) => {
+      const tempoData = (ordens || []).map((os: any) => {
         // Calcular tempo real baseado nos registros de os_tempo
-        const temposOS = (tempos || []).filter((t) => t.os_id === os.id);
+        const temposOS = (tempos || []).filter((t: any) => t.os_id === os.id);
         let tempoRealCalculado = 0;
         let tempoParadaCalculado = 0;
 
@@ -904,15 +904,16 @@ export default function Relatorios() {
         <head>
           <title>${reportTitle}</title>
           <style>
+            @page { size: A4; margin: 12mm; }
             body { 
               font-family: Arial, sans-serif; 
               margin: 0; 
-              padding: 20px; 
+              padding: 0; 
               background: white; 
               color: black; 
             }
             .relatorio-impressao { 
-              max-width: 800px; 
+              width: 190mm; 
               margin: 0 auto; 
             }
             .relatorio-cabecalho { 
@@ -973,7 +974,7 @@ export default function Relatorios() {
               color: #666; 
             }
             @media print {
-              body { margin: 0; padding: 15px; }
+              body { margin: 0; padding: 0; }
             }
           </style>
         </head>
@@ -1009,13 +1010,15 @@ export default function Relatorios() {
       `);
 
       printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-      printWindow.close();
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      };
     }
   };
 
-  // Função para exportar PDF
+  // Função para exportar PDF (com logomarca e layout A4)
   const handleExportPDF = () => {
     console.log('Botão Exportar PDF clicado');
     console.log('reportData:', reportData);
@@ -1025,17 +1028,42 @@ export default function Relatorios() {
         const reportTitle = getReportTitle(reportData.type);
         console.log('Gerando PDF para:', reportTitle);
 
-        // Teste simples primeiro
-        const doc = new jsPDF();
-        doc.text('Teste PDF - Metalma', 20, 20);
-        doc.text(`Relatório: ${reportTitle}`, 20, 30);
-        doc.text(`Data: ${formatDate(new Date().toISOString())}`, 20, 40);
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        let y = 15;
 
-        const fileName = `teste_${reportTitle.toLowerCase().replace(/\s+/g, '_')}.pdf`;
+        // Logo (usa logo importado)
+        try {
+          doc.addImage(logo, 'PNG', pageWidth / 2 - 25, y, 50, 18);
+        } catch {}
+        y += 24;
+
+        // Título e período
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text(reportTitle, pageWidth / 2, y, { align: 'center' });
+        y += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Período: ${formatDate(reportData.period.start)} a ${formatDate(reportData.period.end)}`, pageWidth / 2, y, { align: 'center' });
+        y += 6;
+        doc.text(`Gerado em: ${formatDate(new Date().toISOString())}`, pageWidth / 2, y, { align: 'center' });
+        y += 8;
+
+        // Tabela (usa autoTable existente conforme tipo)
+        const tableHead = [renderTableHeadersForPdf(reportData.type)];
+        const tableBody = renderTableRowsForPdf(reportData.type);
+        autoTable(doc, {
+          startY: y,
+          head: tableHead,
+          body: tableBody,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [240, 240, 240], textColor: 0 },
+          margin: { left: 15, right: 15 },
+        });
+
+        const fileName = `${reportTitle.toLowerCase().replace(/\s+/g, '_')}.pdf`;
         doc.save(fileName);
-        console.log('PDF de teste salvo como:', fileName);
-
-        alert('PDF gerado com sucesso! Verifique a pasta de downloads.');
       } catch (error) {
         console.error('Erro ao gerar PDF:', error);
         alert('Erro ao gerar PDF: ' + error.message);
@@ -1058,6 +1086,46 @@ export default function Relatorios() {
     }).format(value);
   };
 
+  // Helpers para PDF (mantém compatível com as colunas existentes)
+  const renderTableHeadersForPdf = (type: string) => {
+    switch (type) {
+      case 'produtividade':
+        return ['Colaborador', 'Horas', 'OS Concluídas', 'Eficiência', 'Média Diária'];
+      case 'seguranca':
+        return ['Usuário', 'Email', 'Evento', 'Data/Hora', 'IP'];
+      case 'emissao_os':
+      default:
+        return renderTableContent().match(/<th>(.*?)<\/th>/g)?.map((h) => h.replace(/<\/?th>/g, '')) || [];
+    }
+  };
+
+  const renderTableRowsForPdf = (type: string) => {
+    // Aproveita dados já carregados em reportData.rows
+    const rows = (reportData as any)?.rows || [];
+    switch (type) {
+      case 'produtividade':
+        return rows.map((r: any) => [
+          r.colaborador,
+          `${(r.horas_trabalhadas ?? 0).toFixed(1)}h`,
+          String(r.os_concluidas ?? 0),
+          `${(r.eficiencia ?? 0).toFixed(0)}%`,
+          `${(r.media_diaria ?? 0).toFixed(1)}h`,
+        ]);
+      case 'seguranca':
+        return rows.map((r: any) => [
+          r.usuario ?? '-',
+          r.email ?? '-',
+          r.evento ?? '-',
+          r.data_hora ? formatDate(r.data_hora) : '-',
+          r.ip ?? '-',
+        ]);
+      case 'emissao_os':
+      default:
+        // Tenta extrair células de renderTableRows() (fallback simples)
+        return rows.map((r: any) => Object.values(r).map((v) => String(v ?? '-')));
+    }
+  };
+
   const handlePrintOSDetail = () => {
     if (selectedOSDetail) {
       const printWindow = window.open('', '_blank');
@@ -1077,16 +1145,18 @@ export default function Relatorios() {
           <head>
             <title>OS ${os.numero_os}</title>
             <style>
+              @page { size: A4; margin: 12mm; }
               body { 
                 font-family: Arial, sans-serif; 
                 margin: 0; 
-                padding: 20px; 
+                padding: 0; 
                 background: white; 
                 color: black; 
               }
               .relatorio-impressao { 
-                max-width: 800px; 
+                width: 190mm; 
                 margin: 0 auto; 
+                padding: 12mm 0;
               }
               .relatorio-cabecalho { 
                 text-align: center; 
@@ -1176,7 +1246,7 @@ export default function Relatorios() {
                 color: #666; 
               }
               @media print {
-                body { margin: 0; padding: 15px; }
+                body { margin: 0; padding: 0; }
               }
             </style>
           </head>
@@ -1310,14 +1380,15 @@ export default function Relatorios() {
         `);
 
         printWindow.document.close();
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
+        printWindow.onload = () => {
+          printWindow.focus();
+          printWindow.print();
+          printWindow.close();
+        };
       };
       
-      img.onerror = () => {
-        // Se a imagem não carregar, usar apenas texto
-        printWindow.document.write(`
+      // Fallback antigo removido: a janela já aguarda onload para imprimir
+      /* printWindow.document.write(`
           <!DOCTYPE html>
           <html>
           <head>
@@ -1532,23 +1603,23 @@ export default function Relatorios() {
         printWindow.focus();
         printWindow.print();
         printWindow.close();
-    }
+    } */
   };
 
   const handleExportPDFOSDetail = () => {
     if (selectedOSDetail) {
       try {
         const os = selectedOSDetail;
-        const doc = new jsPDF();
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
         
         // Configurações da página
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
-        let yPosition = 20;
+        let yPosition = 15;
 
         // Adicionar logo ao PDF
-        doc.addImage(logo, 'PNG', pageWidth / 2 - 30, yPosition, 60, 20);
-          yPosition += 35;
+        doc.addImage(logo, 'PNG', pageWidth / 2 - 25, yPosition, 50, 18);
+          yPosition += 26;
 
           // Cabeçalho
           doc.setFontSize(16);
@@ -1558,7 +1629,7 @@ export default function Relatorios() {
 
           doc.setFontSize(12);
           doc.text(`Nº ${os.numero_os}`, pageWidth / 2, yPosition, { align: 'center' });
-          yPosition += 20;
+          yPosition += 14;
 
         // Dados da OS
         doc.setFontSize(14);
@@ -1642,6 +1713,7 @@ export default function Relatorios() {
           body: produtosData,
           styles: { fontSize: 8 },
           headStyles: { fillColor: [240, 240, 240] },
+          margin: { left: 15, right: 15 },
           columnStyles: {
             2: { halign: 'center' },
             3: { halign: 'center' },

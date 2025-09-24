@@ -1,4 +1,5 @@
 import React from 'react';
+import logo from '@/assets/logo.png';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -33,7 +34,7 @@ export const ReportTemplate: React.FC<ReportTemplateProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <img
-              src="/logo.png"
+              src={logo}
               alt="Metalma Inox & Cia"
               className="h-16 w-auto"
             />
@@ -85,12 +86,14 @@ export const ReportTemplate: React.FC<ReportTemplateProps> = ({
 
       {/* Estilos específicos para impressão */}
       <style>{`
+        @page { size: A4; margin: 12mm; }
         @media print {
           .print-container {
             margin: 0;
-            padding: 20px;
+            padding: 0;
             font-size: 12px;
             line-height: 1.4;
+            width: 190mm;
           }
           
           .report-content table {

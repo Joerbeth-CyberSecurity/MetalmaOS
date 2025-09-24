@@ -56,7 +56,7 @@ export function Layout({ children }: LayoutProps) {
               >
                 <User className="h-4 w-4" />
                 <span className="ml-1 sm:ml-2 text-xs sm:text-sm hidden sm:inline">
-                  {userProfile?.nome || user?.email || 'Usuário'}
+                  {userProfile?.nome || (user as any)?.user_metadata?.nome || 'Usuário'}
                 </span>
               </Button>
             </div>

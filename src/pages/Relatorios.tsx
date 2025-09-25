@@ -17,6 +17,9 @@ import {
 } from '../components/ui/select';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Calendar } from '../components/ui/calendar';
+import { cn } from '../lib/utils';
 import {
   Table,
   TableBody,
@@ -2235,19 +2238,49 @@ export default function Relatorios() {
               <>
                 <div className="space-y-2">
                   <Label>Data Início</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn('w-full justify-start')}>
+                        {startDate ? new Date(startDate).toLocaleDateString('pt-BR') : 'Selecione a data'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate ? new Date(startDate) : undefined}
+                        onSelect={(date:any) => {
+                          if (!date) return;
+                          const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                            .toISOString().slice(0,10);
+                          setStartDate(iso);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label>Data Fim</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn('w-full justify-start')}>
+                        {endDate ? new Date(endDate).toLocaleDateString('pt-BR') : 'Selecione a data'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate ? new Date(endDate) : undefined}
+                        onSelect={(date:any) => {
+                          if (!date) return;
+                          const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                            .toISOString().slice(0,10);
+                          setEndDate(iso);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </>
             )}
@@ -2393,19 +2426,49 @@ export default function Relatorios() {
                 </div>
                 <div>
                   <Label htmlFor="startDate">Data Início</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn('w-full justify-start')}>
+                        {startDate ? new Date(startDate).toLocaleDateString('pt-BR') : 'Selecione a data'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate ? new Date(startDate) : undefined}
+                        onSelect={(date:any) => {
+                          if (!date) return;
+                          const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                            .toISOString().slice(0,10);
+                          setStartDate(iso);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
                   <Label htmlFor="endDate">Data Fim</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn('w-full justify-start')}>
+                        {endDate ? new Date(endDate).toLocaleDateString('pt-BR') : 'Selecione a data'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate ? new Date(endDate) : undefined}
+                        onSelect={(date:any) => {
+                          if (!date) return;
+                          const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                            .toISOString().slice(0,10);
+                          setEndDate(iso);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
 
@@ -2586,19 +2649,49 @@ export default function Relatorios() {
                 </div>
                 <div>
                   <Label htmlFor="startDate">Data Início</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn('w-full justify-start')}>
+                        {startDate ? new Date(startDate).toLocaleDateString('pt-BR') : 'Selecione a data'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate ? new Date(startDate) : undefined}
+                        onSelect={(date:any) => {
+                          if (!date) return;
+                          const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                            .toISOString().slice(0,10);
+                          setStartDate(iso);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
                   <Label htmlFor="endDate">Data Fim</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn('w-full justify-start')}>
+                        {endDate ? new Date(endDate).toLocaleDateString('pt-BR') : 'Selecione a data'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate ? new Date(endDate) : undefined}
+                        onSelect={(date:any) => {
+                          if (!date) return;
+                          const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                            .toISOString().slice(0,10);
+                          setEndDate(iso);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
                   <Label htmlFor="eventType">Tipo de Evento</Label>

@@ -53,6 +53,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { ColaboradoresResponsiveTable } from '@/components/ui/responsive-table';
 
@@ -477,21 +480,41 @@ export default function Colaboradores() {
               <FormField
                 name="data_admissao"
                 control={form.control}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data de Admissão*</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        value={field.value || ''}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const selectedDate = field.value ? new Date(field.value) : undefined;
+                  const buttonLabel = selectedDate
+                    ? selectedDate.toLocaleDateString('pt-BR')
+                    : 'Selecione a data';
+                  return (
+                    <FormItem>
+                      <FormLabel>Data de Admissão*</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button variant="outline" className={cn('justify-start w-full')}>
+                              {buttonLabel}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={(date:any) => {
+                              if (!date) return;
+                              const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                                .toISOString()
+                                .slice(0, 10);
+                              field.onChange(iso);
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               <div className="flex justify-end pt-6">
                 <Button type="submit" disabled={isSaving}>

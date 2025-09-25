@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar } from '../components/ui/calendar';
+import { cn } from '../lib/utils';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Badge } from '../components/ui/badge';
@@ -28,7 +32,6 @@ import {
   TrendingUp,
   TrendingDown,
   Target,
-  Calendar,
   Download,
   Filter,
   BarChart3,
@@ -433,21 +436,51 @@ export default function RelatoriosFinanceiros() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
               <Label htmlFor="data-inicio">Data Início</Label>
-              <Input
-                id="data-inicio"
-                type="date"
-                value={dateRange.inicio}
-                onChange={(e) => setDateRange(prev => ({ ...prev, inicio: e.target.value }))}
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn('w-full justify-start')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {new Date(dateRange.inicio).toLocaleDateString('pt-BR')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={new Date(dateRange.inicio)}
+                    onSelect={(date:any) => {
+                      if (!date) return;
+                      const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                        .toISOString().slice(0,10);
+                      setDateRange(prev => ({ ...prev, inicio: iso }));
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label htmlFor="data-fim">Data Fim</Label>
-              <Input
-                id="data-fim"
-                type="date"
-                value={dateRange.fim}
-                onChange={(e) => setDateRange(prev => ({ ...prev, fim: e.target.value }))}
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn('w-full justify-start')}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {new Date(dateRange.fim).toLocaleDateString('pt-BR')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={new Date(dateRange.fim)}
+                    onSelect={(date:any) => {
+                      if (!date) return;
+                      const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                        .toISOString().slice(0,10);
+                      setDateRange(prev => ({ ...prev, fim: iso }));
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="flex items-end">
               <Button onClick={fetchFinancialData} className="w-full">

@@ -19,6 +19,7 @@ import {
   Timer,
   StopCircle,
   Percent,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,11 +67,8 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import {
   Tooltip,
   TooltipContent,
@@ -273,7 +271,7 @@ export default function OrdensServico() {
 
   const form = useForm<OsFormData>({
     resolver: zodResolver(osSchema),
-    defaultValues: { status: 'aberta', produtos: [], fabrica: 'Metalma' },
+    defaultValues: { status: 'aberta', produtos: [], fabrica: 'Metalma', data_abertura: new Date().toISOString().slice(0, 10) },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -336,6 +334,9 @@ export default function OrdensServico() {
           status: selectedOs.status ?? 'aberta',
           fabrica: (selectedOs as any).fabrica || 'Metalma',
           produtos: produtosComNome,
+          data_abertura: (selectedOs as any)?.data_abertura
+            ? String((selectedOs as any).data_abertura).slice(0, 10)
+            : new Date().toISOString().slice(0, 10),
         });
       } else {
         form.reset({
@@ -344,6 +345,7 @@ export default function OrdensServico() {
           status: 'aberta',
           fabrica: 'Metalma',
           produtos: [],
+          data_abertura: new Date().toISOString().slice(0, 10),
         });
       }
     }
@@ -466,6 +468,9 @@ export default function OrdensServico() {
             valor_total: valorTotalOS,
             tempo_execucao_previsto: values.tempo_execucao_previsto,
             // meta_hora removido do envio ao banco
+            data_abertura: values.data_abertura
+              ? new Date(values.data_abertura).toISOString()
+              : undefined,
           };
 
         console.log('Atualizando OS:', osDataToUpdate);
@@ -520,7 +525,9 @@ export default function OrdensServico() {
             tempo_execucao_previsto: values.tempo_execucao_previsto,
             // meta_hora removido do envio ao banco
             numero_os: 'Gerando...',
-            data_abertura: new Date().toISOString(),
+            data_abertura: values.data_abertura
+              ? new Date(values.data_abertura).toISOString()
+              : new Date().toISOString(),
           })
           .select()
           .single();
@@ -1140,7 +1147,52 @@ export default function OrdensServico() {
                 )}
               />
 
-              
+              {/* Data de Abertura (DatePicker) */}
+              <FormField
+                name="data_abertura"
+                control={form.control}
+                render={({ field }) => {
+                  const selectedDate = field.value
+                    ? new Date(`${field.value}T00:00:00`)
+                    : undefined;
+                  return (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Data</FormLabel>
+                      <div className="flex items-center gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="icon">
+                              <CalendarIcon className="h-4 w-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={(date:any) => {
+                                if (!date) return;
+                                const iso = new Date(
+                                  Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+                                )
+                                  .toISOString()
+                                  .slice(0, 10);
+                                field.onChange(iso);
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <div className="h-9 rounded border bg-background px-3 text-sm flex items-center">
+                          {(field.value || new Date().toISOString().slice(0,10))
+                            ? new Date(`${field.value || new Date().toISOString().slice(0,10)}T00:00:00`).toLocaleDateString('pt-BR')
+                            : ''}
+                        </div>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField

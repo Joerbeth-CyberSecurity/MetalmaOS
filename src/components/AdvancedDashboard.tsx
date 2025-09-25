@@ -44,6 +44,15 @@ import { ptBR } from 'date-fns/locale';
 import { useDashboardStats, useFinancialMetrics, useMonthlyRevenue, useClientRevenue, useProductRevenue } from '@/hooks/useSupabaseQuery';
 import { useCache, CACHE_KEYS, CACHE_TTL } from '@/hooks/useCache';
 
+const formatHoursToTime = (hours: number): string => {
+  if (!hours || hours === 0) return '00:00:00';
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = Math.floor((totalMinutes % 60));
+  const s = Math.floor(((totalMinutes % 60) - m) * 60);
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
 interface DashboardStats {
   totalOS: number;
   osAbertas: number;
@@ -579,8 +588,8 @@ export default function AdvancedDashboard() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
-              {stats.horasTrabalhadasMes.toFixed(1)}h de{' '}
-              {(stats.metaHoraMedia * stats.totalColaboradores).toFixed(1)}h
+              {formatHoursToTime(stats.horasTrabalhadasMes)} de{' '}
+              {formatHoursToTime(stats.metaHoraMedia * stats.totalColaboradores)}
             </span>
             <span className="text-sm text-muted-foreground">
               {progressPercent.toFixed(1)}%
@@ -588,7 +597,7 @@ export default function AdvancedDashboard() {
           </div>
           <Progress value={progressPercent} className="w-full" />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Meta por colaborador: {stats.metaHoraMedia.toFixed(1)}h</span>
+            <span>Meta por colaborador: {formatHoursToTime(stats.metaHoraMedia)}</span>
             <span>{stats.totalColaboradores} colaboradores ativos</span>
           </div>
         </CardContent>

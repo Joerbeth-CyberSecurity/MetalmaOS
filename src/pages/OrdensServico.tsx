@@ -1198,30 +1198,109 @@ export default function OrdensServico() {
                 <FormField
                   name="tempo_execucao_previsto"
                   control={form.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tempo de Execução Previsto (horas)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          value={field.value || ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (value === '') {
-                              field.onChange(0);
-                            } else {
-                              const numValue = parseFloat(value);
-                              field.onChange(isNaN(numValue) ? 0 : numValue);
-                            }
-                          }}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    // Função para converter horas decimais para HH:MM:SS
+                    const formatHoursToTime = (hours: number): string => {
+                      if (!hours || hours === 0) return '00:00:00';
+                      const totalMinutes = Math.round(hours * 60);
+                      const h = Math.floor(totalMinutes / 60);
+                      const m = Math.floor((totalMinutes % 60));
+                      const s = Math.floor(((totalMinutes % 60) - m) * 60);
+                      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                    };
+
+                    // Função para converter HH:MM:SS para horas decimais
+                    const parseTimeToHours = (timeString: string): number => {
+                      if (!timeString || timeString === '00:00:00') return 0;
+                      const parts = timeString.split(':');
+                      if (parts.length !== 3) return 0;
+                      const hours = parseInt(parts[0]) || 0;
+                      const minutes = parseInt(parts[1]) || 0;
+                      const seconds = parseInt(parts[2]) || 0;
+                      return hours + (minutes / 60) + (seconds / 3600);
+                    };
+
+                    // Função para aplicar máscara de entrada
+                    const applyTimeMask = (value: string): string => {
+                      // Remove caracteres não numéricos
+                      const numbers = value.replace(/\D/g, '');
+                      
+                      // Limita a 6 dígitos (HHMMSS)
+                      const limited = numbers.slice(0, 6);
+                      
+                      // Aplica a máscara HH:MM:SS
+                      if (limited.length <= 2) {
+                        return limited;
+                      } else if (limited.length <= 4) {
+                        return `${limited.slice(0, 2)}:${limited.slice(2)}`;
+                      } else {
+                        return `${limited.slice(0, 2)}:${limited.slice(2, 4)}:${limited.slice(4)}`;
+                      }
+                    };
+
+                    // Função para incrementar/decrementar tempo
+                    const adjustTime = (currentHours: number, increment: number): number => {
+                      const totalMinutes = Math.round(currentHours * 60) + increment;
+                      return Math.max(0, totalMinutes / 60);
+                    };
+
+                    return (
+                      <FormItem>
+                        <FormLabel>Tempo de Execução Previsto (HH:MM:SS)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type="text"
+                              placeholder="00:00:00"
+                              value={field.value ? formatHoursToTime(field.value) : '00:00:00'}
+                              onChange={(e) => {
+                                const maskedValue = applyTimeMask(e.target.value);
+                                const hoursValue = parseTimeToHours(maskedValue);
+                                field.onChange(isNaN(hoursValue) ? 0 : hoursValue);
+                              }}
+                              onKeyDown={(e) => {
+                                // Permitir navegação com setas
+                                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                                  return;
+                                }
+                                // Permitir backspace e delete
+                                if (e.key === 'Backspace' || e.key === 'Delete') {
+                                  return;
+                                }
+                                // Permitir apenas números
+                                if (!/[0-9]/.test(e.key) && !['Tab', 'Enter'].includes(e.key)) {
+                                  e.preventDefault();
+                                }
+                              }}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              className="pr-20"
+                            />
+                            <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex flex-col">
+                              <button
+                                type="button"
+                                onClick={() => field.onChange(adjustTime(field.value || 0, 1))}
+                                className="h-4 w-4 flex items-center justify-center text-gray-500 hover:text-gray-700"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => field.onChange(adjustTime(field.value || 0, -1))}
+                                className="h-4 w-4 flex items-center justify-center text-gray-500 hover:text-gray-700"
+                              >
+                                ▼
+                              </button>
+                            </div>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                        <p className="text-sm text-muted-foreground">
+                          Formato: HH:MM:SS (ex: 02:30:00 para 2h30min)
+                        </p>
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   name="meta_hora"

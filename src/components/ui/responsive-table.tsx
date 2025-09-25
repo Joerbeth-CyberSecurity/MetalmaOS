@@ -339,13 +339,33 @@ export function ColaboradoresResponsiveTable({
     {
       key: 'meta_hora',
       label: 'Meta (h)',
-      render: (value: any) => `${value || 0}h`,
+      render: (value: any) => {
+        const formatHoursToTime = (hours: number): string => {
+          if (!hours || hours === 0) return '00:00:00';
+          const totalMinutes = Math.round(hours * 60);
+          const h = Math.floor(totalMinutes / 60);
+          const m = Math.floor((totalMinutes % 60));
+          const s = Math.floor(((totalMinutes % 60) - m) * 60);
+          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        };
+        return formatHoursToTime(value || 0);
+      },
       hideOnMobile: true,
     },
     {
       key: 'horas_trabalhadas',
       label: 'Horas Trabalhadas',
-      render: (value: any) => `${value || 0}h`,
+      render: (value: any) => {
+        const formatHoursToTime = (hours: number): string => {
+          if (!hours || hours === 0) return '00:00:00';
+          const totalMinutes = Math.round(hours * 60);
+          const h = Math.floor(totalMinutes / 60);
+          const m = Math.floor((totalMinutes % 60));
+          const s = Math.floor(((totalMinutes % 60) - m) * 60);
+          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        };
+        return formatHoursToTime(value || 0);
+      },
       hideOnMobile: true,
     },
     {

@@ -1077,7 +1077,14 @@ export default function Relatorios() {
     }
   };
 
-  const formatHours = (hours) => `${hours.toFixed(1)}h`;
+  const formatHours = (hours) => {
+    if (!hours || hours === 0) return '00:00:00';
+    const totalMinutes = Math.round(hours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.floor((totalMinutes % 60));
+    const s = Math.floor(((totalMinutes % 60) - m) * 60);
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
   const formatDate = (dateString) =>
     format(new Date(dateString), 'dd/MM/yyyy', { locale: ptBR });
 

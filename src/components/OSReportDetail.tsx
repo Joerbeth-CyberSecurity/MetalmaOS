@@ -29,6 +29,15 @@ const formatDateTime = (dateString: string | null) =>
     ? format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: ptBR })
     : 'N/A';
 
+const formatHoursToTime = (hours: number): string => {
+  if (!hours || hours === 0) return '00:00:00';
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = Math.floor((totalMinutes % 60));
+  const s = Math.floor(((totalMinutes % 60) - m) * 60);
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+};
+
 export default function OSReportDetail({ osData, onPrint, onExportPDF }: OSReportDetailProps) {
   if (!osData) return null;
 
@@ -76,8 +85,8 @@ export default function OSReportDetail({ osData, onPrint, onExportPDF }: OSRepor
               {osData.data_fim && (
                 <div><span className="font-medium">Data de Finalização:</span> {formatDateTime(osData.data_fim)}</div>
               )}
-              <div><span className="font-medium">Tempo Previsto:</span> {osData.tempo_execucao_previsto || 0}h</div>
-              <div><span className="font-medium">Tempo Real:</span> {osData.tempo_execucao_real || 0}h</div>
+              <div><span className="font-medium">Tempo Previsto:</span> {formatHoursToTime(osData.tempo_execucao_previsto || 0)}</div>
+              <div><span className="font-medium">Tempo Real:</span> {formatHoursToTime(osData.tempo_execucao_real || 0)}</div>
             </div>
           </div>
 

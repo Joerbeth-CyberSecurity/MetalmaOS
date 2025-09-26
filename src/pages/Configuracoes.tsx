@@ -46,6 +46,18 @@ const configSchema = z.object({
     .number()
     .min(0, 'O tempo de tolerância não pode ser negativo.')
     .max(1440, 'O tempo de tolerância não pode ser maior que 24 horas.'),
+  expediente_horas_segsex: z.coerce
+    .number()
+    .min(0, 'Horas devem ser >= 0.')
+    .max(24, 'Horas diárias não podem exceder 24.'),
+  expediente_horas_sabado: z.coerce
+    .number()
+    .min(0, 'Horas devem ser >= 0.')
+    .max(24, 'Horas diárias não podem exceder 24.'),
+  expediente_horas_domingo: z.coerce
+    .number()
+    .min(0, 'Horas devem ser >= 0.')
+    .max(24, 'Horas diárias não podem exceder 24.'),
 });
 
 type ConfigFormData = z.infer<typeof configSchema>;
@@ -771,10 +783,40 @@ export default function Configuracoes() {
         meta_hora_padrao: parseFloat(configMap.meta_hora_padrao || '0'),
         prefixo_os: configMap.prefixo_os || 'OS',
         tempo_tolerancia_pausa: parseFloat(configMap.tempo_tolerancia_pausa || '120'),
+        expediente_horas_segsex: parseFloat(configMap.expediente_horas_segsex || '8'),
+        expediente_horas_sabado: parseFloat(configMap.expediente_horas_sabado || '4'),
+        expediente_horas_domingo: parseFloat(configMap.expediente_horas_domingo || '0'),
       });
 
       // Carregar numeração da próxima OS (se existir)
       setNextOsNumber(configMap.proxima_os || '');
+
+      // Sincronizar automaticamente a próxima OS a partir da última OS gerada
+      try {
+        const { data: last } = await supabase
+          .from('ordens_servico')
+          .select('numero_os, created_at')
+          .not('numero_os', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (last?.numero_os) {
+          const match = String(last.numero_os).match(/^(\d+)(?:-(\d+))?$/);
+          if (match) {
+            const parteNumerica = parseInt(match[1], 10);
+            const sufixo = match[2] ? `-${match[2]}` : '';
+            const proximoCalc = `${parteNumerica + 1}${sufixo}`;
+            if (proximoCalc && proximoCalc !== (configMap.proxima_os || '')) {
+              // Atualiza configuracoes e estado local
+              await supabase
+                .from('configuracoes')
+                .upsert({ chave: 'proxima_os', valor: proximoCalc }, { onConflict: 'chave' });
+              setNextOsNumber(proximoCalc);
+            }
+          }
+        }
+      } catch {}
     }
     setLoading(false);
   };
@@ -782,15 +824,12 @@ export default function Configuracoes() {
   const onSubmit = async (values: ConfigFormData) => {
     setIsSaving(true);
 
-    const updates = Object.entries(values).map(([chave, valor]) =>
-      supabase
-        .from('configuracoes')
-        .update({ valor: String(valor) })
-        .eq('chave', chave)
-    );
-
-    const results = await Promise.all(updates);
-    const hasError = results.some((res) => res.error);
+    // Upsert todas as chaves (cria se não existir)
+    const entries = Object.entries(values).map(([chave, valor]) => ({ chave, valor: String(valor) }));
+    const { error } = await supabase
+      .from('configuracoes')
+      .upsert(entries, { onConflict: 'chave' });
+    const hasError = !!error;
 
     if (hasError) {
       toast({
@@ -802,6 +841,52 @@ export default function Configuracoes() {
       toast({ title: 'Configurações salvas com sucesso!' });
     }
     setIsSaving(false);
+  };
+
+  // Salvamento por seção: Parâmetros do Sistema
+  const saveParametrosSistema = async () => {
+    if (!isAdmin()) {
+      toast({ title: 'Acesso negado', description: 'Apenas Administradores podem salvar.', variant: 'destructive' });
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const v = form.getValues();
+      const entries: Array<{ chave: string; valor: string }> = [
+        { chave: 'percentual_global_produtos', valor: String(v.percentual_global_produtos ?? 0) },
+        { chave: 'meta_hora_padrao', valor: String(v.meta_hora_padrao ?? 0) },
+        { chave: 'prefixo_os', valor: String(v.prefixo_os ?? 'OS') },
+        { chave: 'tempo_tolerancia_pausa', valor: String(v.tempo_tolerancia_pausa ?? 120) },
+      ];
+      const { error } = await supabase.from('configuracoes').upsert(entries, { onConflict: 'chave' });
+      if (error) throw error;
+      toast({ title: 'Parâmetros do Sistema salvos' });
+    } catch (e) {
+      toast({ title: 'Erro ao salvar', description: String((e as any)?.message || e), variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Salvamento por seção: Janelas de Expediente
+  const saveExpediente = async () => {
+    if (!isAdmin()) {
+      toast({ title: 'Acesso negado', description: 'Apenas Administradores podem salvar.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const v = form.getValues();
+      const entries: Array<{ chave: string; valor: string }> = [
+        { chave: 'expediente_horas_segsex', valor: String((v as any).expediente_horas_segsex ?? 8) },
+        { chave: 'expediente_horas_sabado', valor: String((v as any).expediente_horas_sabado ?? 4) },
+        { chave: 'expediente_horas_domingo', valor: String((v as any).expediente_horas_domingo ?? 0) },
+      ];
+      const { error } = await supabase.from('configuracoes').upsert(entries, { onConflict: 'chave' });
+      if (error) throw error;
+      toast({ title: 'Janelas de Expediente salvas' });
+    } catch (e) {
+      toast({ title: 'Erro ao salvar', description: String((e as any)?.message || e), variant: 'destructive' });
+    }
   };
 
   // Garante que o print-root existe no body
@@ -1149,12 +1234,108 @@ export default function Configuracoes() {
                     )}
                   />
                 </div>
+                {/* Botão: salvar apenas Parâmetros do Sistema */}
+                <div className="flex justify-end">
+                  <Button type="button" onClick={saveParametrosSistema} disabled={isSaving || !isAdmin()}>
+                    {isSaving ? 'Salvando...' : 'Salvar Parâmetros do Sistema'}
+                  </Button>
+                </div>
+
+                {/* Configurações de Expediente */}
+                <div className="rounded-lg border p-4">
+                  <div className="mb-3 font-medium">Janelas de Expediente (horas por dia)</div>
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <FormField
+                      control={form.control}
+                      name="expediente_horas_segsex"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Segunda a Sexta (h/dia)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              max="24"
+                              value={field.value || ''}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
+                                field.onChange(isNaN(v) ? 8 : v);
+                              }}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="expediente_horas_sabado"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Sábado (h/dia)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              max="24"
+                              value={field.value || ''}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
+                                field.onChange(isNaN(v) ? 4 : v);
+                              }}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="expediente_horas_domingo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Domingo (h/dia)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              max="24"
+                              value={field.value || ''}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value);
+                                field.onChange(isNaN(v) ? 0 : v);
+                              }}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Essas horas impactam imediatamente o cálculo do tempo previsto ao escolher a Data de Previsão nas OS.
+                  </p>
+                  <div className="mt-3 flex justify-end">
+                    <Button type="button" onClick={saveExpediente} disabled={!isAdmin()}>
+                      Salvar Janelas de Expediente
+                    </Button>
+                  </div>
+                </div>
                 <FormField
                   control={form.control}
                   name="prefixo_os"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Prefixo para Ordens de Serviço</FormLabel>
+                      <FormLabel>Exemplo: Prefixo para Ordens de Serviço</FormLabel>
                       <FormControl>
                         <Input
                           value={field.value || ''}
@@ -1167,6 +1348,44 @@ export default function Configuracoes() {
                     </FormItem>
                   )}
                 />
+                {/* Numeração da Próxima OS (único local) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div className="col-span-2">
+                    <Label htmlFor="proxima_os">Numeração da Próxima OS</Label>
+                    <Input
+                      id="proxima_os"
+                      placeholder="346-25"
+                      value={nextOsNumber}
+                      onChange={(e) => setNextOsNumber(e.target.value)}
+                      disabled={!isAdmin()}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ex.: 346-25 → a próxima criada será 347-25.
+                    </p>
+                  </div>
+                  <div className="flex md:justify-end">
+                    <Button
+                      onClick={async () => {
+                        if (!isAdmin()) return;
+                        try {
+                          setSavingNextOs(true);
+                          const { error } = await supabase
+                            .from('configuracoes')
+                            .upsert({ chave: 'proxima_os', valor: String(nextOsNumber || '') }, { onConflict: 'chave' });
+                          if (error) throw error;
+                          toast({ title: 'Numeração da próxima OS salva' });
+                        } catch (e) {
+                          toast({ title: 'Erro ao salvar', description: String((e as any)?.message || e), variant: 'destructive' });
+                        } finally {
+                          setSavingNextOs(false);
+                        }
+                      }}
+                      disabled={savingNextOs || !isAdmin()}
+                    >
+                      {savingNextOs ? 'Salvando...' : 'Salvar Próxima OS'}
+                    </Button>
+                  </div>
+                </div>
                 <FormField
                   control={form.control}
                   name="tempo_tolerancia_pausa"
@@ -1383,53 +1602,7 @@ export default function Configuracoes() {
         </CardContent>
       </Card>
 
-      {/* Seção: Numeração da Próxima OS */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sistema</CardTitle>
-          <CardDescription>Configurações gerais do sistema</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div className="col-span-2">
-              <Label htmlFor="proxima_os">Numeração da Próxima OS</Label>
-              <Input
-                id="proxima_os"
-                placeholder="346-25"
-                value={nextOsNumber}
-                onChange={(e) => setNextOsNumber(e.target.value)}
-                disabled={!isAdmin()}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Ex.: 346-25 → a próxima criada será 347-25.
-              </p>
-            </div>
-            <div>
-              <Button
-                onClick={async () => {
-                  if (!isAdmin()) return;
-                  try {
-                    setSavingNextOs(true);
-                    const { error } = await supabase
-                      .from('configuracoes')
-                      .update({ valor: String(nextOsNumber || '') })
-                      .eq('chave', 'proxima_os');
-                    if (error) throw error;
-                    toast({ title: 'Numeração da próxima OS salva' });
-                  } catch (e) {
-                    toast({ title: 'Erro ao salvar', description: String((e as any)?.message || e), variant: 'destructive' });
-                  } finally {
-                    setSavingNextOs(false);
-                  }
-                }}
-                disabled={savingNextOs || !isAdmin()}
-              >
-                {savingNextOs ? 'Salvando...' : 'Salvar Próxima OS'}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Seção antiga removida: Numeração da Próxima OS já foi movida para Parâmetros do Sistema */}
 
 
       {/* Relatório de Auditoria para Impressão - SEMPRE PRESENTE NO DOM */}

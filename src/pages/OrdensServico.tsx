@@ -143,6 +143,7 @@ const osSchema = z.object({
   valor_total: z.number().min(0).optional(),
   numero_os: z.string().optional(),
   data_abertura: z.string().optional(),
+  data_previsao: z.string().optional(),
 });
 type OsFormData = z.infer<typeof osSchema>;
 
@@ -271,7 +272,7 @@ export default function OrdensServico() {
 
   const form = useForm<OsFormData>({
     resolver: zodResolver(osSchema),
-    defaultValues: { status: 'aberta', produtos: [], fabrica: 'Metalma', data_abertura: new Date().toISOString().slice(0, 10) },
+    defaultValues: { status: 'aberta', produtos: [], fabrica: 'Metalma', data_abertura: new Date().toISOString().slice(0, 10), data_previsao: new Date().toISOString().slice(0, 10) },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -284,6 +285,96 @@ export default function OrdensServico() {
     (total, p) => total + p.quantidade * p.preco_unitario,
     0
   );
+
+  // Carga de expediente dinâmica via configuracoes
+  const [expSegSex, setExpSegSex] = useState<number>(8);
+  const [expSab, setExpSab] = useState<number>(4);
+  const [expDom, setExpDom] = useState<number>(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('configuracoes')
+          .select('chave, valor')
+          .in('chave', [
+            'expediente_horas_segsex',
+            'expediente_horas_sabado',
+            'expediente_horas_domingo',
+          ]);
+        const map = Object.fromEntries((data || []).map((r: any) => [r.chave, r.valor]));
+        setExpSegSex(isNaN(parseFloat(map.expediente_horas_segsex)) ? 8 : parseFloat(map.expediente_horas_segsex));
+        setExpSab(isNaN(parseFloat(map.expediente_horas_sabado)) ? 4 : parseFloat(map.expediente_horas_sabado));
+        setExpDom(isNaN(parseFloat(map.expediente_horas_domingo)) ? 0 : parseFloat(map.expediente_horas_domingo));
+      } catch {}
+    })();
+  }, []);
+
+  // Calcula horas úteis entre data_abertura e data_previsao conforme expediente configurado
+  const calcularHorasUteis = (inicioISO?: string, fimISO?: string): number => {
+    if (!inicioISO || !fimISO) return 0;
+    const inicio = new Date(`${inicioISO}T00:00:00Z`);
+    const fim = new Date(`${fimISO}T00:00:00Z`);
+    if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) return 0;
+    if (fim < inicio) return 0;
+
+    let horas = 0;
+    const cursor = new Date(inicio);
+    while (cursor <= fim) {
+      const day = cursor.getUTCDay(); // 0=Dom,6=Sáb
+      if (day === 0) {
+        horas += expDom;
+      } else if (day === 6) {
+        horas += expSab;
+      } else {
+        horas += expSegSex;
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return horas;
+  };
+
+  // Pré-visualização leve para UI (sem efeitos colaterais)
+  const aberturaPreview = ((): string | undefined => {
+    try {
+      return form.watch('data_abertura');
+    } catch { return undefined; }
+  })();
+  const previsaoPreview = ((): string | undefined => {
+    try {
+      // @ts-ignore
+      return (form.watch('data_previsao') as any) as string | undefined;
+    } catch { return undefined; }
+  })();
+  const horasPreview = calcularHorasUteis(aberturaPreview, previsaoPreview);
+  const intervaloInvalido = Boolean(
+    aberturaPreview && previsaoPreview && new Date(`${previsaoPreview}T00:00:00Z`) < new Date(`${aberturaPreview}T00:00:00Z`)
+  );
+
+  // Atualiza automaticamente o tempo_execucao_previsto quando datas mudam (evita loop)
+  useEffect(() => {
+    const sub = form.watch((values, info) => {
+      const changedField = info?.name;
+      if (changedField !== 'data_abertura' && changedField !== 'data_previsao') return;
+      const horas = calcularHorasUteis(values.data_abertura, (values as any).data_previsao);
+      if (isNaN(horas)) return;
+      const current = form.getValues('tempo_execucao_previsto');
+      if (current !== horas) {
+        form.setValue('tempo_execucao_previsto', horas, { shouldDirty: true });
+      }
+    });
+    return () => sub.unsubscribe();
+  }, [form, expSegSex, expSab, expDom]);
+
+  // Define o tempo previsto inicial com base nas datas atuais (ex.: hoje = 8h, sábado = 4h, domingo = 0h)
+  useEffect(() => {
+    const v = form.getValues();
+    const horas = calcularHorasUteis(v.data_abertura, (v as any).data_previsao);
+    if (!isNaN(horas)) {
+      form.setValue('tempo_execucao_previsto', horas, { shouldDirty: true });
+    }
+    // também quando as janelas de expediente carregarem
+  }, [form, expSegSex, expSab, expDom]);
 
   useEffect(() => {
     fetchOrdensServico();
@@ -337,6 +428,9 @@ export default function OrdensServico() {
           data_abertura: (selectedOs as any)?.data_abertura
             ? String((selectedOs as any).data_abertura).slice(0, 10)
             : new Date().toISOString().slice(0, 10),
+          data_previsao: (selectedOs as any)?.data_previsao
+            ? String((selectedOs as any).data_previsao).slice(0, 10)
+            : String((selectedOs as any)?.data_abertura || new Date().toISOString()).slice(0, 10),
         });
       } else {
         form.reset({
@@ -346,7 +440,13 @@ export default function OrdensServico() {
           fabrica: 'Metalma',
           produtos: [],
           data_abertura: new Date().toISOString().slice(0, 10),
+          data_previsao: new Date().toISOString().slice(0, 10),
         });
+        const v = form.getValues();
+        const horas = calcularHorasUteis(v.data_abertura, (v as any).data_previsao);
+        if (!isNaN(horas)) {
+          form.setValue('tempo_execucao_previsto', horas, { shouldDirty: true });
+        }
       }
     }
   }, [selectedOs, dialogOpen, form, produtos]);
@@ -471,6 +571,9 @@ export default function OrdensServico() {
             data_abertura: values.data_abertura
               ? new Date(values.data_abertura).toISOString()
               : undefined,
+            data_previsao: (values as any).data_previsao
+              ? new Date((values as any).data_previsao).toISOString()
+              : undefined,
           };
 
         console.log('Atualizando OS:', osDataToUpdate);
@@ -528,6 +631,9 @@ export default function OrdensServico() {
             data_abertura: values.data_abertura
               ? new Date(values.data_abertura).toISOString()
               : new Date().toISOString(),
+            data_previsao: (values as any).data_previsao
+              ? new Date((values as any).data_previsao).toISOString()
+              : null,
           })
           .select()
           .single();
@@ -1147,52 +1253,112 @@ export default function OrdensServico() {
                 )}
               />
 
-              {/* Data de Abertura (DatePicker) */}
-              <FormField
-                name="data_abertura"
-                control={form.control}
-                render={({ field }) => {
-                  const selectedDate = field.value
-                    ? new Date(`${field.value}T00:00:00`)
-                    : undefined;
-                  return (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Data</FormLabel>
-                      <div className="flex items-center gap-2">
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" size="icon">
-                              <CalendarIcon className="h-4 w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={selectedDate}
-                              onSelect={(date:any) => {
-                                if (!date) return;
-                                const iso = new Date(
-                                  Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
-                                )
-                                  .toISOString()
-                                  .slice(0, 10);
-                                field.onChange(iso);
-                              }}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <div className="h-9 rounded border bg-background px-3 text-sm flex items-center">
-                          {(field.value || new Date().toISOString().slice(0,10))
-                            ? new Date(`${field.value || new Date().toISOString().slice(0,10)}T00:00:00`).toLocaleDateString('pt-BR')
-                            : ''}
+              {/* Datas (Abertura e Previsão) lado a lado */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FormField
+                  name="data_abertura"
+                  control={form.control}
+                  render={({ field }) => {
+                    const selectedDate = field.value
+                      ? new Date(`${field.value}T00:00:00`)
+                      : undefined;
+                    return (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Data</FormLabel>
+                        <div className="flex items-center gap-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="icon">
+                                <CalendarIcon className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={selectedDate}
+                                onSelect={(date:any) => {
+                                  if (!date) return;
+                                  const iso = new Date(
+                                    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+                                  )
+                                    .toISOString()
+                                    .slice(0, 10);
+                                  field.onChange(iso);
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <div className="h-9 rounded border bg-background px-3 text-sm flex items-center">
+                            {(field.value || new Date().toISOString().slice(0,10))
+                              ? new Date(`${field.value || new Date().toISOString().slice(0,10)}T00:00:00`).toLocaleDateString('pt-BR')
+                              : ''}
+                          </div>
                         </div>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+                <FormField
+                  name="data_previsao"
+                  control={form.control}
+                  render={({ field }) => {
+                    const selectedDate = field.value
+                      ? new Date(`${field.value}T00:00:00`)
+                      : undefined;
+                    return (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Data Previsão</FormLabel>
+                        <div className="flex items-center gap-2">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" size="icon">
+                                <CalendarIcon className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={selectedDate}
+                                onSelect={(date:any) => {
+                                  if (!date) return;
+                                  const iso = new Date(
+                                    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+                                  )
+                                    .toISOString()
+                                    .slice(0, 10);
+                                  field.onChange(iso);
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <div className="h-9 rounded border bg-background px-3 text-sm flex items-center">
+                            {field.value
+                              ? new Date(`${field.value}T00:00:00`).toLocaleDateString('pt-BR')
+                              : ''}
+                          </div>
+                        </div>
+                        <div className="mt-2 text-xs">
+                          {intervaloInvalido ? (
+                            <span className="text-destructive">
+                              A data de previsão não pode ser anterior à data de abertura.
+                            </span>
+                          ) : (
+                            previsaoPreview ? (
+                              <span className="text-muted-foreground">
+                                Horas úteis previstas (expediente): {horasPreview}
+                              </span>
+                            ) : null
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+              </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField

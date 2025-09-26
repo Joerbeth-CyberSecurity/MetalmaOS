@@ -1,15 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  Building2,
-  ClipboardList,
-  Users,
-  Package,
-  UserCheck,
-  BarChart3,
-  Settings,
-  LogOut,
-} from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -25,56 +16,7 @@ import {
 import { useAuth } from '@/hooks/useAuth.jsx';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
-
-const items = [
-  { title: 'Dashboard', url: '/', icon: BarChart3, permission: null }, // Sempre visível
-  {
-    title: 'Ordens de Serviço',
-    url: '/ordens-servico',
-    icon: ClipboardList,
-    permission: 'os_visualizar',
-  },
-  {
-    title: 'Clientes',
-    url: '/clientes',
-    icon: Users,
-    permission: 'cliente_visualizar',
-  },
-  {
-    title: 'Colaboradores',
-    url: '/colaboradores',
-    icon: UserCheck,
-    permission: 'colaborador_visualizar',
-  },
-  {
-    title: 'Produtos',
-    url: '/produtos',
-    icon: Package,
-    permission: 'produto_visualizar',
-  },
-  {
-    title: 'Relatórios',
-    url: '/relatorios',
-    icon: BarChart3,
-    permission: 'relatorio_visualizar',
-  },
-];
-
-const adminItems = [
-  {
-    title: 'Configurações',
-    url: '/configuracoes',
-    icon: Settings,
-    permission: 'config_visualizar',
-  },
-  {
-    title: 'Ajuda',
-    url: 'https://joerbeth-cybersecurity.github.io/ajudaMetalmaOS/', // Link correto do GitHub Pages
-    icon: BarChart3, // Pode trocar por um ícone mais apropriado
-    permission: 'config_visualizar',
-    external: true, // Garante que abra em nova aba
-  },
-];
+import { adminModules, mainModules } from '@/lib/navigation';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -90,11 +32,11 @@ export function AppSidebar() {
       : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-foreground/10';
 
   // Filtrar itens baseado nas permissões
-  const filteredItems = items.filter(
+  const filteredItems = mainModules.filter(
     (item) => item.permission === null || hasPermission(item.permission)
   );
 
-  const filteredAdminItems = adminItems.filter((item) =>
+  const filteredAdminItems = adminModules.filter((item) =>
     hasPermission(item.permission)
   );
 

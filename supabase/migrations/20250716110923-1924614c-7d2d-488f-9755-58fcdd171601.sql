@@ -265,6 +265,11 @@ DECLARE
     numero_completo TEXT;
     ano_atual TEXT;
 BEGIN
+    -- If numero_os is already filled by the application, respect it
+    IF NEW.numero_os IS NOT NULL AND NEW.numero_os <> '' AND NEW.numero_os <> 'Gerando...' THEN
+        RETURN NEW;
+    END IF;
+
     -- Get prefix from configurations
     SELECT valor INTO prefixo FROM public.configuracoes WHERE chave = 'prefixo_os';
     IF prefixo IS NULL THEN

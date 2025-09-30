@@ -791,32 +791,8 @@ export default function Configuracoes() {
       // Carregar numeração da próxima OS (se existir)
       setNextOsNumber(configMap.proxima_os || '');
 
-      // Sincronizar automaticamente a próxima OS a partir da última OS gerada
-      try {
-        const { data: last } = await supabase
-          .from('ordens_servico')
-          .select('numero_os, created_at')
-          .not('numero_os', 'is', null)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (last?.numero_os) {
-          const match = String(last.numero_os).match(/^(\d+)(?:-(\d+))?$/);
-          if (match) {
-            const parteNumerica = parseInt(match[1], 10);
-            const sufixo = match[2] ? `-${match[2]}` : '';
-            const proximoCalc = `${parteNumerica + 1}${sufixo}`;
-            if (proximoCalc && proximoCalc !== (configMap.proxima_os || '')) {
-              // Atualiza configuracoes e estado local
-              await supabase
-                .from('configuracoes')
-                .upsert({ chave: 'proxima_os', valor: proximoCalc }, { onConflict: 'chave' });
-              setNextOsNumber(proximoCalc);
-            }
-          }
-        }
-      } catch {}
+      // Não sobrescrever o valor manual de "Próxima OS" automaticamente.
+      // Mantemos apenas o que está salvo em configuracoes.proxima_os.
     }
     setLoading(false);
   };

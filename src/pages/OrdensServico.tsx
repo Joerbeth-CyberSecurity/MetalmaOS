@@ -616,6 +616,55 @@ export default function OrdensServico() {
         setDialogOpen(false);
         fetchOrdensServico();
       } else {
+        // Antes de inserir, obter o valor exato da próxima OS, priorizando 'proxima_os'
+        let numeroOsValor = '';
+        let usouProxima = false;
+        const incrementOsNotation = (input: string): string => {
+          if (!input) return '';
+          const m = input.match(/^(\D*?)(\d+)(.*)$/);
+          if (!m) return input;
+          const prefixo = m[1] || '';
+          const numStr = m[2] || '0';
+          const sufixo = m[3] || '';
+          const next = String(parseInt(numStr, 10) + 1).padStart(numStr.length, '0');
+          return `${prefixo}${next}${sufixo}`;
+        };
+        try {
+          const { data: cfgProx } = await supabase
+            .from('configuracoes')
+            .select('valor')
+            .eq('chave', 'proxima_os')
+            .single();
+          const prox = (cfgProx?.valor || '').trim();
+          if (prox) {
+            numeroOsValor = prox;
+            usouProxima = true;
+          } else {
+            const { data: cfgPrefixo } = await supabase
+              .from('configuracoes')
+              .select('valor')
+              .eq('chave', 'prefixo_os')
+              .single();
+            numeroOsValor = (cfgPrefixo?.valor || '').trim() || 'Gerando...';
+          }
+        } catch {}
+
+        // Garante unicidade antes do INSERT (evita duplicate key)
+        const ensureUniqueNumeroOs = async (valor: string): Promise<string> => {
+          if (!valor || valor === 'Gerando...') return valor;
+          let atual = valor;
+          for (let i = 0; i < 20; i++) {
+            const { count } = await supabase
+              .from('ordens_servico')
+              .select('id', { count: 'exact', head: true })
+              .eq('numero_os', atual);
+            if ((count || 0) === 0) return atual;
+            atual = incrementOsNotation(atual);
+          }
+          return atual;
+        };
+        const numeroUnicoParaInserir = await ensureUniqueNumeroOs(numeroOsValor);
+
         // INSERT
         const { data: newOs, error: osError } = await supabase
           .from('ordens_servico')
@@ -627,7 +676,8 @@ export default function OrdensServico() {
             valor_total: valorTotalOS,
             tempo_execucao_previsto: values.tempo_execucao_previsto,
             // meta_hora removido do envio ao banco
-            numero_os: 'Gerando...',
+            // Definimos aqui o número exato; o trigger respeitará se não for 'Gerando...'
+            numero_os: numeroUnicoParaInserir,
             data_abertura: values.data_abertura
               ? new Date(values.data_abertura).toISOString()
               : new Date().toISOString(),
@@ -642,67 +692,14 @@ export default function OrdensServico() {
 
         console.log('OS criada:', newOs);
 
-        // Gerar número sequencial baseado na configuração 'prefixo_os'
-        try {
-          // 1) Busca primeiro em 'prefixo_os'; se não existir, tenta 'proxima_os'
-          let atual = '';
-          {
-            const { data: cfgPrefixo } = await supabase
+        // Se usamos 'proxima_os', incrementa e salva o próximo para evitar duplicidade
+        if (usouProxima && numeroUnicoParaInserir && numeroUnicoParaInserir !== 'Gerando...') {
+          const proximo = incrementOsNotation(numeroUnicoParaInserir);
+          if (proximo && proximo !== numeroOsValor) {
+            await supabase
               .from('configuracoes')
-              .select('valor')
-              .eq('chave', 'prefixo_os')
-              .single();
-            atual = (cfgPrefixo?.valor || '').trim();
-            if (!atual) {
-              const { data: cfgProx } = await supabase
-                .from('configuracoes')
-                .select('valor')
-                .eq('chave', 'proxima_os')
-                .single();
-              atual = (cfgProx?.valor || '').trim();
-            }
+              .upsert({ chave: 'proxima_os', valor: proximo }, { onConflict: 'chave' });
           }
-
-          // 2) Se vier no formato "NNN-YY" usa como número da OS atual e incrementa apenas a parte NNN
-          //    Se vier apenas "NNN", mantém sem sufixo.
-          let numeroFinal = atual;
-          let proximo = '';
-          const match = atual.match(/^(\d+)(?:-(\d+))?$/);
-          if (match) {
-            const parteNumerica = parseInt(match[1], 10);
-            const sufixo = match[2] ? `-${match[2]}` : '';
-            numeroFinal = `${parteNumerica}${sufixo}`;
-            proximo = `${parteNumerica + 1}${sufixo}`;
-          }
-
-          if (!numeroFinal) {
-            // fallback seguro
-            numeroFinal = newOs.id.slice(0, 8).toUpperCase();
-          }
-
-          // Atualiza OS com numero_final
-          await supabase
-            .from('ordens_servico')
-            .update({ numero_os: numeroFinal })
-            .eq('id', newOs.id);
-
-          // Atualiza configuração para o próximo
-          if (proximo) {
-            // Atualiza preferencialmente 'prefixo_os'; se não existir, tenta 'proxima_os'
-            const { error: updPrefixoError, count } = await supabase
-              .from('configuracoes')
-              .update({ valor: proximo })
-              .eq('chave', 'prefixo_os');
-            if (updPrefixoError) {
-              // tenta chave alternativa sem falhar a operação principal
-              await supabase
-                .from('configuracoes')
-                .update({ valor: proximo })
-                .eq('chave', 'proxima_os');
-            }
-          }
-        } catch (e) {
-          console.warn('Falha ao gerar número de OS pela configuração proxima_os:', e);
         }
 
         const produtosToSave: Database['public']['Tables']['os_produtos']['Insert'][] =

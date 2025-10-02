@@ -111,6 +111,15 @@ export default function Configuracoes() {
   const [filtroDataFim, setFiltroDataFim] = useState('');
   const [filtroTipoEvento, setFiltroTipoEvento] = useState('');
 
+  // Estados para auditoria de OS
+  const [auditoriaOS, setAuditoriaOS] = useState([]);
+  const [loadingAuditoriaOS, setLoadingAuditoriaOS] = useState(false);
+  const [filtroUsuarioOS, setFiltroUsuarioOS] = useState('');
+  const [filtroDataInicioOS, setFiltroDataInicioOS] = useState('');
+  const [filtroDataFimOS, setFiltroDataFimOS] = useState('');
+  const [filtroTipoAcaoOS, setFiltroTipoAcaoOS] = useState('');
+  const [filtroNumeroOS, setFiltroNumeroOS] = useState('');
+
   // =============================
   // Numeração da Próxima OS
   // =============================
@@ -238,6 +247,127 @@ export default function Configuracoes() {
     setFiltroDataFim('');
     setFiltroTipoEvento('');
     setAuditoria([]);
+  }
+
+  // Função para buscar auditoria de OS
+  async function fetchAuditoriaOS() {
+    setLoadingAuditoriaOS(true);
+    try {
+      console.log('Iniciando busca de auditoria de OS...');
+      
+      let query = supabase
+        .from('auditoria_os')
+        .select(`
+          id,
+          user_id,
+          nome_usuario,
+          email_usuario,
+          acao,
+          os_id,
+          numero_os,
+          dados_anteriores,
+          dados_novos,
+          detalhes,
+          data_acao,
+          created_at
+        `)
+        .order('data_acao', { ascending: false })
+        .limit(100);
+
+      // Aplicar filtros
+      if (filtroUsuarioOS) {
+        query = query.or(
+          `nome_usuario.ilike.%${filtroUsuarioOS}%,email_usuario.ilike.%${filtroUsuarioOS}%`
+        );
+      }
+
+      if (filtroDataInicioOS) {
+        query = query.gte('data_acao', filtroDataInicioOS + 'T00:00:00');
+      }
+
+      if (filtroDataFimOS) {
+        query = query.lte('data_acao', filtroDataFimOS + 'T23:59:59');
+      }
+
+      if (filtroTipoAcaoOS) {
+        query = query.eq('acao', filtroTipoAcaoOS);
+      }
+
+      if (filtroNumeroOS) {
+        query = query.ilike('numero_os', `%${filtroNumeroOS}%`);
+      }
+
+      console.log('Executando query de auditoria de OS...');
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Erro na query de auditoria de OS:', error);
+        toast({
+          title: 'Erro ao buscar auditoria de OS',
+          description: error.message,
+          variant: 'destructive',
+        });
+        setAuditoriaOS([]);
+      } else {
+        console.log('Dados de auditoria de OS encontrados:', data);
+        console.log('Total de registros:', data?.length || 0);
+        setAuditoriaOS(data || []);
+        
+        if (!data || data.length === 0) {
+          console.log('Nenhum registro de auditoria de OS encontrado');
+        }
+      }
+    } catch (error) {
+      console.error('Erro geral na auditoria de OS:', error);
+      toast({
+        title: 'Erro ao buscar auditoria de OS',
+        description: 'Erro interno do sistema',
+        variant: 'destructive',
+      });
+      setAuditoriaOS([]);
+    } finally {
+      setLoadingAuditoriaOS(false);
+    }
+  }
+
+  // Função para limpar filtros de auditoria de OS
+  function limparFiltrosOS() {
+    setFiltroUsuarioOS('');
+    setFiltroDataInicioOS('');
+    setFiltroDataFimOS('');
+    setFiltroTipoAcaoOS('');
+    setFiltroNumeroOS('');
+    setAuditoriaOS([]);
+  }
+
+  // Função para exportar auditoria de OS
+  function exportarAuditoriaOS() {
+    const csvContent = [
+      ['Usuário', 'Email', 'Ação', 'Número OS', 'Data/Hora', 'Detalhes'],
+      ...auditoriaOS.map((item) => [
+        item.nome_usuario,
+        item.email_usuario,
+        item.acao,
+        item.numero_os || 'N/A',
+        new Date(item.data_acao).toLocaleString('pt-BR'),
+        item.detalhes || '',
+      ]),
+    ]
+      .map((row) => row.join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute(
+      'download',
+      `auditoria_os_${new Date().toISOString().split('T')[0]}.csv`
+    );
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   // Função removida - não inserir mais dados fictícios na auditoria
@@ -1110,7 +1240,7 @@ export default function Configuracoes() {
       </div>
 
       <Tabs defaultValue="system" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="system" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Sistema
@@ -1127,7 +1257,10 @@ export default function Configuracoes() {
             <AlertTriangle className="h-4 w-4" />
             Auditoria
           </TabsTrigger>
-          
+          <TabsTrigger value="audit-os" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Auditoria OS
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="system" className="space-y-6">
@@ -2311,6 +2444,229 @@ export default function Configuracoes() {
                         </span>
                         <div className="font-medium">
                           {new Set(auditoria.map((item) => item.email_usuario)).size}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </PermissionGuard>
+        </TabsContent>
+
+        <TabsContent value="audit-os" className="space-y-6">
+          <PermissionGuard permission="auditoria_visualizar">
+            <Card>
+              <CardHeader>
+                <CardTitle>Auditoria de Ordens de Serviço</CardTitle>
+                <CardDescription>
+                  Monitore todas as ações realizadas pelos usuários nas Ordens de Serviço.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Filtros para auditoria de OS */}
+                <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg bg-muted/30 p-4 md:grid-cols-5">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Usuário</label>
+                    <Input
+                      placeholder="Nome ou email"
+                      value={filtroUsuarioOS}
+                      onChange={(e) => setFiltroUsuarioOS(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Data Início
+                    </label>
+                    <Input
+                      type="date"
+                      value={filtroDataInicioOS}
+                      onChange={(e) => setFiltroDataInicioOS(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Data Fim</label>
+                    <Input
+                      type="date"
+                      value={filtroDataFimOS}
+                      onChange={(e) => setFiltroDataFimOS(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Tipo de Ação
+                    </label>
+                    <select
+                      className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
+                      value={filtroTipoAcaoOS}
+                      onChange={(e) => setFiltroTipoAcaoOS(e.target.value)}
+                    >
+                      <option value="">Todas</option>
+                      <option value="criar_os">Criar OS</option>
+                      <option value="editar_os">Editar OS</option>
+                      <option value="excluir_os">Excluir OS</option>
+                      <option value="iniciar_os">Iniciar OS</option>
+                      <option value="reiniciar_os">Reiniciar OS</option>
+                      <option value="pausar_os">Pausar OS</option>
+                      <option value="parar_os">Parar OS</option>
+                      <option value="finalizar_os">Finalizar OS</option>
+                      <option value="adicionar_colaborador">Adicionar Colaborador</option>
+                      <option value="remover_colaborador">Remover Colaborador</option>
+                      <option value="cancelar_os">Cancelar OS</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Número da OS
+                    </label>
+                    <Input
+                      placeholder="Ex: OS-001"
+                      value={filtroNumeroOS}
+                      onChange={(e) => setFiltroNumeroOS(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Botões de ação */}
+                <div className="mb-4 flex justify-between">
+                  <div className="flex gap-2">
+                    <Button onClick={fetchAuditoriaOS} disabled={loadingAuditoriaOS}>
+                      {loadingAuditoriaOS && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Buscar
+                    </Button>
+                    <Button variant="outline" onClick={limparFiltrosOS}>
+                      Limpar Filtros
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={exportarAuditoriaOS}
+                      disabled={auditoriaOS.length === 0}
+                    >
+                      Exportar CSV
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Tabela de auditoria de OS */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border text-sm">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-3 py-2 text-left">Usuário</th>
+                        <th className="px-3 py-2 text-left">Email</th>
+                        <th className="px-3 py-2 text-left">Ação</th>
+                        <th className="px-3 py-2 text-left">Número OS</th>
+                        <th className="px-3 py-2 text-left">Data/Hora</th>
+                        <th className="px-3 py-2 text-left">Detalhes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingAuditoriaOS ? (
+                        <tr>
+                          <td colSpan={6} className="py-4 text-center">
+                            <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                          </td>
+                        </tr>
+                      ) : auditoriaOS.length > 0 ? (
+                        auditoriaOS.map((item) => (
+                          <tr key={item.id} className="border-b">
+                            <td className="px-3 py-2 font-medium">
+                              {item.nome_usuario}
+                            </td>
+                            <td className="px-3 py-2">{item.email_usuario}</td>
+                            <td className="px-3 py-2">
+                              <span
+                                className={`rounded px-2 py-1 text-xs ${
+                                  item.acao === 'criar_os' || item.acao === 'iniciar_os' || item.acao === 'reiniciar_os'
+                                    ? 'bg-green-100 text-green-800'
+                                    : item.acao === 'excluir_os' || item.acao === 'parar_os'
+                                    ? 'bg-red-100 text-red-800'
+                                    : item.acao === 'pausar_os'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : item.acao === 'finalizar_os'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {item.acao === 'criar_os' && 'Criar OS'}
+                                {item.acao === 'editar_os' && 'Editar OS'}
+                                {item.acao === 'excluir_os' && 'Excluir OS'}
+                                {item.acao === 'iniciar_os' && 'Iniciar OS'}
+                                {item.acao === 'reiniciar_os' && 'Reiniciar OS'}
+                                {item.acao === 'pausar_os' && 'Pausar OS'}
+                                {item.acao === 'parar_os' && 'Parar OS'}
+                                {item.acao === 'finalizar_os' && 'Finalizar OS'}
+                                {item.acao === 'adicionar_colaborador' && 'Adicionar Colaborador'}
+                                {item.acao === 'remover_colaborador' && 'Remover Colaborador'}
+                                {item.acao === 'cancelar_os' && 'Cancelar OS'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 font-mono">
+                              {item.numero_os || 'N/A'}
+                            </td>
+                            <td className="px-3 py-2">
+                              {item.data_acao 
+                                ? new Date(item.data_acao).toLocaleString('pt-BR')
+                                : 'Data não disponível'
+                              }
+                            </td>
+                            <td className="max-w-xs truncate px-3 py-2 text-xs text-muted-foreground">
+                              {item.detalhes}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="py-4 text-center text-muted-foreground"
+                          >
+                            Nenhum registro de auditoria de OS encontrado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Estatísticas */}
+                {auditoriaOS.length > 0 && (
+                  <div className="mt-4 rounded-lg bg-muted/30 p-4">
+                    <h4 className="mb-2 font-medium">Estatísticas</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+                      <div>
+                        <span className="text-muted-foreground">
+                          Total de ações:
+                        </span>
+                        <div className="font-medium">{auditoriaOS.length}</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">OS criadas:</span>
+                        <div className="font-medium text-green-600">
+                          {
+                            auditoriaOS.filter((item) => item.acao === 'criar_os')
+                              .length
+                          }
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">OS finalizadas:</span>
+                        <div className="font-medium text-blue-600">
+                          {
+                            auditoriaOS.filter((item) => item.acao === 'finalizar_os')
+                              .length
+                          }
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">
+                          Usuários únicos:
+                        </span>
+                        <div className="font-medium">
+                          {new Set(auditoriaOS.map((item) => item.email_usuario)).size}
                         </div>
                       </div>
                     </div>

@@ -89,6 +89,7 @@ import { Database } from '@/integrations/supabase/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { OSResponsiveTable } from '@/components/ui/responsive-table';
 import { JustificativaDialog } from '@/components/JustificativaDialog';
+import { useAuditoriaOS } from '@/hooks/useAuditoriaOS';
 // Remover import do ReportTemplate se não for mais usado
 // import { ReportTemplate } from '@/components/ui/ReportTemplate';
 
@@ -245,6 +246,20 @@ export default function OrdensServico() {
   );
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
+  
+  // Hook de auditoria
+  const {
+    auditarCriacaoOS,
+    auditarEdicaoOS,
+    auditarExclusaoOS,
+    auditarInicioOS,
+    auditarReinicioOS,
+    auditarPausaOS,
+    auditarParadaOS,
+    auditarFinalizacaoOS,
+    auditarAdicaoColaborador,
+    auditarRemocaoColaborador
+  } = useAuditoriaOS();
   const [colaboradores, setColaboradores] = useState<ColaboradorRow[]>([]);
   const [showColaboradoresDialog, setShowColaboradoresDialog] = useState(false);
   const [selectedColaboradores, setSelectedColaboradores] = useState<string[]>(
@@ -612,6 +627,13 @@ export default function OrdensServico() {
 
         if (produtosError) throw produtosError;
 
+        // Auditoria: edição de OS
+        await auditarEdicaoOS(selectedOs, {
+          ...selectedOs,
+          ...osDataToUpdate,
+          valor_total: valorTotalOS
+        });
+
         toast({ title: 'OS atualizada com sucesso!' });
         setDialogOpen(false);
         fetchOrdensServico();
@@ -719,6 +741,9 @@ export default function OrdensServico() {
 
         if (produtosError) throw produtosError;
 
+        // Auditoria: criação de OS
+        await auditarCriacaoOS(newOs);
+
         toast({ title: 'OS salva com sucesso!' });
         setDialogOpen(false);
         fetchOrdensServico();
@@ -758,6 +783,9 @@ export default function OrdensServico() {
         variant: 'destructive',
       });
     else {
+      // Auditoria: exclusão de OS
+      await auditarExclusaoOS(osToDelete);
+      
       toast({ title: 'OS excluída com sucesso!' });
       setOsToDelete(null);
       fetchOrdensServico();
@@ -803,6 +831,13 @@ export default function OrdensServico() {
         .insert(registrosTempo);
 
       if (tempoError) throw tempoError;
+
+      // Auditoria: início ou reinício de OS baseado no status anterior
+      if (os.status === 'pausada') {
+        await auditarReinicioOS(os, colaboradoresOS);
+      } else {
+        await auditarInicioOS(os, colaboradoresOS);
+      }
 
       toast({ title: 'OS iniciada com sucesso!' });
       fetchOrdensServico();
@@ -910,6 +945,13 @@ export default function OrdensServico() {
         await Promise.all(updatePromises);
       }
 
+      // Auditoria: pausa ou parada de OS
+      if (justificativaTipo === 'pausa') {
+        await auditarPausaOS(osParaJustificativa, justificativa);
+      } else {
+        await auditarParadaOS(osParaJustificativa, justificativa);
+      }
+
       toast({
         title: justificativaTipo === 'pausa' ? 'OS pausada com sucesso!' : 'OS parada com sucesso!',
         description: justificativaTipo === 'pausa' 
@@ -985,6 +1027,9 @@ export default function OrdensServico() {
 
       if (osError) throw osError;
 
+      // Auditoria: finalização de OS
+      await auditarFinalizacaoOS(os);
+
       toast({ title: 'OS finalizada com sucesso!' });
       fetchOrdensServico();
     } catch (error) {
@@ -1021,6 +1066,14 @@ export default function OrdensServico() {
 
       if (error) throw error;
 
+      // Auditoria: adição de colaboradores
+      for (const colaboradorId of selectedColaboradores) {
+        const colaborador = colaboradores.find(c => c.id === colaboradorId);
+        if (colaborador) {
+          await auditarAdicaoColaborador(os, colaborador);
+        }
+      }
+
       toast({ title: 'Colaboradores associados com sucesso!' });
       setShowColaboradoresDialog(false);
       setSelectedColaboradores([]);
@@ -1028,6 +1081,31 @@ export default function OrdensServico() {
     } catch (error) {
       toast({
         title: 'Erro ao associar colaboradores',
+        description:
+          error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRemoveColaborador = async (os: any, colaboracao: any) => {
+    try {
+      const { error } = await supabase
+        .from('os_colaboradores')
+        .delete()
+        .eq('os_id', os.id)
+        .eq('colaborador_id', colaboracao.id);
+
+      if (error) throw error;
+
+      // Auditoria: remoção de colaborador
+      await auditarRemocaoColaborador(os, colaboracao);
+
+      toast({ title: 'Colaborador removido com sucesso!' });
+      fetchOrdensServico();
+    } catch (error) {
+      toast({
+        title: 'Erro ao remover colaborador',
         description:
           error instanceof Error ? error.message : 'Erro desconhecido',
         variant: 'destructive',
@@ -1115,6 +1193,7 @@ export default function OrdensServico() {
           setShowColaboradoresDialog(true);
         }}
         onParadaMaterial={handlePararOS}
+        onRemoveColaborador={handleRemoveColaborador}
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

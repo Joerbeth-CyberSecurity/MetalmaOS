@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -167,6 +168,7 @@ type Cliente = {
 };
 
 export default function Clientes() {
+  const navigate = useNavigate();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -272,6 +274,8 @@ export default function Clientes() {
       });
       setSheetOpen(false);
       fetchClientes(); // Re-fetch data para atualizar a tabela
+      // Garantir retorno à listagem de clientes (evita tela em branco caso o usuário venha de outra rota)
+      navigate('/clientes');
     }
     setIsSaving(false);
   };

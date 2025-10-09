@@ -97,7 +97,7 @@ export function useAuditoriaOS() {
     });
   };
 
-  const auditarExclusaoOS = async (os: any) => {
+  const auditarExclusaoOS = async (os: any, motivo?: string) => {
     await registrarAcao({
       acao: 'excluir_os',
       osId: os.id,
@@ -107,9 +107,11 @@ export function useAuditoriaOS() {
         cliente_id: os.cliente_id,
         descricao: os.descricao,
         valor_total: os.valor_total,
-        status: os.status
+        status: os.status,
+        fabrica: os.fabrica,
+        cliente_nome: os.clientes?.nome
       },
-      detalhes: `OS ${os.numero_os} excluída`
+      detalhes: `OS ${os.numero_os} excluída${motivo ? `. Motivo: ${motivo}` : ''}`
     });
   };
 
@@ -216,6 +218,39 @@ export function useAuditoriaOS() {
     });
   };
 
+  const auditarPausaColaborador = async (os: any, colaborador: any, motivo?: string) => {
+    await registrarAcao({
+      acao: 'pausar_os',
+      osId: os.id,
+      numeroOs: os.numero_os,
+      dadosAnteriores: { status: os.status },
+      dadosNovos: { status: 'pausada' },
+      detalhes: `Colaborador ${colaborador.nome} pausado na OS ${os.numero_os}${motivo ? `. Motivo: ${motivo}` : ''}`
+    });
+  };
+
+  const auditarParadaColaborador = async (os: any, colaborador: any, motivo?: string) => {
+    await registrarAcao({
+      acao: 'parar_os',
+      osId: os.id,
+      numeroOs: os.numero_os,
+      dadosAnteriores: { status: os.status },
+      dadosNovos: { status: 'falta_material' },
+      detalhes: `Colaborador ${colaborador.nome} parado na OS ${os.numero_os}${motivo ? `. Motivo: ${motivo}` : ''}`
+    });
+  };
+
+  const auditarFinalizacaoColaborador = async (os: any, colaborador: any, motivo?: string) => {
+    await registrarAcao({
+      acao: 'finalizar_os',
+      osId: os.id,
+      numeroOs: os.numero_os,
+      dadosAnteriores: { status: os.status },
+      dadosNovos: { status: 'finalizada' },
+      detalhes: `Colaborador ${colaborador.nome} finalizado na OS ${os.numero_os}${motivo ? `. Motivo: ${motivo}` : ''}`
+    });
+  };
+
   return {
     registrarAcao,
     auditarCriacaoOS,
@@ -228,6 +263,9 @@ export function useAuditoriaOS() {
     auditarFinalizacaoOS,
     auditarCancelamentoOS,
     auditarAdicaoColaborador,
-    auditarRemocaoColaborador
+    auditarRemocaoColaborador,
+    auditarPausaColaborador,
+    auditarParadaColaborador,
+    auditarFinalizacaoColaborador
   };
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -95,6 +96,7 @@ const formatCurrency = (value: number) => {
 };
 
 export default function Produtos() {
+  const navigate = useNavigate();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [produtosFiltrados, setProdutosFiltrados] = useState<Produto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -214,6 +216,7 @@ export default function Produtos() {
       });
       setSheetOpen(false);
       fetchProdutos();
+      navigate('/produtos');
     }
     setIsSaving(false);
   };

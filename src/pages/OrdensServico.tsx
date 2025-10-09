@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -69,6 +70,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Label } from '@/components/ui/label';
 import {
   Tooltip,
   TooltipContent,
@@ -89,6 +91,7 @@ import { Database } from '@/integrations/supabase/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { OSResponsiveTable } from '@/components/ui/responsive-table';
 import { JustificativaDialog } from '@/components/JustificativaDialog';
+import { ColaboradorSelectionDialog } from '@/components/ColaboradorSelectionDialog';
 import { useAuditoriaOS } from '@/hooks/useAuditoriaOS';
 // Remover import do ReportTemplate se não for mais usado
 // import { ReportTemplate } from '@/components/ui/ReportTemplate';
@@ -144,7 +147,7 @@ const osSchema = z.object({
   valor_total: z.number().min(0).optional(),
   numero_os: z.string().optional(),
   data_abertura: z.string().optional(),
-  data_previsao: z.string().optional(),
+  data_conclusao: z.string().optional(), // Renomeado de data_previsao para data_conclusao
 });
 type OsFormData = z.infer<typeof osSchema>;
 
@@ -232,6 +235,7 @@ const sanitizeCurrencyInput = (raw: string): string => {
 };
 
 export default function OrdensServico() {
+  const navigate = useNavigate();
   const [ordens, setOrdens] = useState<OrdemServicoComRelacoes[]>([]);
   const [clientes, setClientes] = useState<ClienteRow[]>([]);
   const [produtos, setProdutos] = useState<ProdutoRow[]>([]);
@@ -249,6 +253,7 @@ export default function OrdensServico() {
   
   // Hook de auditoria
   const {
+    registrarAcao,
     auditarCriacaoOS,
     auditarEdicaoOS,
     auditarExclusaoOS,
@@ -258,7 +263,10 @@ export default function OrdensServico() {
     auditarParadaOS,
     auditarFinalizacaoOS,
     auditarAdicaoColaborador,
-    auditarRemocaoColaborador
+    auditarRemocaoColaborador,
+    auditarPausaColaborador,
+    auditarParadaColaborador,
+    auditarFinalizacaoColaborador
   } = useAuditoriaOS();
   const [colaboradores, setColaboradores] = useState<ColaboradorRow[]>([]);
   const [showColaboradoresDialog, setShowColaboradoresDialog] = useState(false);
@@ -277,9 +285,14 @@ export default function OrdensServico() {
   const [produtoSearch, setProdutoSearch] = useState('');
   const [descontoFilter, setDescontoFilter] = useState<'todos' | 'com' | 'sem'>('todos');
   const [showJustificativaDialog, setShowJustificativaDialog] = useState(false);
+  const [showExclusaoDialog, setShowExclusaoDialog] = useState(false);
+  const [motivoExclusao, setMotivoExclusao] = useState('');
   const [justificativaTipo, setJustificativaTipo] = useState<'pausa' | 'parada'>('pausa');
   const [osParaJustificativa, setOsParaJustificativa] = useState<OrdemServicoComRelacoes | null>(null);
+  const [colaboradorParaJustificativa, setColaboradorParaJustificativa] = useState<string | null>(null);
   const [tempoTolerancia, setTempoTolerancia] = useState<number>(120);
+  const [showColaboradorSelectionDialog, setShowColaboradorSelectionDialog] = useState(false);
+  const [colaboradorSelectionTipo, setColaboradorSelectionTipo] = useState<'pausa' | 'parada' | 'finalizacao'>('pausa');
   // Controla o texto exibido no input de preço por linha enquanto o usuário digita
   const [priceInputs, setPriceInputs] = useState<Record<number, string>>({});
   const setPriceDisplay = (idx: number, text: string) =>
@@ -287,7 +300,7 @@ export default function OrdensServico() {
 
   const form = useForm<OsFormData>({
     resolver: zodResolver(osSchema),
-    defaultValues: { status: 'aberta', produtos: [], fabrica: 'Metalma', data_abertura: new Date().toISOString().slice(0, 10), data_previsao: new Date().toISOString().slice(0, 10) },
+    defaultValues: { status: 'aberta', produtos: [], fabrica: 'Metalma', data_abertura: new Date().toISOString().slice(0, 10), data_conclusao: new Date().toISOString().slice(0, 10) },
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -325,7 +338,7 @@ export default function OrdensServico() {
     })();
   }, []);
 
-  // Calcula horas úteis entre data_abertura e data_previsao conforme expediente configurado
+  // Calcula horas úteis entre data_abertura e data_conclusao conforme expediente configurado
   const calcularHorasUteis = (inicioISO?: string, fimISO?: string): number => {
     if (!inicioISO || !fimISO) return 0;
     const inicio = new Date(`${inicioISO}T00:00:00Z`);
@@ -355,23 +368,23 @@ export default function OrdensServico() {
       return form.watch('data_abertura');
     } catch { return undefined; }
   })();
-  const previsaoPreview = ((): string | undefined => {
+  const conclusaoPreview = ((): string | undefined => {
     try {
       // @ts-ignore
-      return (form.watch('data_previsao') as any) as string | undefined;
+      return (form.watch('data_conclusao') as any) as string | undefined;
     } catch { return undefined; }
   })();
-  const horasPreview = calcularHorasUteis(aberturaPreview, previsaoPreview);
+  const horasPreview = calcularHorasUteis(aberturaPreview, conclusaoPreview);
   const intervaloInvalido = Boolean(
-    aberturaPreview && previsaoPreview && new Date(`${previsaoPreview}T00:00:00Z`) < new Date(`${aberturaPreview}T00:00:00Z`)
+    aberturaPreview && conclusaoPreview && new Date(`${conclusaoPreview}T00:00:00Z`) < new Date(`${aberturaPreview}T00:00:00Z`)
   );
 
   // Atualiza automaticamente o tempo_execucao_previsto quando datas mudam (evita loop)
   useEffect(() => {
     const sub = form.watch((values, info) => {
       const changedField = info?.name;
-      if (changedField !== 'data_abertura' && changedField !== 'data_previsao') return;
-      const horas = calcularHorasUteis(values.data_abertura, (values as any).data_previsao);
+      if (changedField !== 'data_abertura' && changedField !== 'data_conclusao') return;
+      const horas = calcularHorasUteis(values.data_abertura, values.data_conclusao);
       if (isNaN(horas)) return;
       const current = form.getValues('tempo_execucao_previsto');
       if (current !== horas) {
@@ -384,7 +397,7 @@ export default function OrdensServico() {
   // Define o tempo previsto inicial com base nas datas atuais (ex.: hoje = 8h, sábado = 4h, domingo = 0h)
   useEffect(() => {
     const v = form.getValues();
-    const horas = calcularHorasUteis(v.data_abertura, (v as any).data_previsao);
+    const horas = calcularHorasUteis(v.data_abertura, v.data_conclusao);
     if (!isNaN(horas)) {
       form.setValue('tempo_execucao_previsto', horas, { shouldDirty: true });
     }
@@ -443,8 +456,8 @@ export default function OrdensServico() {
           data_abertura: (selectedOs as any)?.data_abertura
             ? String((selectedOs as any).data_abertura).slice(0, 10)
             : new Date().toISOString().slice(0, 10),
-          data_previsao: (selectedOs as any)?.data_previsao
-            ? String((selectedOs as any).data_previsao).slice(0, 10)
+          data_conclusao: (selectedOs as any)?.data_conclusao
+            ? String((selectedOs as any).data_conclusao).slice(0, 10)
             : String((selectedOs as any)?.data_abertura || new Date().toISOString()).slice(0, 10),
         });
       } else {
@@ -455,10 +468,10 @@ export default function OrdensServico() {
           fabrica: 'Metalma',
           produtos: [],
           data_abertura: new Date().toISOString().slice(0, 10),
-          data_previsao: new Date().toISOString().slice(0, 10),
+          data_conclusao: new Date().toISOString().slice(0, 10),
         });
         const v = form.getValues();
-        const horas = calcularHorasUteis(v.data_abertura, (v as any).data_previsao);
+        const horas = calcularHorasUteis(v.data_abertura, v.data_conclusao);
         if (!isNaN(horas)) {
           form.setValue('tempo_execucao_previsto', horas, { shouldDirty: true });
         }
@@ -470,15 +483,14 @@ export default function OrdensServico() {
     setLoading(true);
     const { data, error } = await supabase
       .from('ordens_servico')
-      .select(
-        `
+      .select(`
         *,
         clientes ( nome ),
         os_produtos ( *, produtos ( nome ) ),
-        os_colaboradores ( id, colaborador_id, colaborador:colaboradores(nome) ),
+        os_colaboradores ( id, colaborador_id, colaborador:colaboradores(id, nome) ),
+        os_colaboradores_produtos ( produto_id, colaborador_id, colaborador:colaboradores(id, nome) ),
         os_tempo ( tipo, data_inicio, data_fim, colaborador:colaboradores(nome) )
-      `
-      )
+      `)
       .order('data_abertura', { ascending: false });
 
     if (error) {
@@ -488,7 +500,80 @@ export default function OrdensServico() {
         variant: 'destructive',
       });
     } else {
-      setOrdens(data as OrdemServicoComRelacoes[]);
+      // Processar os dados para mostrar colaboradores corretos e status
+      const processedData = (data as OrdemServicoComRelacoes[]).map(os => {
+        // Usar os_colaboradores_produtos como fonte principal, mas manter compatibilidade
+        const colaboradoresUnicos = new Map();
+        
+        // Primeiro, adicionar colaboradores de os_colaboradores_produtos
+        if (os.os_colaboradores_produtos) {
+          os.os_colaboradores_produtos.forEach((rel: any) => {
+            if (rel.colaborador) {
+              colaboradoresUnicos.set(rel.colaborador.id, {
+                id: rel.colaborador.id,
+                colaborador_id: rel.colaborador.id,
+                colaborador: rel.colaborador
+              });
+            }
+          });
+        }
+        
+        // Depois, adicionar colaboradores de os_colaboradores (para compatibilidade)
+        if (os.os_colaboradores) {
+          os.os_colaboradores.forEach((rel: any) => {
+            if (rel.colaborador && !colaboradoresUnicos.has(rel.colaborador.id)) {
+              colaboradoresUnicos.set(rel.colaborador.id, rel);
+            }
+          });
+        }
+        
+        // Adicionar status dos colaboradores baseado no os_tempo
+        const colaboradoresComStatus = Array.from(colaboradoresUnicos.values()).map((colab: any) => {
+          const colaboradorId = colab.colaborador_id || colab.colaborador?.id;
+          const tempoColaborador = os.os_tempo?.filter((t: any) => 
+            t.colaborador?.nome === colab.colaborador?.nome
+          ) || [];
+          
+          // Determinar status baseado nos registros de tempo
+          let status = 'ativo';
+          if (tempoColaborador.length > 0) {
+            // Verificar se há registros ativos (sem data_fim)
+            const temPausaAtiva = tempoColaborador.some((t: any) => 
+              t.tipo === 'pausa' && !t.data_fim
+            );
+            const temParadaAtiva = tempoColaborador.some((t: any) => 
+              t.tipo === 'parada_material' && !t.data_fim
+            );
+            const temTrabalhoAtivo = tempoColaborador.some((t: any) => 
+              t.tipo === 'trabalho' && !t.data_fim
+            );
+            
+            // Lógica corrigida: verificar o tipo do último registro ativo
+            if (temPausaAtiva) {
+              status = 'pausado';
+            } else if (temParadaAtiva) {
+              status = 'parado';
+            } else if (temTrabalhoAtivo) {
+              status = 'ativo';
+            } else {
+              // Só marca como finalizado se não há nenhum registro ativo
+              status = 'finalizado';
+            }
+          }
+          
+          return {
+            ...colab,
+            status
+          };
+        });
+        
+        return {
+          ...os,
+          os_colaboradores: colaboradoresComStatus
+        };
+      });
+      
+      setOrdens(processedData);
     }
     setLoading(false);
   };
@@ -586,8 +671,9 @@ export default function OrdensServico() {
             data_abertura: values.data_abertura
               ? new Date(values.data_abertura).toISOString()
               : undefined,
-            data_previsao: (values as any).data_previsao
-              ? new Date((values as any).data_previsao).toISOString()
+            data_atual: new Date().toISOString(), // Atualizar data atual
+            data_conclusao: values.data_conclusao
+              ? new Date(values.data_conclusao).toISOString()
               : undefined,
           };
 
@@ -637,6 +723,7 @@ export default function OrdensServico() {
         toast({ title: 'OS atualizada com sucesso!' });
         setDialogOpen(false);
         fetchOrdensServico();
+        navigate('/ordens-servico');
       } else {
         // Antes de inserir, obter o valor exato da próxima OS, priorizando 'proxima_os'
         let numeroOsValor = '';
@@ -703,8 +790,9 @@ export default function OrdensServico() {
             data_abertura: values.data_abertura
               ? new Date(values.data_abertura).toISOString()
               : new Date().toISOString(),
-            data_previsao: (values as any).data_previsao
-              ? new Date((values as any).data_previsao).toISOString()
+            data_atual: new Date().toISOString(), // Data atual do sistema
+            data_conclusao: values.data_conclusao
+              ? new Date(values.data_conclusao).toISOString()
               : null,
           })
           .select()
@@ -747,6 +835,7 @@ export default function OrdensServico() {
         toast({ title: 'OS salva com sucesso!' });
         setDialogOpen(false);
         fetchOrdensServico();
+        navigate('/ordens-servico');
       }
     } catch (error) {
       console.error('Erro ao salvar OS:', error);
@@ -769,33 +858,83 @@ export default function OrdensServico() {
     }
   };
 
+  const handleDelete = (os: OrdemServicoComRelacoes) => {
+    setOsToDelete(os);
+    setMotivoExclusao('');
+    setShowExclusaoDialog(true);
+  };
+
   const handleDeleteConfirm = async () => {
     if (!osToDelete) return;
     setIsDeleting(true);
+    
+    try {
+      // Auditoria: exclusão de OS com motivo (ANTES de excluir)
+      await auditarExclusaoOS(osToDelete, motivoExclusao);
+      
     const { error } = await supabase
       .from('ordens_servico')
       .delete()
       .eq('id', osToDelete.id);
-    if (error)
+        
+      if (error) {
       toast({
         title: 'Erro ao excluir OS',
         description: error.message,
         variant: 'destructive',
       });
-    else {
-      // Auditoria: exclusão de OS
-      await auditarExclusaoOS(osToDelete);
-      
+      } else {
       toast({ title: 'OS excluída com sucesso!' });
       setOsToDelete(null);
+        setMotivoExclusao('');
+        setShowExclusaoDialog(false);
       fetchOrdensServico();
     }
+    } catch (error) {
+      console.error('Erro ao excluir OS:', error);
+      toast({
+        title: 'Erro ao excluir OS',
+        description: 'Ocorreu um erro inesperado',
+        variant: 'destructive',
+      });
+    } finally {
     setIsDeleting(false);
+    }
   };
 
   const handleStartOS = async (os: OrdemServicoComRelacoes) => {
     setIsStarting(true);
     try {
+      // Fechar quaisquer tempos abertos desta OS antes de iniciar
+      const { data: temposAbertos } = await supabase
+        .from('os_tempo')
+        .select('*')
+        .eq('os_id', os.id)
+        .is('data_fim', null);
+      if (temposAbertos && temposAbertos.length) {
+        const nowIso = new Date().toISOString();
+        for (const t of temposAbertos) {
+          const inicio = new Date(t.data_inicio).getTime();
+          const fim = new Date().getTime();
+          const horas = Math.max(0, (fim - inicio) / (1000 * 60 * 60));
+          await supabase
+            .from('os_tempo')
+            .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
+            .eq('id', t.id);
+
+          // Se havia uma parada de material em aberto, lançar débito formal
+          if (t.tipo === 'parada_material' && t.colaborador_id) {
+            await supabase.from('retrabalhos').insert({
+              os_id: os.id,
+              colaborador_id: t.colaborador_id,
+              motivo: t.motivo || 'parada_material',
+              horas_abatidas: Number(horas.toFixed(2)),
+              observacoes: 'Débito gerado automaticamente ao iniciar OS'
+            });
+          }
+        }
+      }
+
       // Atualizar status da OS
       const { error: osError } = await supabase
         .from('ordens_servico')
@@ -856,13 +995,27 @@ export default function OrdensServico() {
   const handlePauseOS = (os: OrdemServicoComRelacoes) => {
     setOsParaJustificativa(os);
     setJustificativaTipo('pausa');
+    setColaboradorParaJustificativa(null);
     setShowJustificativaDialog(true);
   };
 
   const handlePararOS = (os: OrdemServicoComRelacoes) => {
     setOsParaJustificativa(os);
     setJustificativaTipo('parada');
+    setColaboradorParaJustificativa(null);
     setShowJustificativaDialog(true);
+  };
+
+  // Novas ações: pausar/parar colaborador específico
+  const handlePauseColaborador = (os: OrdemServicoComRelacoes) => {
+    setOsParaJustificativa(os);
+    setColaboradorSelectionTipo('pausa');
+    setShowColaboradorSelectionDialog(true);
+  };
+  const handlePararColaborador = (os: OrdemServicoComRelacoes) => {
+    setOsParaJustificativa(os);
+    setColaboradorSelectionTipo('parada');
+    setShowColaboradorSelectionDialog(true);
   };
 
   const handleConfirmJustificativa = async (justificativa: string) => {
@@ -870,22 +1023,57 @@ export default function OrdensServico() {
 
     setIsPausing(true);
     try {
-      // Encontrar o registro de tempo atual sem data_fim
-      const { data: tempoAtual } = await supabase
-        .from('os_tempo')
-        .select('*')
-        .eq('os_id', osParaJustificativa.id)
-        .is('data_fim', null)
-        .single();
-
-      if (tempoAtual) {
-        // Finalizar o tempo atual
-        const { error: updateError } = await supabase
+      if (colaboradorParaJustificativa && colaboradorParaJustificativa !== 'select') {
+        // Finalizar o tempo atual apenas para o colaborador selecionado
+        const { data: tempoAberto } = await supabase
           .from('os_tempo')
-          .update({ data_fim: new Date().toISOString() })
-          .eq('id', tempoAtual.id);
+          .select('*')
+          .eq('os_id', osParaJustificativa.id)
+          .eq('colaborador_id', colaboradorParaJustificativa)
+          .is('data_fim', null)
+          .single();
+        if (tempoAberto) {
+          const nowIso = new Date().toISOString();
+          const inicio = new Date(tempoAberto.data_inicio).getTime();
+          const fim = new Date().getTime();
+          const horas = Math.max(0, (fim - inicio) / (1000 * 60 * 60));
+          const { error: updateError } = await supabase
+            .from('os_tempo')
+            .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
+            .eq('id', tempoAberto.id);
+          if (updateError) throw updateError;
 
-        if (updateError) throw updateError;
+          // Se estávamos fechando um trabalho para abrir uma parada_material deste colaborador,
+          // lançar débito formal em retrabalhos
+          if (colaboradorSelectionTipo === 'parada' && tempoAberto.colaborador_id) {
+            await supabase.from('retrabalhos').insert({
+              os_id: osParaJustificativa.id,
+              colaborador_id: tempoAberto.colaborador_id,
+              motivo: 'parada_material',
+              horas_abatidas: Number(horas.toFixed(2)),
+              observacoes: 'Débito gerado automaticamente ao registrar parada por colaborador'
+            });
+          }
+        }
+      } else {
+        // Comportamento anterior: fecha tempo atual (um registro aberto)
+        const { data: tempoAtual } = await supabase
+          .from('os_tempo')
+          .select('*')
+          .eq('os_id', osParaJustificativa.id)
+          .is('data_fim', null)
+          .single();
+        if (tempoAtual) {
+          const nowIso = new Date().toISOString();
+          const inicio = new Date(tempoAtual.data_inicio).getTime();
+          const fim = new Date().getTime();
+          const horas = Math.max(0, (fim - inicio) / (1000 * 60 * 60));
+          const { error: updateError } = await supabase
+            .from('os_tempo')
+            .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
+            .eq('id', tempoAtual.id);
+          if (updateError) throw updateError;
+        }
       }
 
       // Buscar colaboradores ativos na OS
@@ -900,7 +1088,10 @@ export default function OrdensServico() {
         throw new Error('Nenhum colaborador ativo na OS.');
 
       // Inserir registro de pausa/parada para cada colaborador
-      const registrosTempo = colaboradoresOS.map(({ colaborador_id }) => ({
+      const alvoIds = (colaboradorParaJustificativa && colaboradorParaJustificativa !== 'select')
+        ? colaboradoresOS.filter(c => c.colaborador_id === colaboradorParaJustificativa)
+        : colaboradoresOS;
+      const registrosTempo = alvoIds.map(({ colaborador_id }) => ({
         os_id: osParaJustificativa.id,
         colaborador_id,
         tipo: justificativaTipo === 'pausa' ? 'pausa' : 'parada_material',
@@ -921,21 +1112,20 @@ export default function OrdensServico() {
           os_id: osParaJustificativa.id,
           tipo: justificativaTipo,
           justificativa: justificativa,
-          colaborador_id: colaboradoresOS[0]?.colaborador_id, // Usar o primeiro colaborador como referência
+          colaborador_id: alvoIds[0]?.colaborador_id || null,
           tempo_tolerancia_minutos: justificativaTipo === 'pausa' ? tempoTolerancia : 0,
         });
 
       if (justificativaError) throw justificativaError;
 
       // Atualizar status da OS
-      const { error: osError } = await supabase
-        .from('ordens_servico')
-        .update({
-          status: 'pausada',
-        })
-        .eq('id', osParaJustificativa.id);
-
-      if (osError) throw osError;
+      if (!(colaboradorParaJustificativa && colaboradorParaJustificativa !== 'select')) {
+        const { error: osError } = await supabase
+          .from('ordens_servico')
+          .update({ status: 'pausada' })
+          .eq('id', osParaJustificativa.id);
+        if (osError) throw osError;
+      }
 
       // Atualizar contador de paradas para cada colaborador (se for parada)
       if (justificativaTipo === 'parada') {
@@ -981,6 +1171,114 @@ export default function OrdensServico() {
       setIsPausing(false);
       setShowJustificativaDialog(false);
       setOsParaJustificativa(null);
+      setColaboradorParaJustificativa(null);
+    }
+  };
+
+  const handleConfirmColaboradorSelection = async (colaboradorId: string, justificativa: string) => {
+    if (!osParaJustificativa) return;
+
+    setIsPausing(true);
+    try {
+      // Encontrar o colaborador específico
+      const colaboradorOS = osParaJustificativa.os_colaboradores?.find(col => col.colaborador_id === colaboradorId);
+      if (!colaboradorOS) {
+        toast({
+          title: 'Colaborador não encontrado',
+          description: 'O colaborador selecionado não está associado a esta OS.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Encerrar o tempo aberto para o colaborador específico
+      const { error: errorTempo } = await supabase
+        .from('os_tempo')
+        .update({ 
+          data_fim: new Date().toISOString()
+        })
+        .eq('os_id', osParaJustificativa.id)
+        .eq('colaborador_id', colaboradorId)
+        .is('data_fim', null);
+
+      if (errorTempo) {
+        console.error('Erro ao encerrar tempo:', errorTempo);
+      }
+
+      // Inserir novo registro de tempo baseado na ação
+      let tipoTempo = '';
+      if (colaboradorSelectionTipo === 'pausa') {
+        tipoTempo = 'pausa';
+      } else if (colaboradorSelectionTipo === 'parada') {
+        tipoTempo = 'parada_material';
+      } else if (colaboradorSelectionTipo === 'finalizacao') {
+        tipoTempo = 'trabalho'; // Para finalização, inserimos um registro de trabalho finalizado
+      }
+
+      if (tipoTempo) {
+        const { error: errorInserirTempo } = await supabase
+          .from('os_tempo')
+          .insert({
+            os_id: osParaJustificativa.id,
+            colaborador_id: colaboradorId,
+            tipo: tipoTempo,
+            data_inicio: new Date().toISOString(),
+            data_fim: colaboradorSelectionTipo === 'finalizacao' ? new Date().toISOString() : null,
+            motivo: justificativa
+          });
+
+        if (errorInserirTempo) {
+          console.error('Erro ao inserir registro de tempo:', errorInserirTempo);
+        }
+      }
+
+      // Se for finalização, remover o colaborador da OS
+      if (colaboradorSelectionTipo === 'finalizacao') {
+        const { error: errorRemove } = await supabase
+          .from('os_colaboradores')
+          .delete()
+          .eq('os_id', osParaJustificativa.id)
+          .eq('colaborador_id', colaboradorId);
+
+        if (errorRemove) throw errorRemove;
+      }
+
+      // Registrar na auditoria
+      const acao = colaboradorSelectionTipo === 'pausa' ? 'pausar_os' : 
+                   colaboradorSelectionTipo === 'parada' ? 'parar_os' : 'finalizar_os';
+
+      // Registrar auditoria específica para colaborador
+      const colaborador = (colaboradorOS as any)?.colaborador;
+      if (colaborador) {
+        if (colaboradorSelectionTipo === 'pausa') {
+          await auditarPausaColaborador(osParaJustificativa, colaborador, justificativa);
+        } else if (colaboradorSelectionTipo === 'parada') {
+          await auditarParadaColaborador(osParaJustificativa, colaborador, justificativa);
+        } else if (colaboradorSelectionTipo === 'finalizacao') {
+          await auditarFinalizacaoColaborador(osParaJustificativa, colaborador, justificativa);
+        }
+      }
+
+      const acaoTexto = colaboradorSelectionTipo === 'pausa' ? 'pausado' : 
+                       colaboradorSelectionTipo === 'parada' ? 'parado' : 'finalizado';
+
+      toast({
+        title: `Colaborador ${acaoTexto} com sucesso!`,
+        description: `O colaborador foi ${acaoTexto} e o tempo foi encerrado.`,
+      });
+
+      setShowColaboradorSelectionDialog(false);
+      setOsParaJustificativa(null);
+      fetchOrdensServico();
+    } catch (error) {
+      console.error('Erro ao processar colaborador:', error);
+      toast({
+        title: 'Erro',
+        description: 'Ocorreu um erro ao processar o colaborador.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPausing(false);
     }
   };
 
@@ -1004,10 +1302,14 @@ export default function OrdensServico() {
         .single();
 
       if (tempoAtual) {
-        // Finalizar o tempo atual
+        // Finalizar o tempo atual com cálculo de horas
+        const nowIso = new Date().toISOString();
+        const inicio = new Date(tempoAtual.data_inicio).getTime();
+        const fim = new Date().getTime();
+        const horas = Math.max(0, (fim - inicio) / (1000 * 60 * 60));
         const { error: updateError } = await supabase
           .from('os_tempo')
-          .update({ data_fim: new Date().toISOString() })
+          .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
           .eq('id', tempoAtual.id);
 
         if (updateError) throw updateError;
@@ -1051,52 +1353,164 @@ export default function OrdensServico() {
     setShowDescontoDialog(true);
   };
 
+  const handleFinishColaborador = (os: OrdemServicoComRelacoes) => {
+    setOsParaJustificativa(os);
+    setColaboradorSelectionTipo('finalizacao');
+    setShowColaboradorSelectionDialog(true);
+  };
+
   const handleAssociateColaboradores = async (os: OrdemServicoComRelacoes) => {
     try {
-      const colaboradoresToSave = selectedColaboradores.map(
+      const sanitizeUUID = (value: string | null | undefined): string => {
+        if (!value) return '';
+        return String(value).replace(/[^a-fA-F0-9-]/g, '').toLowerCase();
+      };
+      const isUUID = (value: string): boolean =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+
+      // Primeiro, remover todas as associações existentes para esta OS
+      const { error: deleteError } = await supabase
+        .from('os_colaboradores_produtos')
+        .delete()
+        .eq('os_id', os.id);
+
+      if (deleteError) throw deleteError;
+
+      // Processar as associações de colaboradores por produto
+      const colaboradoresProdutosToSave = selectedColaboradores.map(
+        (associacao) => {
+          // Use a delimiter that does not occur in UUIDs
+          const [produtoId, colaboradorId] = associacao.split('|');
+          return {
+            os_id: sanitizeUUID(os.id as any),
+            produto_id: sanitizeUUID(produtoId),
+            colaborador_id: sanitizeUUID(colaboradorId),
+          };
+        }
+      ).filter(r => isUUID(r.os_id) && isUUID(r.produto_id) && isUUID(r.colaborador_id));
+
+      // Inserir as novas associações
+      if (colaboradoresProdutosToSave.length > 0) {
+        const { error: errorProdutos } = await supabase
+          .from('os_colaboradores_produtos')
+          .insert(colaboradoresProdutosToSave);
+
+        if (errorProdutos) throw errorProdutos;
+      }
+
+      // Também manter a compatibilidade com a tabela antiga (os_colaboradores)
+      // para não quebrar funcionalidades existentes
+      const colaboradoresUnicos = [...new Set(
+        selectedColaboradores
+          .map(associacao => associacao.split('|')[1])
+          .map(id => sanitizeUUID(id))
+          .filter(id => isUUID(id))
+      )];
+      
+      // Primeiro, remover todos os colaboradores existentes da OS
+      const { error: deleteColabError } = await supabase
+        .from('os_colaboradores')
+        .delete()
+        .eq('os_id', os.id);
+
+      if (deleteColabError) throw deleteColabError;
+      
+      // Depois, inserir apenas os colaboradores selecionados
+      if (colaboradoresUnicos.length > 0) {
+      const colaboradoresToSave = colaboradoresUnicos.map(
         (colaboradorId) => ({
           os_id: os.id,
           colaborador_id: colaboradorId,
         })
       );
 
-      const { error } = await supabase
+      const { error: errorColaboradores } = await supabase
         .from('os_colaboradores')
-        .insert(colaboradoresToSave);
+          .insert(colaboradoresToSave);
 
-      if (error) throw error;
+      if (errorColaboradores) throw errorColaboradores;
+      }
 
       // Auditoria: adição de colaboradores
-      for (const colaboradorId of selectedColaboradores) {
+      for (const colaboradorId of colaboradoresUnicos) {
         const colaborador = colaboradores.find(c => c.id === colaboradorId);
         if (colaborador) {
           await auditarAdicaoColaborador(os, colaborador);
         }
       }
 
-      toast({ title: 'Colaboradores associados com sucesso!' });
+      toast({ title: 'Colaboradores associados aos produtos com sucesso!' });
       setShowColaboradoresDialog(false);
       setSelectedColaboradores([]);
       fetchOrdensServico();
     } catch (error) {
+      let msg = '';
+      if (error && typeof error === 'object') {
+        if ('message' in error && (error as any).message) msg += (error as any).message + '\n';
+        if ('details' in error && (error as any).details) msg += (error as any).details + '\n';
+        if ('hint' in error && (error as any).hint) msg += (error as any).hint + '\n';
+        if ('code' in error && (error as any).code) msg += 'Código: ' + (error as any).code + '\n';
+        if (!msg && 'toString' in error) msg += (error as any).toString();
+      }
       toast({
         title: 'Erro ao associar colaboradores',
-        description:
-          error instanceof Error ? error.message : 'Erro desconhecido',
+        description: msg || 'Erro desconhecido',
         variant: 'destructive',
       });
     }
   };
 
+  // Carregar colaboradores já apontados quando abrir o diálogo
+  const handleOpenColaboradoresDialog = (os: OrdemServicoComRelacoes) => {
+    setSelectedOs(os);
+
+    // Pré-selecionar colaboradores exatamente por produto, usando a tabela os_colaboradores_produtos
+    const selecionados: string[] = [];
+    const mapaProdutoParaColabs = new Map<string, Set<string>>();
+
+    (os as any).os_colaboradores_produtos?.forEach((rel: any) => {
+      if (!rel?.produto_id || !rel?.colaborador_id) return;
+      if (!mapaProdutoParaColabs.has(rel.produto_id)) {
+        mapaProdutoParaColabs.set(rel.produto_id, new Set());
+      }
+      mapaProdutoParaColabs.get(rel.produto_id)!.add(rel.colaborador_id);
+    });
+
+    (os.os_produtos || []).forEach((op: any) => {
+      const setColabs = mapaProdutoParaColabs.get(op.produto_id);
+      if (setColabs) {
+        setColabs.forEach((colabId) => {
+          selecionados.push(`${op.produto_id}|${colabId}`);
+        });
+      }
+    });
+
+    setSelectedColaboradores(selecionados);
+    setShowColaboradoresDialog(true);
+  };
+
   const handleRemoveColaborador = async (os: any, colaboracao: any) => {
     try {
-      const { error } = await supabase
+      // Remover das duas tabelas para garantir consistência
+      const tasks = [
+        supabase
         .from('os_colaboradores')
         .delete()
         .eq('os_id', os.id)
-        .eq('colaborador_id', colaboracao.id);
+          .eq('colaborador_id', colaboracao.colaborador_id || colaboracao.id),
+        supabase
+          .from('os_colaboradores_produtos')
+          .delete()
+          .eq('os_id', os.id)
+          .eq('colaborador_id', colaboracao.colaborador_id || colaboracao.id)
+      ];
 
-      if (error) throw error;
+      const results = await Promise.all(tasks);
+      
+      // Verificar se houve erro em alguma das operações
+      for (const result of results) {
+        if (result.error) throw result.error;
+      }
 
       // Auditoria: remoção de colaborador
       await auditarRemocaoColaborador(os, colaboracao);
@@ -1115,7 +1529,7 @@ export default function OrdensServico() {
 
   const filteredOrdensBase = statusFilter
     ? ordens.filter((os) => os.status === statusFilter)
-    : ordens;
+    : ordens.filter((os) => os.status !== 'em_cliente');
 
   const filteredOrdens = filteredOrdensBase.filter((os) => {
     if (descontoFilter === 'com') return (os.desconto_valor || 0) > 0;
@@ -1184,15 +1598,15 @@ export default function OrdensServico() {
         data={filteredOrdens}
         loading={loading}
         onEdit={handleEdit}
-        onDelete={setOsToDelete}
+        onDelete={handleDelete}
         onStart={handleStartOS}
         onPause={handlePauseOS}
+        onPauseColaborador={handlePauseColaborador}
         onFinish={handleFinishOS}
-        onAssociateColaboradores={(os) => {
-          setSelectedOs(os);
-          setShowColaboradoresDialog(true);
-        }}
+        onFinishColaborador={handleFinishColaborador}
+        onAssociateColaboradores={handleOpenColaboradoresDialog}
         onParadaMaterial={handlePararOS}
+        onPararColaborador={handlePararColaborador}
         onRemoveColaborador={handleRemoveColaborador}
       />
 
@@ -1329,8 +1743,8 @@ export default function OrdensServico() {
                 )}
               />
 
-              {/* Datas (Abertura e Previsão) lado a lado */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {/* Datas (Abertura, Atual e Conclusão) lado a lado */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <FormField
                   name="data_abertura"
                   control={form.control}
@@ -1340,7 +1754,7 @@ export default function OrdensServico() {
                       : undefined;
                     return (
                       <FormItem className="flex flex-col">
-                        <FormLabel>Data</FormLabel>
+                        <FormLabel>Data de Abertura</FormLabel>
                         <div className="flex items-center gap-2">
                           <Popover>
                             <PopoverTrigger asChild>
@@ -1376,8 +1790,18 @@ export default function OrdensServico() {
                     );
                   }}
                 />
+                
+                {/* Campo Data Atual (somente leitura) */}
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium mb-2">Data Atual</label>
+                  <div className="h-9 rounded border bg-muted px-3 text-sm flex items-center text-muted-foreground">
+                    {new Date().toLocaleDateString('pt-BR')}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Data do sistema (não editável)</p>
+                </div>
+
                 <FormField
-                  name="data_previsao"
+                  name="data_conclusao"
                   control={form.control}
                   render={({ field }) => {
                     const selectedDate = field.value
@@ -1385,7 +1809,7 @@ export default function OrdensServico() {
                       : undefined;
                     return (
                       <FormItem className="flex flex-col">
-                        <FormLabel>Data Previsão</FormLabel>
+                        <FormLabel>Data Conclusão</FormLabel>
                         <div className="flex items-center gap-2">
                           <Popover>
                             <PopoverTrigger asChild>
@@ -1419,10 +1843,10 @@ export default function OrdensServico() {
                         <div className="mt-2 text-xs">
                           {intervaloInvalido ? (
                             <span className="text-destructive">
-                              A data de previsão não pode ser anterior à data de abertura.
+                              A data de conclusão não pode ser anterior à data de abertura.
                             </span>
                           ) : (
-                            previsaoPreview ? (
+                            typeof horasPreview !== 'undefined' ? (
                               <span className="text-muted-foreground">
                                 Horas úteis previstas (expediente): {horasPreview}
                               </span>
@@ -1799,36 +2223,56 @@ export default function OrdensServico() {
         open={showColaboradoresDialog}
         onOpenChange={setShowColaboradoresDialog}
       >
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Associar Colaboradores</DialogTitle>
+            <DialogTitle>Apontar Colaboradores por Produto</DialogTitle>
             <DialogDescription>
-              Selecione os colaboradores que trabalharão nesta OS.
+              Selecione os colaboradores que trabalharão em cada produto desta OS.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {colaboradores.map((colaborador) => (
-              <div key={colaborador.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={colaborador.id}
-                  checked={selectedColaboradores.includes(colaborador.id)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedColaboradores([
-                        ...selectedColaboradores,
-                        colaborador.id,
-                      ]);
-                    } else {
-                      setSelectedColaboradores(
-                        selectedColaboradores.filter(
-                          (id) => id !== colaborador.id
-                        )
-                      );
-                    }
-                  }}
-                />
-                <label htmlFor={colaborador.id}>{colaborador.nome}</label>
+          <div className="space-y-6">
+            {selectedOs?.os_produtos?.map((produto) => (
+              <div key={produto.id} className="border rounded-lg p-4 space-y-3">
+                <h4 className="font-medium text-lg">
+                  {produto.produtos?.nome || 'Produto não encontrado'}
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  Quantidade: {produto.quantidade} | 
+                  Preço Unitário: R$ {produto.preco_unitario?.toFixed(2)} | 
+                  Subtotal: R$ {produto.subtotal?.toFixed(2)}
+                </p>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Colaboradores para este produto:</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {colaboradores.map((colaborador) => (
+                      <div key={`${produto.produto_id}|${colaborador.id}`} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`${produto.produto_id}|${colaborador.id}`}
+                          checked={selectedColaboradores.includes(`${produto.produto_id}|${colaborador.id}`)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedColaboradores([
+                                ...selectedColaboradores,
+                                `${produto.produto_id}|${colaborador.id}`,
+                              ]);
+                            } else {
+                              setSelectedColaboradores(
+                                selectedColaboradores.filter(
+                                  (id) => id !== `${produto.produto_id}|${colaborador.id}`
+                                )
+                              );
+                            }
+                          }}
+                        />
+                        <label htmlFor={`${produto.produto_id}|${colaborador.id}`} className="text-sm">
+                          {colaborador.nome}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -1836,12 +2280,18 @@ export default function OrdensServico() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setShowColaboradoresDialog(false)}
+              onClick={() => {
+                setShowColaboradoresDialog(false);
+                setSelectedColaboradores([]);
+              }}
             >
               Cancelar
             </Button>
-            <Button onClick={() => handleAssociateColaboradores(selectedOs!)}>
-              Confirmar
+            <Button 
+              onClick={() => handleAssociateColaboradores(selectedOs!)}
+              disabled={selectedColaboradores.length === 0}
+            >
+              Confirmar ({selectedColaboradores.length} associação(ões))
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1893,6 +2343,7 @@ export default function OrdensServico() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Finalização de OS (global) continua com desconto; não exibir seleção de colaborador aqui */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center gap-2">
                 <input
@@ -1956,6 +2407,7 @@ export default function OrdensServico() {
               onClick={() => {
                 if (!selectedOs) return;
                 setShowDescontoDialog(false);
+                // Sempre finalizar a OS inteira com possível desconto
                 finalizarComDesconto(selectedOs, tipoDesconto, valorDesconto);
               }}
               disabled={!selectedOs}
@@ -1974,7 +2426,86 @@ export default function OrdensServico() {
         osNumero={osParaJustificativa?.numero_os || ''}
         tempoTolerancia={justificativaTipo === 'pausa' ? tempoTolerancia : undefined}
         loading={isPausing}
+        // Campos extras: seleção de colaborador quando requerido
+        extraFields={(() => {
+          if (!osParaJustificativa) return null;
+          if (colaboradorParaJustificativa !== 'select') return null;
+          const options = (osParaJustificativa.os_colaboradores || []).map((c:any) => ({
+            id: c.colaborador_id,
+            nome: c.colaborador?.nome || 'N/A',
+          }));
+          return {
+            type: 'select_colaborador',
+            options,
+            value: '',
+            onChange: (id: string) => setColaboradorParaJustificativa(id || null),
+          } as any;
+        })()}
       />
+
+      <ColaboradorSelectionDialog
+        open={showColaboradorSelectionDialog}
+        onOpenChange={setShowColaboradorSelectionDialog}
+        onConfirm={handleConfirmColaboradorSelection}
+        tipo={colaboradorSelectionTipo}
+        osNumero={osParaJustificativa?.numero_os || ''}
+        colaboradores={osParaJustificativa?.os_colaboradores?.map(c => ({
+          id: c.colaborador_id,
+          nome: c.colaborador?.nome || 'N/A',
+          status: (c as any).status || 'ativo'
+        })) || []}
+        tempoTolerancia={colaboradorSelectionTipo === 'pausa' ? tempoTolerancia : undefined}
+        loading={isPausing}
+      />
+
+      {/* Diálogo de Motivo para Exclusão */}
+      <Dialog open={showExclusaoDialog} onOpenChange={setShowExclusaoDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Excluir Ordem de Serviço</DialogTitle>
+            <DialogDescription>
+              Você está prestes a excluir a OS <span className="font-bold">{osToDelete?.numero_os}</span>.
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="motivo-exclusao">Motivo da Exclusão *</Label>
+              <Textarea
+                id="motivo-exclusao"
+                placeholder="Descreva o motivo da exclusão desta OS..."
+                value={motivoExclusao}
+                onChange={(e) => setMotivoExclusao(e.target.value)}
+                className="min-h-[100px]"
+                disabled={isDeleting}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowExclusaoDialog(false);
+                setMotivoExclusao('');
+                setOsToDelete(null);
+              }}
+              disabled={isDeleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting || !motivoExclusao.trim()}
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isDeleting ? 'Excluindo...' : 'Confirmar Exclusão'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,6 +9,7 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -97,7 +99,7 @@ const colaboradorSchema = z.object({
     .min(0, { message: 'O salário deve ser um número válido.' }),
   data_admissao: z
     .string()
-    .min(1, { message: 'A data de admissão é obrigatória.' }),
+    .optional(),
   email: z
     .string()
     .email({ message: 'E-mail inválido.' })
@@ -133,6 +135,7 @@ type Colaborador = {
 };
 
 export default function Colaboradores() {
+  const navigate = useNavigate();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -250,6 +253,7 @@ export default function Colaboradores() {
       });
       setSheetOpen(false);
       fetchColaboradores();
+      navigate('/colaboradores');
     }
     setIsSaving(false);
   };
@@ -481,36 +485,59 @@ export default function Colaboradores() {
                 name="data_admissao"
                 control={form.control}
                 render={({ field }) => {
-                  const selectedDate = field.value ? new Date(field.value) : undefined;
-                  const buttonLabel = selectedDate
-                    ? selectedDate.toLocaleDateString('pt-BR')
-                    : 'Selecione a data';
+                  const selectedDate = field.value
+                    ? new Date(`${field.value}T00:00:00`)
+                    : undefined;
                   return (
-                    <FormItem>
-                      <FormLabel>Data de Admissão*</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button variant="outline" className={cn('justify-start w-full')}>
-                              {buttonLabel}
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Data de Admissão</FormLabel>
+                      <div className="flex items-center gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="icon">
+                              <CalendarIcon className="h-4 w-4" />
                             </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={selectedDate}
-                            onSelect={(date:any) => {
-                              if (!date) return;
-                              const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-                                .toISOString()
-                                .slice(0, 10);
-                              field.onChange(iso);
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                          </PopoverTrigger>
+                          <PopoverContent className="p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={(date:any) => {
+                                if (!date) return;
+                                const iso = new Date(
+                                  Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+                                )
+                                  .toISOString()
+                                  .slice(0, 10);
+                                field.onChange(iso);
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <Input
+                          type="text"
+                          placeholder="DD/MM/AAAA"
+                          className="flex-1"
+                          value={field.value ? new Date(`${field.value}T00:00:00`).toLocaleDateString('pt-BR') : ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Permitir digitação manual no formato DD/MM/AAAA
+                            if (value.length === 10) {
+                              const [day, month, year] = value.split('/');
+                              if (day && month && year) {
+                                const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                                if (!isNaN(date.getTime())) {
+                                  const iso = date.toISOString().slice(0, 10);
+                                  field.onChange(iso);
+                                }
+                              }
+                            } else if (value === '') {
+                              field.onChange('');
+                            }
+                          }}
+                        />
+                      </div>
                       <FormMessage />
                     </FormItem>
                   );

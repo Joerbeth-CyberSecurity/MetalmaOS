@@ -17,6 +17,7 @@ import {
 } from '../components/ui/select';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
+import { Checkbox } from '../components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { cn } from '../lib/utils';
@@ -73,6 +74,7 @@ export default function Relatorios() {
   const [endDate, setEndDate] = useState('');
   const [selectedOSDetail, setSelectedOSDetail] = useState(null);
   const [justificativaFilter, setJustificativaFilter] = useState('todos');
+  const [incluirExcluidas, setIncluirExcluidas] = useState(false);
 
   const reportTypes = [
     {
@@ -104,6 +106,12 @@ export default function Relatorios() {
       title: 'Emissão de OS',
       description: 'Relatório detalhado de ordens de serviço',
       icon: FileText,
+    },
+    {
+      id: 'retrabalhos',
+      title: 'Retrabalhos',
+      description: 'Débitos de horas por OS e colaborador',
+      icon: AlertTriangle,
     },
   ];
 
@@ -469,6 +477,10 @@ export default function Relatorios() {
           console.log('Gerando relatório de paradas...');
           await generateParadasReport(start, end);
           break;
+        case 'retrabalhos':
+          console.log('Gerando relatório de retrabalhos...');
+          await generateRetrabalhosReport(start, end);
+          break;
         case 'os_status':
           console.log('Gerando relatório de status...');
           await generateOsStatusReport(start, end);
@@ -509,6 +521,13 @@ export default function Relatorios() {
         .gte('data_inicio', start)
         .lte('data_inicio', end);
 
+      // Buscar débitos formais em retrabalhos (abatimentos)
+      const { data: retrabalhos } = await supabase
+        .from('retrabalhos')
+        .select('colaborador_id, horas_abatidas')
+        .gte('data_retrabalho', start)
+        .lte('data_retrabalho', end);
+
       // Processar dados
       const colabMap = {};
 
@@ -517,6 +536,7 @@ export default function Relatorios() {
           nome: colab.nome,
           meta_hora: colab.meta_hora || 0,
           horas_trabalhadas: 0,
+          horas_debitadas: 0,
           eficiencia: 0,
           paradas_material: 0,
           os_finalizadas: 0,
@@ -534,11 +554,19 @@ export default function Relatorios() {
         }
       });
 
+      // Somar débitos formais
+      (retrabalhos || []).forEach((r) => {
+        if (colabMap[r.colaborador_id]) {
+          colabMap[r.colaborador_id].horas_debitadas += r.horas_abatidas || 0;
+        }
+      });
+
       // Calcular eficiência
       Object.values(colabMap as any).forEach((colab: any) => {
+        const horasLiquidas = Math.max(0, (colab.horas_trabalhadas || 0) - (colab.horas_debitadas || 0));
         colab.eficiencia =
           colab.meta_hora > 0
-            ? Math.min(100, (colab.horas_trabalhadas / colab.meta_hora) * 100)
+            ? Math.min(100, (horasLiquidas / colab.meta_hora) * 100)
             : 0;
       });
 
@@ -594,6 +622,36 @@ export default function Relatorios() {
       });
     } catch (error) {
       console.error('Erro ao gerar relatório de paradas:', error);
+    }
+  };
+
+  const generateRetrabalhosReport = async (start, end) => {
+    try {
+      const { data } = await supabase
+        .from('retrabalhos')
+        .select(`
+          horas_abatidas,
+          motivo,
+          data_retrabalho,
+          colaborador:colaboradores(nome),
+          os:ordens_servico(numero_os, cliente:clientes(nome))
+        `)
+        .gte('data_retrabalho', start)
+        .lte('data_retrabalho', end)
+        .order('data_retrabalho', { ascending: false });
+
+      const rows = (data || []).map((r: any) => ({
+        os_numero: r.os?.numero_os || 'N/A',
+        colaborador: r.colaborador?.nome || 'N/A',
+        cliente: r.os?.cliente || 'N/A',
+        motivo: r.motivo || 'retrabalho',
+        horas: r.horas_abatidas || 0,
+        data: r.data_retrabalho,
+      }));
+
+      setReportData({ type: 'retrabalhos', data: rows, period: { start, end } });
+    } catch (error) {
+      console.error('Erro ao gerar relatório de retrabalhos:', error);
     }
   };
 
@@ -756,8 +814,12 @@ export default function Relatorios() {
     try {
       console.log('Iniciando geração do relatório de emissão de OS...');
       console.log('Período:', { start, end });
-      console.log('Filtros:', { osNumberFilter, clienteFilter, justificativaFilter });
+      console.log('Filtros:', { osNumberFilter, clienteFilter, justificativaFilter, incluirExcluidas });
 
+      let ordens = [];
+      let osExcluidas = [];
+
+      // Buscar OS ativas
       let query = supabase
         .from('ordens_servico')
         .select(`
@@ -809,16 +871,34 @@ export default function Relatorios() {
         query = query.eq('fabrica', fabricaFilter);
       }
 
-      console.log('Executando query...');
-      const { data: ordens, error } = await query;
+      console.log('Executando query de OS ativas...');
+      const { data: ordensAtivas, error: errorAtivas } = await query;
 
-      if (error) {
-        console.error('Erro ao buscar OS:', error);
-        alert('Erro ao buscar dados: ' + error.message);
+      if (errorAtivas) {
+        console.error('Erro ao buscar OS ativas:', errorAtivas);
+        alert('Erro ao buscar dados: ' + errorAtivas.message);
         return;
       }
 
-      console.log('Dados retornados:', ordens?.length || 0, 'ordens encontradas');
+      ordens = ordensAtivas || [];
+
+      // Se solicitado, buscar OS excluídas da auditoria
+      if (incluirExcluidas) {
+        const { data: auditoriaExcluidas, error: errorExcluidas } = await supabase
+          .from('auditoria_os')
+          .select('*')
+          .eq('acao', 'excluir_os')
+          .gte('created_at', start + 'T00:00:00')
+          .lte('created_at', end + 'T23:59:59')
+          .order('created_at', { ascending: false });
+
+        if (errorExcluidas) {
+          console.error('Erro ao buscar OS excluídas:', errorExcluidas);
+          alert('Erro ao buscar OS excluídas: ' + errorExcluidas.message);
+        } else {
+          osExcluidas = auditoriaExcluidas || [];
+        }
+      }
 
       // Processar dados para o relatório
       let osData = (ordens || []).map((os) => ({
@@ -828,6 +908,8 @@ export default function Relatorios() {
         descricao: os.descricao,
         status: os.status,
         data_abertura: os.data_abertura,
+        data_atual: (os as any).data_atual,
+        data_conclusao: (os as any).data_conclusao,
         data_fim: os.data_fim,
         valor_total: os.valor_total,
         desconto_tipo: os.desconto_tipo,
@@ -840,17 +922,72 @@ export default function Relatorios() {
         colaboradores: os.os_colaboradores || [],
         justificativas: os.justificativas_os || [],
         tem_justificativa: (os.justificativas_os || []).length > 0,
+        isExcluded: false,
       }));
 
-      console.log('Dados processados:', osData.length, 'OS processadas');
+      // Adicionar OS excluídas se solicitado
+      if (incluirExcluidas && osExcluidas.length > 0) {
+        console.log('Processando OS excluídas para o relatório...');
+        const osExcluidasData = osExcluidas.map((audit) => {
+          // Extrair o motivo da exclusão dos detalhes
+          let motivo_exclusao = 'Motivo não informado';
+          if (audit.detalhes) {
+            try {
+              // Tentar parsear como JSON
+              const detalhesObj = typeof audit.detalhes === 'string' 
+                ? JSON.parse(audit.detalhes) 
+                : audit.detalhes;
+              
+              if (detalhesObj.motivo) {
+                motivo_exclusao = detalhesObj.motivo;
+              } else if (detalhesObj.includes && detalhesObj.includes('Motivo:')) {
+                motivo_exclusao = detalhesObj.split('Motivo:')[1]?.trim();
+              }
+            } catch (e) {
+              // Se não for JSON, tentar extrair do texto
+              if (typeof audit.detalhes === 'string' && audit.detalhes.includes('Motivo:')) {
+                motivo_exclusao = audit.detalhes.split('Motivo:')[1]?.trim();
+              } else {
+                motivo_exclusao = audit.detalhes;
+              }
+            }
+          }
+          
+          return {
+            numero_os: audit.numero_os,
+            fabrica: audit.dados_anteriores?.fabrica || 'N/A',
+            cliente: { nome: audit.dados_anteriores?.cliente_nome || 'Cliente não informado' },
+            descricao: audit.dados_anteriores?.descricao || 'OS foi excluída do sistema',
+            status: 'excluida',
+            data_abertura: audit.created_at,
+            data_atual: null,
+            data_conclusao: null,
+            data_fim: audit.created_at,
+            valor_total: audit.dados_anteriores?.valor_total || 0,
+            desconto_tipo: null,
+            desconto_valor: null,
+            valor_total_com_desconto: audit.dados_anteriores?.valor_total || 0,
+            tempo_execucao_previsto: 0,
+            tempo_execucao_real: 0,
+            observacoes: motivo_exclusao,
+            produtos: [],
+            colaboradores: [],
+            justificativas: [],
+            tem_justificativa: false,
+            isExcluded: true,
+            motivo_exclusao: motivo_exclusao,
+          };
+        });
+
+        osData = [...osData, ...osExcluidasData];
+      }
+
 
       // Aplicar filtro de justificativa
       if (justificativaFilter === 'com') {
         osData = osData.filter(os => os.tem_justificativa);
-        console.log('Após filtro de justificativa (com):', osData.length, 'OS');
       } else if (justificativaFilter === 'sem') {
         osData = osData.filter(os => !os.tem_justificativa);
-        console.log('Após filtro de justificativa (sem):', osData.length, 'OS');
       }
 
       const reportData = {
@@ -1798,6 +1935,8 @@ export default function Relatorios() {
         return `
           <th>Colaborador</th>
           <th>Horas Trabalhadas</th>
+          <th>Horas Debitadas</th>
+          <th>Horas Líquidas</th>
           <th>Meta (h)</th>
           <th>Eficiência (%)</th>
           <th>Paradas Material</th>
@@ -1809,6 +1948,15 @@ export default function Relatorios() {
           <th>Motivo</th>
           <th>Data Início</th>
           <th>Duração (h)</th>
+        `;
+      case 'retrabalhos':
+        return `
+          <th>OS</th>
+          <th>Cliente</th>
+          <th>Colaborador</th>
+          <th>Motivo</th>
+          <th>Horas Debitadas</th>
+          <th>Data</th>
         `;
       case 'os_status':
         return `
@@ -1854,6 +2002,8 @@ export default function Relatorios() {
           <tr>
             <td style="font-weight: bold;">${colab.nome}</td>
             <td>${formatHours(colab.horas_trabalhadas)}</td>
+            <td title="Horas debitadas de retrabalhos">${formatHours(colab.horas_debitadas || 0)}</td>
+            <td title="Horas líquidas = trabalhadas - debitadas">${formatHours(Math.max(0, (colab.horas_trabalhadas||0) - (colab.horas_debitadas||0)))}</td>
             <td>${formatHours(colab.meta_hora)}</td>
             <td>${colab.eficiencia.toFixed(1)}%</td>
             <td>${colab.paradas_material}</td>
@@ -1871,6 +2021,21 @@ export default function Relatorios() {
             <td>${parada.motivo}</td>
             <td>${formatDate(parada.data_inicio)}</td>
             <td>${formatHours(parada.duracao)}</td>
+          </tr>
+        `
+          )
+          .join('');
+      case 'retrabalhos':
+        return reportData.data
+          .map(
+            (r, index) => `
+          <tr>
+            <td style="font-weight: bold;">${r.os_numero}</td>
+            <td>${r.cliente}</td>
+            <td>${r.colaborador}</td>
+            <td>${r.motivo}</td>
+            <td>${formatHours(r.horas)}</td>
+            <td>${formatDate(r.data)}</td>
           </tr>
         `
           )
@@ -1939,6 +2104,8 @@ export default function Relatorios() {
           <>
             <TableHead>Colaborador</TableHead>
             <TableHead>Horas Trabalhadas</TableHead>
+            <TableHead title="Horas debitadas de retrabalhos">Horas Debitadas</TableHead>
+            <TableHead title="Horas líquidas = trabalhadas - debitadas">Horas Líquidas</TableHead>
             <TableHead>Meta (h)</TableHead>
             <TableHead>Eficiência (%)</TableHead>
             <TableHead>Paradas Material</TableHead>
@@ -1952,6 +2119,17 @@ export default function Relatorios() {
             <TableHead>Motivo</TableHead>
             <TableHead>Data Início</TableHead>
             <TableHead>Duração (h)</TableHead>
+          </>
+        );
+      case 'retrabalhos':
+        return (
+          <>
+            <TableHead>OS</TableHead>
+            <TableHead>Cliente</TableHead>
+            <TableHead>Colaborador</TableHead>
+            <TableHead>Motivo</TableHead>
+            <TableHead>Horas Debitadas</TableHead>
+            <TableHead>Data</TableHead>
           </>
         );
       case 'os_status':
@@ -2002,6 +2180,8 @@ export default function Relatorios() {
           <TableRow key={index}>
             <TableCell className="font-medium">{colab.nome}</TableCell>
             <TableCell>{formatHours(colab.horas_trabalhadas)}</TableCell>
+            <TableCell title="Horas debitadas de retrabalhos">{formatHours(colab.horas_debitadas || 0)}</TableCell>
+            <TableCell title="Horas líquidas = trabalhadas - debitadas">{formatHours(Math.max(0, (colab.horas_trabalhadas||0) - (colab.horas_debitadas||0)))}</TableCell>
             <TableCell>{formatHours(colab.meta_hora)}</TableCell>
             <TableCell>
               <Badge
@@ -2027,6 +2207,17 @@ export default function Relatorios() {
             <TableCell>{parada.motivo}</TableCell>
             <TableCell>{formatDate(parada.data_inicio)}</TableCell>
             <TableCell>{formatHours(parada.duracao)}</TableCell>
+          </TableRow>
+        ));
+      case 'retrabalhos':
+        return reportData.data.map((r, index) => (
+          <TableRow key={index}>
+            <TableCell className="font-medium">{r.os_numero}</TableCell>
+            <TableCell>{r.cliente}</TableCell>
+            <TableCell>{r.colaborador}</TableCell>
+            <TableCell>{r.motivo}</TableCell>
+            <TableCell>{formatHours(r.horas)}</TableCell>
+            <TableCell>{formatDate(r.data)}</TableCell>
           </TableRow>
         ));
       case 'os_status':
@@ -2237,6 +2428,21 @@ export default function Relatorios() {
                       <SelectItem value="sem">Sem Justificativa</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="incluir-excluidas"
+                      checked={incluirExcluidas}
+                      onCheckedChange={setIncluirExcluidas}
+                    />
+                    <Label htmlFor="incluir-excluidas" className="text-sm font-medium">
+                      Incluir OS Excluídas
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Inclui no relatório as OS que foram excluídas do sistema com seus motivos
+                  </p>
                 </div>
               </>
             )}

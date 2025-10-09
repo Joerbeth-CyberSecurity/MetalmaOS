@@ -46,6 +46,7 @@
     --status-finalizada: 142 76% 36%; /* Verde */
     --status-cancelada: 0 84% 60%; /* Vermelho */
     --status-falta-material: 25 95% 53%; /* Laranja */
+    --status-excluida: 0 0% 50%; /* Cinza */
 
     /* Priority colors */
     --priority-baixa: 142.1 76.2% 36.3%;
@@ -249,6 +250,12 @@
     border: 1px solid hsl(25 95% 53% / 0.3) !important;
   }
 
+  .status-excluida {
+    background-color: hsl(0 0% 50% / 0.15) !important; /* Cinza claro */
+    color: hsl(0 0% 30%) !important; /* Cinza escuro */
+    border: 1px solid hsl(0 0% 50% / 0.3) !important;
+  }
+
   /* Status badge styles for dark mode */
   .dark .status-aberta {
     background-color: hsl(47.9 95.8% 53.1% / 0.2) !important;
@@ -284,6 +291,12 @@
     background-color: hsl(25 95% 53% / 0.2) !important;
     color: hsl(25 95% 53%) !important;
     border: 1px solid hsl(25 95% 53% / 0.3) !important;
+  }
+
+  .dark .status-excluida {
+    background-color: hsl(0 0% 50% / 0.2) !important;
+    color: hsl(0 0% 70%) !important;
+    border: 1px solid hsl(0 0% 50% / 0.3) !important;
   }
 
   /* Priority badge styles */

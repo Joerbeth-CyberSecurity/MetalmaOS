@@ -402,9 +402,12 @@ export function OSResponsiveTable({
   onDelete,
   onStart,
   onPause,
+  onPauseColaborador,
   onFinish,
+  onFinishColaborador,
   onAssociateColaboradores,
   onParadaMaterial,
+  onPararColaborador,
   onRemoveColaborador,
   loading = false,
 }: {
@@ -413,9 +416,12 @@ export function OSResponsiveTable({
   onDelete?: (item: any) => void;
   onStart?: (item: any) => void;
   onPause?: (item: any) => void;
+  onPauseColaborador?: (item: any) => void;
   onFinish?: (item: any) => void;
+  onFinishColaborador?: (item: any) => void;
   onAssociateColaboradores?: (item: any) => void;
   onParadaMaterial?: (item: any) => void;
+  onPararColaborador?: (item: any) => void;
   onRemoveColaborador?: (os: any, colaboracao: any) => void;
   loading?: boolean;
 }) {
@@ -446,6 +452,8 @@ export function OSResponsiveTable({
         return 'status-pausada';
       case 'falta_material':
         return 'status-falta-material';
+      case 'em_cliente':
+        return 'status-em-cliente';
       default:
         return 'status-aberta';
     }
@@ -530,42 +538,70 @@ export function OSResponsiveTable({
       render: (value: any, item: any) => (
         <div className="flex flex-wrap gap-1">
           {value?.map((c: any, index: number) => (
-            <div key={index} className="flex items-center gap-1">
-              <Badge variant="outline" className="text-xs">
-                {c.colaborador?.nome}
-              </Badge>
-              <button
-                type="button"
-                aria-label="Remover colaborador"
-                className={`inline-flex h-5 w-5 items-center justify-center rounded border transition border-border text-muted-foreground hover:text-destructive hover:border-destructive`}
-                title={'Remover colaborador'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onRemoveColaborador) {
-                    onRemoveColaborador(item, c);
-                    return;
-                  }
-                  // Remoção padrão: tenta excluir o vínculo em os_colaboradores e recarrega a lista
-                  const proceed = window.confirm('Remover este colaborador da OS?');
-                  if (!proceed) return;
-                  const id = (c && (c.id)) as string | undefined;
-                  if (!id) {
-                    console.warn('ID da colaboração não encontrado. Garanta que a query seleciona os_colaboradores.id.');
-                    return;
-                  }
-                  supabase
-                    .from('os_colaboradores')
-                    .delete()
-                    .eq('id', id)
-                    .then(() => {
-                      // Atualização simples via reload para refletir estado da lista
-                      window.location.reload();
-                    })
-                    .catch((err) => console.error('Erro ao remover colaborador:', err));
-                }}
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
+            <div key={index} className="flex flex-col gap-1">
+              <div className="flex items-center gap-1">
+                <Badge variant="outline" className="text-xs">
+                  {c.colaborador?.nome}
+                </Badge>
+                <button
+                  type="button"
+                  aria-label="Remover colaborador"
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded border transition border-border text-muted-foreground hover:text-destructive hover:border-destructive`}
+                  title={'Remover colaborador'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onRemoveColaborador) {
+                      onRemoveColaborador(item, c);
+                      return;
+                    }
+                    // Remoção padrão: tenta excluir o vínculo em os_colaboradores e recarrega a lista
+                    const proceed = window.confirm('Remover este colaborador da OS?');
+                    if (!proceed) return;
+                    const id = (c && (c.id)) as string | undefined;
+                    const colaboradorId = (c && (c.colaborador_id)) as string | undefined;
+                    const osId = (item && (item.id)) as string | undefined;
+                    const tasks: Promise<any>[] = [];
+                    if (id) {
+                      tasks.push(
+                        supabase.from('os_colaboradores').delete().eq('id', id)
+                      );
+                    }
+                    if (osId && colaboradorId) {
+                      tasks.push(
+                        supabase
+                          .from('os_colaboradores_produtos')
+                          .delete()
+                          .eq('os_id', osId)
+                          .eq('colaborador_id', colaboradorId)
+                      );
+                    }
+                    Promise.all(tasks)
+                      .then(() => window.location.reload())
+                      .catch((err) => console.error('Erro ao remover colaborador:', err));
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+              {/* Exibir status do colaborador */}
+              {c.status && c.status !== 'ativo' && (
+                <div className="text-xs">
+                  <Badge 
+                    variant="secondary" 
+                    className={`text-xs ${
+                      c.status === 'pausado' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                      c.status === 'parado' ? 'bg-red-100 text-red-800 border-red-300' :
+                      c.status === 'finalizado' ? 'bg-green-100 text-green-800 border-green-300' :
+                      'bg-gray-100 text-gray-800 border-gray-300'
+                    }`}
+                  >
+                    {c.status === 'pausado' ? 'Pausado' :
+                     c.status === 'parado' ? 'Parado' :
+                     c.status === 'finalizado' ? 'Finalizado' :
+                     c.status}
+                  </Badge>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -598,11 +634,27 @@ export function OSResponsiveTable({
     }
     
     if (os.status === 'em_andamento') {
+      // Permitir adicionar/associar colaboradores mesmo com OS em andamento
+      if (onAssociateColaboradores) {
+        actions.push({ 
+          label: 'Apontar Colaboradores', 
+          icon: UserPlus, 
+          onClick: () => onAssociateColaboradores(os) 
+        });
+      }
       if (onPause) {
         actions.push({ 
           label: 'Pausar OS', 
           icon: Pause, 
           onClick: () => onPause(os) 
+        });
+      }
+      const hasMultiColabs = Array.isArray(os.os_colaboradores) && os.os_colaboradores.length > 1;
+      if (hasMultiColabs && onPauseColaborador) {
+        actions.push({ 
+          label: 'Pausar Colaborador', 
+          icon: Pause, 
+          onClick: () => onPauseColaborador(os) 
         });
       }
       if (onParadaMaterial) {
@@ -613,11 +665,27 @@ export function OSResponsiveTable({
           variant: 'destructive' as const
         });
       }
+      if (hasMultiColabs && onPararColaborador) {
+        actions.push({ 
+          label: 'Parar Colaborador', 
+          icon: StopCircle, 
+          onClick: () => onPararColaborador(os),
+          variant: 'destructive' as const
+        });
+      }
       if (onFinish) {
         actions.push({ 
           label: 'Finalizar OS', 
           icon: CheckCircle, 
           onClick: () => onFinish(os) 
+        });
+      }
+      const hasMultiColabs2 = Array.isArray(os.os_colaboradores) && os.os_colaboradores.length > 1;
+      if (hasMultiColabs2 && onFinishColaborador) {
+        actions.push({ 
+          label: 'Finalizar Colaborador', 
+          icon: CheckCircle, 
+          onClick: () => onFinishColaborador(os) 
         });
       }
     }

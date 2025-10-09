@@ -32,6 +32,219 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useTheme } from '@/components/ThemeProvider';
+import React from 'react';
+
+function OsEmClienteSection() {
+  const { toast } = useToast();
+  const [inicio, setInicio] = useState<string>('');
+  const [fim, setFim] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [lista, setLista] = useState<any[]>([]);
+
+  const buscar = async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('ordens_servico')
+        .select('id, numero_os, descricao, status, data_abertura, data_inicio, clientes(nome)')
+        .in('status', ['em_andamento', 'pausada', 'aberta', 'em_cliente']);
+      if (inicio) query = query.gte('data_abertura', inicio + 'T00:00:00');
+      if (fim) query = query.lte('data_abertura', fim + 'T23:59:59');
+      const { data, error } = await query.order('data_abertura', { ascending: false });
+      if (error) throw error;
+      setLista(data || []);
+    } catch (e:any) {
+      toast({ title: 'Erro ao buscar OS', description: e.message, variant: 'destructive' });
+      setLista([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const marcarEmCliente = async (os:any) => {
+    try {
+      // Fecha tempos abertos e cria lançamento conforme regras atuais
+      const { data: tempos } = await supabase
+        .from('os_tempo')
+        .select('*')
+        .eq('os_id', os.id)
+        .is('data_fim', null);
+      if (tempos && tempos.length) {
+        const nowIso = new Date().toISOString();
+        // Atualiza cada registro calculando horas_calculadas
+        for (const t of tempos) {
+          const inicio = new Date(t.data_inicio).getTime();
+          const fim = new Date().getTime();
+          const horas = Math.max(0, (fim - inicio) / (1000 * 60 * 60));
+          await supabase
+            .from('os_tempo')
+            .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
+            .eq('id', t.id);
+        }
+      }
+      // Atualiza status para em_cliente e remove da listagem principal
+      const { error: osError } = await supabase
+        .from('ordens_servico')
+        .update({ status: 'em_cliente' })
+        .eq('id', os.id);
+      if (osError) throw osError;
+
+      // Auditoria da transição de status
+      await supabase.from('auditoria_sistema').insert({
+        acao: 'os_em_cliente',
+        tabela: 'ordens_servico',
+        registro_id: os.id,
+        detalhes: `OS ${os.numero_os} marcada como em_cliente`
+      });
+      toast({ title: `OS ${os.numero_os} marcada como em cliente` });
+      await buscar();
+    } catch (e:any) {
+      toast({ title: 'Erro ao marcar OS em cliente', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  const retornarProducao = async (os:any) => {
+    try {
+      // Fecha quaisquer tempos abertos antes de retornar
+      const { data: abertos } = await supabase
+        .from('os_tempo')
+        .select('*')
+        .eq('os_id', os.id)
+        .is('data_fim', null);
+      if (abertos && abertos.length) {
+        const nowIso = new Date().toISOString();
+        for (const t of abertos) {
+          const inicio = new Date(t.data_inicio).getTime();
+          const fim = new Date().getTime();
+          const horas = Math.max(0, (fim - inicio) / (1000 * 60 * 60));
+          await supabase
+            .from('os_tempo')
+            .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
+            .eq('id', t.id);
+
+          // Se era parada de material, gerar retrabalho (débito formal de horas)
+          if (t.tipo === 'parada_material' && t.colaborador_id) {
+            await supabase.from('retrabalhos').insert({
+              os_id: os.id,
+              colaborador_id: t.colaborador_id,
+              motivo: t.motivo || 'parada_material',
+              horas_abatidas: Number(horas.toFixed(2)),
+              observacoes: 'Débito gerado automaticamente ao retornar à produção'
+            });
+          }
+        }
+      }
+
+      // Volta para em_andamento e reinicia contagem de banco de horas a partir de agora
+      const { error: updError } = await supabase
+        .from('ordens_servico')
+        .update({ status: 'em_andamento' })
+        .eq('id', os.id);
+      if (updError) throw updError;
+
+      // Buscar colaboradores ativos
+      const { data: colaboradoresOS, error: colabError } = await supabase
+        .from('os_colaboradores')
+        .select('colaborador_id')
+        .eq('os_id', os.id)
+        .eq('ativo', true);
+      if (colabError) throw colabError;
+
+      if (colaboradoresOS && colaboradoresOS.length > 0) {
+        const registrosTempo = colaboradoresOS.map(({ colaborador_id }:any) => ({
+          os_id: os.id,
+          colaborador_id,
+          tipo: 'trabalho',
+          data_inicio: new Date().toISOString(),
+        }));
+        const { error: tempoError } = await supabase.from('os_tempo').insert(registrosTempo);
+        if (tempoError) throw tempoError;
+      }
+
+      // Auditoria da transição de status
+      await supabase.from('auditoria_sistema').insert({
+        acao: 'os_retorno_producao',
+        tabela: 'ordens_servico',
+        registro_id: os.id,
+        detalhes: `OS ${os.numero_os} retornou à produção`
+      });
+
+      toast({ title: `OS ${os.numero_os} retornou à produção` });
+      await buscar();
+    } catch (e:any) {
+      toast({ title: 'Erro ao retornar à produção', description: e.message, variant: 'destructive' });
+    }
+  };
+
+  // Não carregar automaticamente - só quando buscar
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div>
+          <Label>Data início</Label>
+          <Input type="date" value={inicio} onChange={(e:any) => setInicio(e.target.value)} />
+        </div>
+        <div>
+          <Label>Data fim</Label>
+          <Input type="date" value={fim} onChange={(e:any) => setFim(e.target.value)} />
+        </div>
+        <div className="flex items-end gap-2">
+          <Button onClick={buscar} disabled={loading}>
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Buscar
+          </Button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full border text-sm">
+          <thead>
+            <tr className="bg-muted">
+              <th className="px-3 py-2 text-left">Número</th>
+              <th className="px-3 py-2 text-left">Cliente</th>
+              <th className="px-3 py-2 text-left">Descrição</th>
+              <th className="px-3 py-2 text-left">Status</th>
+              <th className="px-3 py-2 text-left">Data</th>
+              <th className="px-3 py-2 text-left">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="py-4 text-center">
+                  <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                </td>
+              </tr>
+            ) : lista.length > 0 ? (
+              lista.map((os:any) => (
+                <tr key={os.id} className="border-b">
+                  <td className="px-3 py-2 font-mono">{os.numero_os}</td>
+                  <td className="px-3 py-2">{os.clientes?.nome || 'N/A'}</td>
+                  <td className="px-3 py-2 max-w-xs truncate" title={os.descricao}>{os.descricao}</td>
+                  <td className="px-3 py-2">{String(os.status || '').replace(/_/g, ' ')}</td>
+                  <td className="px-3 py-2">{os.data_abertura ? new Date(os.data_abertura).toLocaleDateString('pt-BR') : '—'}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-2">
+                      {os.status === 'em_cliente' ? (
+                        <Button size="sm" onClick={() => retornarProducao(os)}>Retornar à produção</Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => marcarEmCliente(os)}>OS em cliente</Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="py-4 text-center text-muted-foreground">Nenhuma OS encontrada para o período.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 // Esquema de validação
 const configSchema = z.object({
@@ -1240,7 +1453,7 @@ export default function Configuracoes() {
       </div>
 
       <Tabs defaultValue="system" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="system" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Sistema
@@ -1260,6 +1473,10 @@ export default function Configuracoes() {
           <TabsTrigger value="audit-os" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             Auditoria OS
+          </TabsTrigger>
+          <TabsTrigger value="os-em-cliente" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            OS em Cliente
           </TabsTrigger>
         </TabsList>
 
@@ -2675,6 +2892,20 @@ export default function Configuracoes() {
               </CardContent>
             </Card>
           </PermissionGuard>
+        </TabsContent>
+        {/* Nova seção: OS em Cliente / Retornar à Produção */}
+        <TabsContent value="os-em-cliente" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>OS em Cliente</CardTitle>
+              <CardDescription>
+                Filtre por data e gerencie OS enviadas ao cliente (pausa provisória) e retorno à produção.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <OsEmClienteSection />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

@@ -8,3 +8,4 @@
 ## npm rum deploy
 
 ## obs: as vezes nao publica, dai, pode ser necessariorodar: npm install
+## teste

@@ -1573,36 +1573,6 @@ export default function OrdensServico() {
           </Button>
         </div>
       </div>
-      <div className="mb-4 flex flex-col sm:flex-row gap-3">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-          <label className="text-sm font-medium text-foreground">Status:</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 w-full sm:w-auto"
-          >
-            <option value="">Todos</option>
-            <option value="aberta">Aberta</option>
-            <option value="em_andamento">Em andamento</option>
-            <option value="finalizada">Finalizada</option>
-            <option value="cancelada">Cancelada</option>
-            <option value="pausada">Pausada</option>
-            <option value="falta_material">Falta de material</option>
-          </select>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-          <label className="text-sm font-medium text-foreground">Desconto:</label>
-          <select
-            value={descontoFilter}
-            onChange={(e) => setDescontoFilter(e.target.value as any)}
-            className="rounded border border-border bg-background px-3 py-2 text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 w-full sm:w-auto"
-          >
-            <option value="todos">Todos</option>
-            <option value="com">Com desconto</option>
-            <option value="sem">Sem desconto</option>
-          </select>
-        </div>
-      </div>
       <OSResponsiveTable
         data={filteredOrdens}
         loading={loading}

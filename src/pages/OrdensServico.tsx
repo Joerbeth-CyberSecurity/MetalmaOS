@@ -282,6 +282,7 @@ export default function OrdensServico() {
   const [showParadaDialog, setShowParadaDialog] = useState(false);
   const [motivoParada, setMotivoParada] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [dateSort, setDateSort] = useState<'asc' | 'desc' | ''>('');
   const [produtoSearch, setProdutoSearch] = useState('');
   const [descontoFilter, setDescontoFilter] = useState<'todos' | 'com' | 'sem'>('todos');
   const [showJustificativaDialog, setShowJustificativaDialog] = useState(false);
@@ -1531,11 +1532,19 @@ export default function OrdensServico() {
     ? ordens.filter((os) => os.status === statusFilter)
     : ordens.filter((os) => os.status !== 'em_cliente');
 
-  const filteredOrdens = filteredOrdensBase.filter((os) => {
+  let filteredOrdens = filteredOrdensBase.filter((os) => {
     if (descontoFilter === 'com') return (os.desconto_valor || 0) > 0;
     if (descontoFilter === 'sem') return (os.desconto_valor || 0) <= 0;
     return true;
   });
+
+  if (dateSort) {
+    filteredOrdens = [...filteredOrdens].sort((a, b) => {
+      const da = a?.data_abertura ? new Date(a.data_abertura as any).getTime() : 0;
+      const db = b?.data_abertura ? new Date(b.data_abertura as any).getTime() : 0;
+      return dateSort === 'asc' ? da - db : db - da;
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -1608,6 +1617,10 @@ export default function OrdensServico() {
         onParadaMaterial={handlePararOS}
         onPararColaborador={handlePararColaborador}
         onRemoveColaborador={handleRemoveColaborador}
+        statusFilterValue={statusFilter}
+        onChangeStatusFilter={setStatusFilter}
+        dateSort={dateSort}
+        onChangeDateSort={setDateSort}
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

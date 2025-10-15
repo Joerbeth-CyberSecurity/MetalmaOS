@@ -16,7 +16,7 @@ interface ResponsiveTableProps {
   data: any[];
   columns: {
     key: string;
-    label: string;
+    label: React.ReactNode;
     render?: (value: any, item: any) => React.ReactNode;
     className?: string;
     hideOnMobile?: boolean;
@@ -410,6 +410,11 @@ export function OSResponsiveTable({
   onPararColaborador,
   onRemoveColaborador,
   loading = false,
+  // Novos controles opcionais no cabeçalho
+  statusFilterValue,
+  onChangeStatusFilter,
+  dateSort,
+  onChangeDateSort,
 }: {
   data: any[];
   onEdit?: (item: any) => void;
@@ -424,6 +429,10 @@ export function OSResponsiveTable({
   onPararColaborador?: (item: any) => void;
   onRemoveColaborador?: (os: any, colaboracao: any) => void;
   loading?: boolean;
+  statusFilterValue?: string;
+  onChangeStatusFilter?: (value: string) => void;
+  dateSort?: 'asc' | 'desc' | '';
+  onChangeDateSort?: (value: 'asc' | 'desc' | '') => void;
 }) {
   const formatCurrency = (value: number | null | undefined) => {
     if (value === null || value === undefined || isNaN(value)) return 'R$ 0,00';
@@ -487,7 +496,28 @@ export function OSResponsiveTable({
     },
     {
       key: 'status',
-      label: 'Status',
+      label: (
+        <div className="flex items-center gap-2">
+          <span>Status</span>
+          {onChangeStatusFilter && (
+            <select
+              aria-label="Filtrar por status"
+              value={statusFilterValue ?? ''}
+              onChange={(e) => onChangeStatusFilter?.(e.target.value)}
+              className="ml-1 rounded border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none"
+            >
+              <option value="">Todos</option>
+              <option value="aberta">Aberta</option>
+              <option value="em_andamento">Em andamento</option>
+              <option value="finalizada">Finalizada</option>
+              <option value="cancelada">Cancelada</option>
+              <option value="pausada">Pausada</option>
+              <option value="falta_material">Falta de material</option>
+              <option value="em_cliente">Em cliente</option>
+            </select>
+          )}
+        </div>
+      ),
       render: (value: any) => (
         <Badge className={getStatusClass(value)}>
           {value?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
@@ -528,7 +558,31 @@ export function OSResponsiveTable({
     },
     {
       key: 'data_abertura',
-      label: 'Data',
+      label: (
+        <div className="flex items-center gap-2">
+          <span>Data</span>
+          {onChangeDateSort && (
+            <button
+              type="button"
+              aria-label="Ordenar por data"
+              className="rounded border border-border px-1 py-0.5 text-xs hover:bg-muted"
+              onClick={() => {
+                const next = dateSort === 'asc' ? 'desc' : dateSort === 'desc' ? '' : 'asc';
+                onChangeDateSort?.(next);
+              }}
+              title={
+                dateSort === 'asc'
+                  ? 'Ordenação: Crescente (clique para Decrescente)'
+                  : dateSort === 'desc'
+                  ? 'Ordenação: Decrescente (clique para Remover)'
+                  : 'Sem ordenação (clique para Crescente)'
+              }
+            >
+              {dateSort === 'asc' ? '▲' : dateSort === 'desc' ? '▼' : '⇅'}
+            </button>
+          )}
+        </div>
+      ),
       render: (value: any) => formatDate(value),
       hideOnMobile: true,
     },

@@ -75,6 +75,7 @@ export default function Relatorios() {
   const [selectedOSDetail, setSelectedOSDetail] = useState(null);
   const [justificativaFilter, setJustificativaFilter] = useState('todos');
   const [incluirExcluidas, setIncluirExcluidas] = useState(false);
+  const [statusRelatorio, setStatusRelatorio] = useState('todos');
 
   const reportTypes = [
     {
@@ -871,6 +872,10 @@ export default function Relatorios() {
         query = query.eq('fabrica', fabricaFilter);
       }
 
+      if (statusRelatorio !== 'todos') {
+        query = query.eq('status', statusRelatorio);
+      }
+
       console.log('Executando query de OS ativas...');
       const { data: ordensAtivas, error: errorAtivas } = await query;
 
@@ -999,6 +1004,7 @@ export default function Relatorios() {
           osNumber: osNumberFilter,
           justificativa: justificativaFilter,
           fabrica: fabricaFilter,
+          status: statusRelatorio,
           startDate,
           endDate
         },
@@ -2413,6 +2419,24 @@ export default function Relatorios() {
                       <SelectItem value="todas">Todas</SelectItem>
                       <SelectItem value="Metalma">Metalma</SelectItem>
                       <SelectItem value="Galpão">Galpão</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={statusRelatorio} onValueChange={setStatusRelatorio}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="aberta">Aberta</SelectItem>
+                      <SelectItem value="em_andamento">Em andamento</SelectItem>
+                      <SelectItem value="finalizada">Finalizada</SelectItem>
+                      <SelectItem value="cancelada">Cancelada</SelectItem>
+                      <SelectItem value="pausada">Pausada</SelectItem>
+                      <SelectItem value="falta_material">Falta de material</SelectItem>
+                      <SelectItem value="em_cliente">Em cliente</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -1563,14 +1563,6 @@ export default function OrdensServico() {
             <span className="hidden sm:inline">Nova Ordem de Serviço</span>
             <span className="sm:hidden">Nova OS</span>
           </Button>
-          <Button
-            onClick={() => window.print()}
-            type="button"
-            className="bg-primary font-semibold text-white shadow-soft transition hover:bg-primary/80 w-full sm:w-auto"
-          >
-            <span className="hidden sm:inline">Imprimir / Exportar PDF</span>
-            <span className="sm:hidden">Imprimir</span>
-          </Button>
         </div>
       </div>
       <OSResponsiveTable

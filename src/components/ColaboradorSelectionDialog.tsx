@@ -44,7 +44,7 @@ export function ColaboradorSelectionDialog({
   const [colaboradorSelecionado, setColaboradorSelecionado] = useState<string>('');
 
   const handleConfirm = () => {
-    if (justificativa.trim() && colaboradorSelecionado) {
+    if (colaboradorSelecionado) {
       onConfirm(colaboradorSelecionado, justificativa.trim());
       setJustificativa('');
       setColaboradorSelecionado('');
@@ -185,7 +185,7 @@ export function ColaboradorSelectionDialog({
           </div>
 
           <div>
-            <Label htmlFor="justificativa">Justificativa *</Label>
+            <Label htmlFor="justificativa">Justificativa (opcional)</Label>
             <Textarea
               id="justificativa"
               placeholder="Descreva o motivo da pausa/parada/finalização..."
@@ -232,7 +232,7 @@ export function ColaboradorSelectionDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={!justificativa.trim() || !colaboradorSelecionado || loading}
+            disabled={!colaboradorSelecionado || loading}
             variant={tipo === 'parada' ? 'destructive' : 'default'}
           >
             {loading ? 'Processando...' : `Confirmar ${tipo === 'pausa' ? 'Pausa' : tipo === 'parada' ? 'Parada' : 'Finalização'}`}

@@ -2797,7 +2797,7 @@ export default function Configuracoes() {
                             <td className="px-3 py-2">
                               <span
                                 className={`rounded px-2 py-1 text-xs ${
-                                  item.acao === 'criar_os' || item.acao === 'iniciar_os' || item.acao === 'reiniciar_os'
+                                  item.acao === 'criar_os' || item.acao === 'iniciar_os' || item.acao === 'reiniciar_os' || item.acao === 'iniciar_colaborador'
                                     ? 'bg-green-100 text-green-800'
                                     : item.acao === 'excluir_os' || item.acao === 'parar_os'
                                     ? 'bg-red-100 text-red-800'
@@ -2812,6 +2812,7 @@ export default function Configuracoes() {
                                 {item.acao === 'editar_os' && 'Editar OS'}
                                 {item.acao === 'excluir_os' && 'Excluir OS'}
                                 {item.acao === 'iniciar_os' && 'Iniciar OS'}
+                                {item.acao === 'iniciar_colaborador' && 'Iniciar Colaborador'}
                                 {item.acao === 'reiniciar_os' && 'Reiniciar OS'}
                                 {item.acao === 'pausar_os' && 'Pausar OS'}
                                 {item.acao === 'parar_os' && 'Parar OS'}

@@ -299,6 +299,19 @@ export default function OrdensServico() {
   const setPriceDisplay = (idx: number, text: string) =>
     setPriceInputs((prev) => ({ ...prev, [idx]: text }));
 
+  // Agregador de logs apenas em desenvolvimento
+  const [devLogs, setDevLogs] = useState<Array<{ ts: string; os: string | undefined; tag: string; msg: string }>>([]);
+  const appendDevLog = (tag: string, osNumero: string | undefined, msg: string) => {
+    if (!import.meta.env.DEV) return; // Exibe somente em DEV
+    const ts = new Date().toLocaleTimeString('pt-BR');
+    setDevLogs((logs) => [...logs, { ts, os: osNumero, tag, msg }]);
+    try {
+      // Também manter em memória global para outras páginas, se necessário
+      (window as any).__METALMA_LOGS = (window as any).__METALMA_LOGS || [];
+      (window as any).__METALMA_LOGS.push({ ts, os: osNumero, tag, msg });
+    } catch {}
+  };
+
   const form = useForm<OsFormData>({
     resolver: zodResolver(osSchema),
     defaultValues: { status: 'aberta', produtos: [], fabrica: 'Metalma', data_abertura: new Date().toISOString().slice(0, 10), data_conclusao: new Date().toISOString().slice(0, 10) },
@@ -489,8 +502,8 @@ export default function OrdensServico() {
         clientes ( nome ),
         os_produtos ( *, produtos ( nome ) ),
         os_colaboradores ( id, colaborador_id, colaborador:colaboradores(id, nome) ),
-        os_colaboradores_produtos ( produto_id, colaborador_id, colaborador:colaboradores(id, nome) ),
-        os_tempo ( tipo, data_inicio, data_fim, colaborador:colaboradores(nome) )
+        os_colaboradores_produtos ( produto_id, colaborador_id, created_at, produtos ( nome ), colaborador:colaboradores(id, nome) ),
+        os_tempo ( id, tipo, data_inicio, data_fim, colaborador_id, produto_id )
       `)
       .order('data_abertura', { ascending: false });
 
@@ -507,8 +520,9 @@ export default function OrdensServico() {
         const colaboradoresUnicos = new Map();
         
         // Primeiro, adicionar colaboradores de os_colaboradores_produtos
-        if (os.os_colaboradores_produtos) {
-          os.os_colaboradores_produtos.forEach((rel: any) => {
+        const osAny: any = os as any;
+        if (osAny?.os_colaboradores_produtos) {
+          osAny.os_colaboradores_produtos.forEach((rel: any) => {
             if (rel.colaborador) {
               colaboradoresUnicos.set(rel.colaborador.id, {
                 id: rel.colaborador.id,
@@ -528,28 +542,27 @@ export default function OrdensServico() {
           });
         }
         
-        // Adicionar status dos colaboradores baseado no os_tempo
+        // Mapa rápido de associação colaborador->apontado (existe associação na OS)
+        const associadosNaOS = new Set(
+          (osAny?.os_colaboradores_produtos || []).map((rel: any) => rel.colaborador?.id || rel.colaborador_id)
+        );
+
+        // Adicionar status dos colaboradores baseado no os_tempo (por colaborador_id)
         const colaboradoresComStatus = Array.from(colaboradoresUnicos.values()).map((colab: any) => {
           const colaboradorId = colab.colaborador_id || colab.colaborador?.id;
-          const tempoColaborador = os.os_tempo?.filter((t: any) => 
-            t.colaborador?.nome === colab.colaborador?.nome
+          const tempoColaborador = (os as any).os_tempo?.filter((t: any) => 
+            t.colaborador_id === colaboradorId
           ) || [];
-          
+
           // Determinar status baseado nos registros de tempo
-          let status = 'ativo';
+          // Nova regra: quando não houver registro ATIVO, mas houver associação atual na OS, exibir 'apontado' (não 'finalizado')
+          // Apenas considerar 'finalizado' se não houver associação atual na OS
+          let status = '';
           if (tempoColaborador.length > 0) {
-            // Verificar se há registros ativos (sem data_fim)
-            const temPausaAtiva = tempoColaborador.some((t: any) => 
-              t.tipo === 'pausa' && !t.data_fim
-            );
-            const temParadaAtiva = tempoColaborador.some((t: any) => 
-              t.tipo === 'parada_material' && !t.data_fim
-            );
-            const temTrabalhoAtivo = tempoColaborador.some((t: any) => 
-              t.tipo === 'trabalho' && !t.data_fim
-            );
-            
-            // Lógica corrigida: verificar o tipo do último registro ativo
+            const temPausaAtiva = tempoColaborador.some((t: any) => t.tipo === 'pausa' && !t.data_fim);
+            const temParadaAtiva = tempoColaborador.some((t: any) => t.tipo === 'parada_material' && !t.data_fim);
+            const temTrabalhoAtivo = tempoColaborador.some((t: any) => t.tipo === 'trabalho' && !t.data_fim);
+
             if (temPausaAtiva) {
               status = 'pausado';
             } else if (temParadaAtiva) {
@@ -557,19 +570,64 @@ export default function OrdensServico() {
             } else if (temTrabalhoAtivo) {
               status = 'ativo';
             } else {
-              // Só marca como finalizado se não há nenhum registro ativo
-              status = 'finalizado';
+              status = associadosNaOS.has(colaboradorId) ? 'apontado' : 'finalizado';
             }
+          } else {
+            // Sem histórico de tempo: se está associado na OS, mostrar 'apontado'
+            status = associadosNaOS.has(colaboradorId) ? 'apontado' : '';
           }
-          
+
+          // Logs de depuração para o terminal do Cursor
+          appendDevLog('[OS Status]', (os as any).numero_os, `Colab ${colaboradorId} => ${status} (tempos=${tempoColaborador?.length || 0}, associado=${associadosNaOS.has(colaboradorId)})`);
+          console.log('[OS Status] OS', (os as any).numero_os, 'Colab', colaboradorId, 'status calculado =', status, {
+            tempos: tempoColaborador?.length || 0,
+            associadosNaOS: associadosNaOS.has(colaboradorId)
+          });
+
           return {
             ...colab,
             status
           };
         });
         
+        // Compatibilidade para UI existente: popular nome do colaborador em os_tempo quando possível
+        try {
+          const idParaNome = new Map<string, string>();
+          Array.from(colaboradoresUnicos.values()).forEach((colab: any) => {
+            const cid = colab.colaborador_id || colab.colaborador?.id;
+            const nome = colab.colaborador?.nome;
+            if (cid && nome) idParaNome.set(cid, nome);
+          });
+          if (Array.isArray((os as any).os_tempo)) {
+            (os as any).os_tempo = (os as any).os_tempo.map((t:any) => ({
+              ...t,
+              colaborador: t.colaborador || (t.colaborador_id && idParaNome.has(t.colaborador_id)
+                ? { nome: idParaNome.get(t.colaborador_id) }
+                : undefined),
+            }));
+          }
+        } catch {}
+
+        // Definir status com base em quantos colaboradores estão com trabalho ativo
+        let statusOS = os.status as any;
+        const ativos = (os as any).os_tempo ? (os as any).os_tempo.filter((t:any) => t.tipo === 'trabalho' && !t.data_fim) : [];
+        const ativosSet = new Set(ativos.map((t:any) => t?.colaborador_id));
+        const totalColabs = colaboradoresUnicos.size;
+        const totalAtivos = Array.from(colaboradoresUnicos.values()).filter((colab:any) => {
+          const cid = colab.colaborador_id || colab.colaborador?.id;
+          return ativosSet.has(cid);
+        }).length;
+
+        if (totalAtivos > 0 && totalAtivos < totalColabs && os.status === 'aberta') {
+          statusOS = 'em_andamento_parcial';
+        } else if (totalColabs > 0 && totalAtivos === totalColabs) {
+          // Todos os colaboradores em trabalho: tratar como em andamento total para a UI
+          statusOS = 'em_andamento';
+        }
+
         return {
           ...os,
+          status: statusOS,
           os_colaboradores: colaboradoresComStatus
         };
       });
@@ -672,7 +730,7 @@ export default function OrdensServico() {
             data_abertura: values.data_abertura
               ? new Date(values.data_abertura).toISOString()
               : undefined,
-            data_atual: new Date().toISOString(), // Atualizar data atual
+            // data_atual removido, não faz parte do tipo Update
             data_conclusao: values.data_conclusao
               ? new Date(values.data_conclusao).toISOString()
               : undefined,
@@ -906,12 +964,16 @@ export default function OrdensServico() {
   const handleStartOS = async (os: OrdemServicoComRelacoes) => {
     setIsStarting(true);
     try {
+      appendDevLog('[OS Iniciar]', os.numero_os, `Solicitação para iniciar OS (id=${os.id})`);
+      console.log('[OS Iniciar] Solicitação para iniciar OS', os.numero_os, 'ID', os.id);
       // Fechar quaisquer tempos abertos desta OS antes de iniciar
       const { data: temposAbertos } = await supabase
         .from('os_tempo')
         .select('*')
         .eq('os_id', os.id)
         .is('data_fim', null);
+      appendDevLog('[OS Iniciar]', os.numero_os, `Tempos abertos encontrados: ${(temposAbertos || []).length}`);
+      console.log('[OS Iniciar] Tempos abertos encontrados:', (temposAbertos || []).length);
       if (temposAbertos && temposAbertos.length) {
         const nowIso = new Date().toISOString();
         for (const t of temposAbertos) {
@@ -922,6 +984,8 @@ export default function OrdensServico() {
             .from('os_tempo')
             .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
             .eq('id', t.id);
+          appendDevLog('[OS Iniciar]', os.numero_os, `Tempo fechado (tempoId=${t.id}, tipo=${t.tipo}, colaborador_id=${t.colaborador_id}, horas=${horas.toFixed(2)})`);
+          console.log('[OS Iniciar] Tempo fechado', { tempoId: t.id, tipo: t.tipo, colaborador_id: t.colaborador_id, horas });
 
           // Se havia uma parada de material em aberto, lançar débito formal
           if (t.tipo === 'parada_material' && t.colaborador_id) {
@@ -932,6 +996,8 @@ export default function OrdensServico() {
               horas_abatidas: Number(horas.toFixed(2)),
               observacoes: 'Débito gerado automaticamente ao iniciar OS'
             });
+            appendDevLog('[OS Iniciar]', os.numero_os, `Débito retrabalho lançado (colab=${t.colaborador_id}, horas=${horas.toFixed(2)})`);
+            console.log('[OS Iniciar] Débito retrabalho lançado para colaborador', t.colaborador_id, 'horas', horas);
           }
         }
       }
@@ -946,6 +1012,8 @@ export default function OrdensServico() {
         .eq('id', os.id);
 
       if (osError) throw osError;
+      appendDevLog('[OS Iniciar]', os.numero_os, 'Status da OS atualizado para em_andamento');
+      console.log('[OS Iniciar] Status da OS atualizado para em_andamento', os.numero_os);
 
       // Buscar colaboradores ativos na OS
       const { data: colaboradoresOS, error: colabError } = await supabase
@@ -957,6 +1025,8 @@ export default function OrdensServico() {
       if (colabError) throw colabError;
       if (!colaboradoresOS || colaboradoresOS.length === 0)
         throw new Error('Nenhum colaborador ativo na OS.');
+      appendDevLog('[OS Iniciar]', os.numero_os, `Colaboradores ativos: ${colaboradoresOS.map(c => c.colaborador_id).join(',')}`);
+      console.log('[OS Iniciar] Colaboradores ativos na OS:', colaboradoresOS.map(c => c.colaborador_id));
 
       // Registrar início no os_tempo para cada colaborador
       const registrosTempo = colaboradoresOS.map(({ colaborador_id }) => ({
@@ -971,6 +1041,8 @@ export default function OrdensServico() {
         .insert(registrosTempo);
 
       if (tempoError) throw tempoError;
+      appendDevLog('[OS Iniciar]', os.numero_os, `Registros TRABALHO inseridos: ${registrosTempo.length}`);
+      console.log('[OS Iniciar] Registros de tempo TRABALHO inseridos:', registrosTempo.length);
 
       // Auditoria: início ou reinício de OS baseado no status anterior
       if (os.status === 'pausada') {
@@ -978,6 +1050,8 @@ export default function OrdensServico() {
       } else {
         await auditarInicioOS(os, colaboradoresOS);
       }
+      appendDevLog('[OS Iniciar]', os.numero_os, 'Auditoria registrada');
+      console.log('[OS Iniciar] Auditoria registrada');
 
       toast({ title: 'OS iniciada com sucesso!' });
       fetchOrdensServico();
@@ -1024,6 +1098,8 @@ export default function OrdensServico() {
 
     setIsPausing(true);
     try {
+      appendDevLog('[OS Justificativa]', osParaJustificativa.numero_os, `Tipo=${justificativaTipo} Colab=${colaboradorParaJustificativa || 'todos'}`);
+      console.log('[OS Justificativa] Tipo', justificativaTipo, 'OS', osParaJustificativa.numero_os, 'Colab alvo', colaboradorParaJustificativa || 'todos');
       if (colaboradorParaJustificativa && colaboradorParaJustificativa !== 'select') {
         // Finalizar o tempo atual apenas para o colaborador selecionado
         const { data: tempoAberto } = await supabase
@@ -1043,6 +1119,8 @@ export default function OrdensServico() {
             .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
             .eq('id', tempoAberto.id);
           if (updateError) throw updateError;
+          appendDevLog('[OS Justificativa]', osParaJustificativa.numero_os, `Tempo fechado (colab=${colaboradorParaJustificativa}, horas=${horas.toFixed(2)})`);
+          console.log('[OS Justificativa] Tempo fechado do colaborador', colaboradorParaJustificativa, 'horas', horas);
 
           // Se estávamos fechando um trabalho para abrir uma parada_material deste colaborador,
           // lançar débito formal em retrabalhos
@@ -1054,6 +1132,8 @@ export default function OrdensServico() {
               horas_abatidas: Number(horas.toFixed(2)),
               observacoes: 'Débito gerado automaticamente ao registrar parada por colaborador'
             });
+            appendDevLog('[OS Justificativa]', osParaJustificativa.numero_os, `Retrabalho lançado (colab=${tempoAberto.colaborador_id}, horas=${horas.toFixed(2)})`);
+            console.log('[OS Justificativa] Débito retrabalho lançado para colaborador', tempoAberto.colaborador_id, 'horas', horas);
           }
         }
       } else {
@@ -1074,6 +1154,8 @@ export default function OrdensServico() {
             .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
             .eq('id', tempoAtual.id);
           if (updateError) throw updateError;
+          appendDevLog('[OS Justificativa]', osParaJustificativa.numero_os, `Tempo aberto geral fechado (tempoId=${tempoAtual.id}, horas=${horas.toFixed(2)})`);
+          console.log('[OS Justificativa] Tempo aberto geral fechado', { tempoId: tempoAtual.id, horas });
         }
       }
 
@@ -1105,6 +1187,8 @@ export default function OrdensServico() {
         .insert(registrosTempo);
 
       if (tempoError) throw tempoError;
+      appendDevLog('[OS Justificativa]', osParaJustificativa.numero_os, `Registros inseridos=${registrosTempo.length} tipo=${justificativaTipo}`);
+      console.log('[OS Justificativa] Registros inseridos', registrosTempo.length, 'tipo', justificativaTipo);
 
       // Salvar justificativa na tabela de justificativas
       const { error: justificativaError } = await supabase
@@ -1134,6 +1218,8 @@ export default function OrdensServico() {
           supabase.rpc('increment_paradas_material', { colaborador_id })
         );
         await Promise.all(updatePromises);
+        appendDevLog('[OS Justificativa]', osParaJustificativa.numero_os, `Paradas material ++ para ${colaboradoresOS.map(c => c.colaborador_id).join(',')}`);
+        console.log('[OS Justificativa] Paradas de material incrementadas para', colaboradoresOS.map(c => c.colaborador_id));
       }
 
       // Auditoria: pausa ou parada de OS
@@ -1142,6 +1228,8 @@ export default function OrdensServico() {
       } else {
         await auditarParadaOS(osParaJustificativa, justificativa);
       }
+      appendDevLog('[OS Justificativa]', osParaJustificativa.numero_os, 'Auditoria registrada');
+      console.log('[OS Justificativa] Auditoria registrada');
 
       toast({
         title: justificativaTipo === 'pausa' ? 'OS pausada com sucesso!' : 'OS parada com sucesso!',
@@ -1181,6 +1269,8 @@ export default function OrdensServico() {
 
     setIsPausing(true);
     try {
+      appendDevLog('[OS Colab]', osParaJustificativa.numero_os, `Tipo=${colaboradorSelectionTipo} Colab=${colaboradorId}`);
+      console.log('[OS Colaborador Seleção] Tipo', colaboradorSelectionTipo, 'OS', osParaJustificativa.numero_os, 'Colab', colaboradorId);
       // Encontrar o colaborador específico
       const colaboradorOS = osParaJustificativa.os_colaboradores?.find(col => col.colaborador_id === colaboradorId);
       if (!colaboradorOS) {
@@ -1205,6 +1295,8 @@ export default function OrdensServico() {
       if (errorTempo) {
         console.error('Erro ao encerrar tempo:', errorTempo);
       }
+      appendDevLog('[OS Colab]', osParaJustificativa.numero_os, `Tempos anteriores encerrados para colab=${colaboradorId}`);
+      console.log('[OS Colaborador Seleção] Tempos anteriores encerrados para colaborador', colaboradorId);
 
       // Inserir novo registro de tempo baseado na ação
       let tipoTempo = '';
@@ -1231,18 +1323,11 @@ export default function OrdensServico() {
         if (errorInserirTempo) {
           console.error('Erro ao inserir registro de tempo:', errorInserirTempo);
         }
+        appendDevLog('[OS Colab]', osParaJustificativa.numero_os, `Tempo inserido tipo=${tipoTempo} colab=${colaboradorId}`);
+        console.log('[OS Colaborador Seleção] Registro de tempo inserido', { tipoTempo, colaboradorId });
       }
 
-      // Se for finalização, remover o colaborador da OS
-      if (colaboradorSelectionTipo === 'finalizacao') {
-        const { error: errorRemove } = await supabase
-          .from('os_colaboradores')
-          .delete()
-          .eq('os_id', osParaJustificativa.id)
-          .eq('colaborador_id', colaboradorId);
-
-        if (errorRemove) throw errorRemove;
-      }
+      // Não removemos o colaborador da OS ao finalizar; ele poderá ser reatribuído
 
       // Registrar na auditoria
       const acao = colaboradorSelectionTipo === 'pausa' ? 'pausar_os' : 
@@ -1259,6 +1344,8 @@ export default function OrdensServico() {
           await auditarFinalizacaoColaborador(osParaJustificativa, colaborador, justificativa);
         }
       }
+      appendDevLog('[OS Colab]', osParaJustificativa.numero_os, 'Auditoria registrada');
+      console.log('[OS Colaborador Seleção] Auditoria registrada');
 
       const acaoTexto = colaboradorSelectionTipo === 'pausa' ? 'pausado' : 
                        colaboradorSelectionTipo === 'parada' ? 'parado' : 'finalizado';
@@ -1290,6 +1377,8 @@ export default function OrdensServico() {
   ) => {
     setIsFinishing(true);
     try {
+      appendDevLog('[OS Finalizar]', os.numero_os, `Solicitação (desconto=${tipo}:${valor})`);
+      console.log('[OS Finalizar] Solicitação para finalizar OS', os.numero_os, 'tipo desconto', tipo, 'valor', valor);
       const totalAtual = os.valor_total || 0;
       const descontoValor = tipo === 'valor' ? valor : (totalAtual * (valor || 0)) / 100;
       const descontoAplicado = Math.max(0, Math.min(descontoValor, totalAtual));
@@ -1314,6 +1403,8 @@ export default function OrdensServico() {
           .eq('id', tempoAtual.id);
 
         if (updateError) throw updateError;
+        appendDevLog('[OS Finalizar]', os.numero_os, `Tempo aberto encerrado (tempoId=${tempoAtual.id}, horas=${horas.toFixed(2)})`);
+        console.log('[OS Finalizar] Tempo aberto encerrado ao finalizar', { tempoId: tempoAtual.id, horas });
       }
 
       // Atualizar status e descontos da OS
@@ -1329,9 +1420,13 @@ export default function OrdensServico() {
         .eq('id', os.id);
 
       if (osError) throw osError;
+      appendDevLog('[OS Finalizar]', os.numero_os, `OS finalizada (desconto aplicado=${descontoAplicado})`);
+      console.log('[OS Finalizar] OS finalizada', os.numero_os, 'desconto aplicado', descontoAplicado);
 
       // Auditoria: finalização de OS
       await auditarFinalizacaoOS(os);
+      appendDevLog('[OS Finalizar]', os.numero_os, 'Auditoria registrada');
+      console.log('[OS Finalizar] Auditoria registrada');
 
       toast({ title: 'OS finalizada com sucesso!' });
       fetchOrdensServico();
@@ -1369,16 +1464,16 @@ export default function OrdensServico() {
       const isUUID = (value: string): boolean =>
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
-      // Primeiro, remover todas as associações existentes para esta OS
-      const { error: deleteError } = await supabase
+      // Buscar associações existentes para preservar created_at e evitar reset indevido
+      const { data: existentes, error: existentesError } = await supabase
         .from('os_colaboradores_produtos')
-        .delete()
+        .select('os_id, produto_id, colaborador_id')
         .eq('os_id', os.id);
+      if (existentesError) throw existentesError;
+      const setExistentes = new Set((existentes || []).map((r: any) => `${r.produto_id}|${r.colaborador_id}`));
 
-      if (deleteError) throw deleteError;
-
-      // Processar as associações de colaboradores por produto
-      const colaboradoresProdutosToSave = selectedColaboradores.map(
+      // Normalizar seleção atual
+      const normalizados = selectedColaboradores.map(
         (associacao) => {
           // Use a delimiter that does not occur in UUIDs
           const [produtoId, colaboradorId] = associacao.split('|');
@@ -1390,13 +1485,31 @@ export default function OrdensServico() {
         }
       ).filter(r => isUUID(r.os_id) && isUUID(r.produto_id) && isUUID(r.colaborador_id));
 
-      // Inserir as novas associações
-      if (colaboradoresProdutosToSave.length > 0) {
-        const { error: errorProdutos } = await supabase
-          .from('os_colaboradores_produtos')
-          .insert(colaboradoresProdutosToSave);
+      const setSelecionados = new Set(normalizados.map(r => `${r.produto_id}|${r.colaborador_id}`));
 
-        if (errorProdutos) throw errorProdutos;
+      // Calcular diffs para inserir/remover apenas o necessário
+      const toInsert = normalizados.filter(r => !setExistentes.has(`${r.produto_id}|${r.colaborador_id}`));
+      const toDelete = (existentes || []).filter((r: any) => !setSelecionados.has(`${r.produto_id}|${r.colaborador_id}`));
+
+      if (toInsert.length > 0) {
+        const { error: errorInsert } = await supabase
+          .from('os_colaboradores_produtos')
+          .insert(toInsert);
+        if (errorInsert) throw errorInsert;
+      }
+      if (toDelete.length > 0) {
+        const deletions = toDelete.map((r: any) =>
+          supabase
+            .from('os_colaboradores_produtos')
+            .delete()
+            .eq('os_id', os.id)
+            .eq('produto_id', r.produto_id)
+            .eq('colaborador_id', r.colaborador_id)
+        );
+        const deletionResults = await Promise.all(deletions);
+        for (const res of deletionResults) {
+          if ((res as any).error) throw (res as any).error;
+        }
       }
 
       // Também manter a compatibilidade com a tabela antiga (os_colaboradores)
@@ -1408,28 +1521,30 @@ export default function OrdensServico() {
           .filter(id => isUUID(id))
       )];
       
-      // Primeiro, remover todos os colaboradores existentes da OS
-      const { error: deleteColabError } = await supabase
+      // Sincronizar tabela antiga os_colaboradores preservando existentes e inserindo faltantes
+      const { data: existentesColabs } = await supabase
         .from('os_colaboradores')
-        .delete()
+        .select('colaborador_id')
         .eq('os_id', os.id);
-
-      if (deleteColabError) throw deleteColabError;
-      
-      // Depois, inserir apenas os colaboradores selecionados
-      if (colaboradoresUnicos.length > 0) {
-      const colaboradoresToSave = colaboradoresUnicos.map(
-        (colaboradorId) => ({
-          os_id: os.id,
-          colaborador_id: colaboradorId,
-        })
-      );
-
-      const { error: errorColaboradores } = await supabase
-        .from('os_colaboradores')
+      const setExistentesColabs = new Set((existentesColabs || []).map((r: any) => r.colaborador_id));
+      const novosColabs = colaboradoresUnicos.filter(id => !setExistentesColabs.has(id));
+      if (novosColabs.length > 0) {
+        const colaboradoresToSave = novosColabs.map((colaboradorId) => ({ os_id: os.id, colaborador_id: colaboradorId }));
+        const { error: errorColaboradores } = await supabase
+          .from('os_colaboradores')
           .insert(colaboradoresToSave);
-
-      if (errorColaboradores) throw errorColaboradores;
+        if (errorColaboradores) throw errorColaboradores;
+      }
+      // Remover da tabela antiga apenas os que foram explicitamente desassociados de todos os produtos
+      const manterColabs = new Set(colaboradoresUnicos);
+      const toRemoveColabs = (existentesColabs || []).filter((r: any) => !manterColabs.has(r.colaborador_id));
+      if (toRemoveColabs.length > 0) {
+        const { error: errorRemoveOld } = await supabase
+          .from('os_colaboradores')
+          .delete()
+          .eq('os_id', os.id)
+          .in('colaborador_id', toRemoveColabs.map((r: any) => r.colaborador_id));
+        if (errorRemoveOld) throw errorRemoveOld;
       }
 
       // Auditoria: adição de colaboradores
@@ -1440,6 +1555,7 @@ export default function OrdensServico() {
         }
       }
 
+      appendDevLog('[OS Assoc]', os.numero_os as any, `Inseridos=${(toInsert || []).length} Removidos=${(toDelete || []).length}`);
       toast({ title: 'Colaboradores associados aos produtos com sucesso!' });
       setShowColaboradoresDialog(false);
       setSelectedColaboradores([]);
@@ -1528,6 +1644,137 @@ export default function OrdensServico() {
     }
   };
 
+  // Reiniciar colaborador específico (quando estiver pausado/parado)
+  const handleRestartColaborador = async (os: any, colaboracao: any) => {
+    try {
+      const colaboradorId = colaboracao.colaborador_id || colaboracao.id;
+      if (!colaboradorId) return;
+
+      const ok = window.confirm(`Reiniciar o colaborador "${colaboracao.colaborador?.nome || ''}" na OS ${os.numero_os}?`);
+      if (!ok) return;
+
+      // Fechar quaisquer tempos abertos do colaborador nesta OS
+      const { data: temposAbertos } = await supabase
+        .from('os_tempo')
+        .select('*')
+        .eq('os_id', os.id)
+        .eq('colaborador_id', colaboradorId)
+        .is('data_fim', null);
+      if (temposAbertos && temposAbertos.length) {
+        const nowIso = new Date().toISOString();
+        for (const t of temposAbertos) {
+          const inicio = new Date(t.data_inicio).getTime();
+          const fim = new Date().getTime();
+          const horas = Math.max(0, (fim - inicio) / (1000 * 60 * 60));
+          await supabase
+            .from('os_tempo')
+            .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
+            .eq('id', t.id);
+        }
+      }
+
+      // Garantir OS em andamento
+      if (os.status !== 'em_andamento') {
+        await supabase
+          .from('ordens_servico')
+          .update({ status: 'em_andamento' })
+          .eq('id', os.id);
+      }
+
+      // Abrir novo registro de trabalho para o colaborador
+      const { error: tempoError } = await supabase
+        .from('os_tempo')
+        .insert({
+          os_id: os.id,
+          colaborador_id: colaboradorId,
+          tipo: 'trabalho',
+          data_inicio: new Date().toISOString(),
+        });
+      if (tempoError) throw tempoError;
+
+      // Auditoria
+      if (colaboracao.colaborador) {
+        await auditarReinicioOS(os, [{ nome: colaboracao.colaborador.nome }]);
+      }
+
+      toast({ title: 'Colaborador reiniciado com sucesso!', description: `OS ${os.numero_os} retomada para este colaborador.` });
+      fetchOrdensServico();
+    } catch (e) {
+      toast({ title: 'Erro ao reiniciar colaborador', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    }
+  };
+
+  // Iniciar colaborador após ter sido finalizado (reabrir hora)
+  const handleStartColaborador = async (os: any, colaboracao: any) => {
+    try {
+      const colaboradorId = colaboracao.colaborador_id || colaboracao.id;
+      if (!colaboradorId) return;
+
+
+      // Fecha qualquer tempo aberto desse colaborador nesta OS, para não "reabrir" produto antigo
+      const { data: abertos } = await supabase
+        .from('os_tempo')
+        .select('*')
+        .eq('os_id', os.id)
+        .eq('colaborador_id', colaboradorId)
+        .is('data_fim', null);
+      if (abertos && abertos.length) {
+        const nowIso = new Date().toISOString();
+        for (const t of abertos) {
+          const inicio = new Date(t.data_inicio).getTime();
+          const fim = new Date().getTime();
+          const horas = Math.max(0, (fim - inicio) / (1000 * 60 * 60));
+          await supabase
+            .from('os_tempo')
+            .update({ data_fim: nowIso, horas_calculadas: Number(horas.toFixed(2)) })
+            .eq('id', t.id);
+        }
+      }
+
+      // Atualizar status da OS somente se estiver pausada; se estiver "aberta",
+      // não muda no banco (a UI apresentará "Em Andamento Parcial" ao detectar tempo ativo)
+      if (os.status === 'pausada') {
+        await supabase
+          .from('ordens_servico')
+          .update({ status: 'em_andamento' })
+          .eq('id', os.id);
+      }
+
+      // Abrir novo registro de trabalho
+      // CORREÇÃO: Incluir produto_id quando disponível para associar tempo ao produto específico
+      const dadosTempo = {
+        os_id: os.id,
+        colaborador_id: colaboradorId,
+        tipo: 'trabalho',
+        data_inicio: new Date().toISOString(),
+        produto_id: colaboracao.produto_id || null, // Incluir produto_id se disponível
+      };
+      
+      
+      const { error } = await supabase
+        .from('os_tempo')
+        .insert(dadosTempo);
+      if (error) throw error;
+
+      // Auditoria
+      if (colaboracao.colaborador) {
+        await registrarAcao({
+          acao: 'adicionar_colaborador',
+          osId: os.id,
+          numeroOs: os.numero_os,
+          dadosAnteriores: {},
+          dadosNovos: { colaborador: colaboracao.colaborador.nome },
+          detalhes: `Colaborador ${colaboracao.colaborador.nome} iniciado individualmente`
+        });
+      }
+
+      toast({ title: 'Colaborador iniciado com sucesso!', description: `Tempo iniciado para este colaborador. A OS pode aparecer como Em Andamento Parcial.` });
+      fetchOrdensServico();
+    } catch (e) {
+      toast({ title: 'Erro ao iniciar colaborador', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    }
+  };
+
   const filteredOrdensBase = statusFilter
     ? ordens.filter((os) => os.status === statusFilter)
     : ordens.filter((os) => os.status !== 'em_cliente');
@@ -1565,6 +1812,8 @@ export default function OrdensServico() {
           </Button>
         </div>
       </div>
+
+      {/* Painel de logs de depuração removido conforme solicitação */}
       <OSResponsiveTable
         data={filteredOrdens}
         loading={loading}
@@ -1579,6 +1828,8 @@ export default function OrdensServico() {
         onParadaMaterial={handlePararOS}
         onPararColaborador={handlePararColaborador}
         onRemoveColaborador={handleRemoveColaborador}
+        onRestartColaborador={handleRestartColaborador}
+        onStartColaborador={handleStartColaborador}
         statusFilterValue={statusFilter}
         onChangeStatusFilter={setStatusFilter}
         dateSort={dateSort}
@@ -2401,21 +2652,6 @@ export default function OrdensServico() {
         osNumero={osParaJustificativa?.numero_os || ''}
         tempoTolerancia={justificativaTipo === 'pausa' ? tempoTolerancia : undefined}
         loading={isPausing}
-        // Campos extras: seleção de colaborador quando requerido
-        extraFields={(() => {
-          if (!osParaJustificativa) return null;
-          if (colaboradorParaJustificativa !== 'select') return null;
-          const options = (osParaJustificativa.os_colaboradores || []).map((c:any) => ({
-            id: c.colaborador_id,
-            nome: c.colaborador?.nome || 'N/A',
-          }));
-          return {
-            type: 'select_colaborador',
-            options,
-            value: '',
-            onChange: (id: string) => setColaboradorParaJustificativa(id || null),
-          } as any;
-        })()}
       />
 
       <ColaboradorSelectionDialog

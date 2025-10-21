@@ -5,6 +5,7 @@ import {
   UserCheck,
   BarChart3,
   Settings,
+  FileText,
 } from 'lucide-react';
 
 export type AppModule = {
@@ -58,6 +59,13 @@ export const mainModules: AppModule[] = [
     icon: BarChart3,
     permission: 'relatorio_visualizar',
     description: 'Produtividade, tempo real vs previsto, status de OS.',
+  },
+  {
+    title: 'Orçamentos',
+    url: '/orcamentos',
+    icon: FileText,
+    permission: 'orcamento_visualizar',
+    description: 'Gestão de orçamentos e transformação em OS.',
   },
 ];
 

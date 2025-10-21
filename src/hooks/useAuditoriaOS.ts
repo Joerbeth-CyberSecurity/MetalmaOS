@@ -145,6 +145,24 @@ export function useAuditoriaOS() {
     });
   };
 
+  const auditarReinicioColaboradorFinalizado = async (os: any, colaborador: any) => {
+    await registrarAcao({
+      acao: 'reiniciar_colaborador_finalizado',
+      osId: os.id,
+      numeroOs: os.numero_os,
+      dadosAnteriores: { 
+        colaborador: colaborador.nome,
+        status_colaborador: 'finalizado'
+      },
+      dadosNovos: { 
+        colaborador: colaborador.nome,
+        status_colaborador: 'reiniciado',
+        data_reinicio: new Date().toISOString()
+      },
+      detalhes: `Colaborador ${colaborador.nome} reiniciado na OS ${os.numero_os} após ter sido finalizado. Nova contagem de horas iniciada.`
+    });
+  };
+
   const auditarPausaOS = async (os: any, motivo?: string) => {
     await registrarAcao({
       acao: 'pausar_os',
@@ -251,6 +269,24 @@ export function useAuditoriaOS() {
     });
   };
 
+  const auditarAjusteHorasOS = async (os: any, colaborador: any, horasAnteriores: number, horasNovas: number, justificativa: string) => {
+    await registrarAcao({
+      acao: 'ajustar_horas_os',
+      osId: os.id,
+      numeroOs: os.numero_os,
+      dadosAnteriores: { 
+        colaborador: colaborador.nome,
+        horas: horasAnteriores
+      },
+      dadosNovos: { 
+        colaborador: colaborador.nome,
+        horas: horasNovas,
+        diferenca: horasNovas - horasAnteriores
+      },
+      detalhes: `Ajuste de horas para ${colaborador.nome} na OS ${os.numero_os}. De ${horasAnteriores.toFixed(2)}h para ${horasNovas.toFixed(2)}h (${horasNovas - horasAnteriores > 0 ? '+' : ''}${(horasNovas - horasAnteriores).toFixed(2)}h). Justificativa: ${justificativa}`
+    });
+  };
+
   return {
     registrarAcao,
     auditarCriacaoOS,
@@ -258,6 +294,7 @@ export function useAuditoriaOS() {
     auditarExclusaoOS,
     auditarInicioOS,
     auditarReinicioOS,
+    auditarReinicioColaboradorFinalizado,
     auditarPausaOS,
     auditarParadaOS,
     auditarFinalizacaoOS,
@@ -266,6 +303,7 @@ export function useAuditoriaOS() {
     auditarRemocaoColaborador,
     auditarPausaColaborador,
     auditarParadaColaborador,
-    auditarFinalizacaoColaborador
+    auditarFinalizacaoColaborador,
+    auditarAjusteHorasOS
   };
 }

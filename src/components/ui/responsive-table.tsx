@@ -666,12 +666,12 @@ export function OSResponsiveTable({
                 </HoverCard>
                 {/* Sem indicador global de "em trabalho" para evitar ambiguidade entre produtos */}
                 <>
-                    {(status === 'pausado' || status === 'parado') && (
+                    {(status === 'pausado' || status === 'parado' || status === 'finalizado') && (
                       <button
                         type="button"
                         aria-label="Reiniciar colaborador"
                         className={`inline-flex h-5 w-5 items-center justify-center rounded border transition border-border text-muted-foreground hover:text-green-600 hover:border-green-600`}
-                        title={'Reiniciar colaborador'}
+                        title={status === 'finalizado' ? 'Reiniciar colaborador finalizado' : 'Reiniciar colaborador'}
                         onClick={(e) => {
                           e.stopPropagation();
                           onRestartColaborador?.(item, c);

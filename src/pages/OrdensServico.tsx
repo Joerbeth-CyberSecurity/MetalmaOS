@@ -259,6 +259,7 @@ export default function OrdensServico() {
     auditarExclusaoOS,
     auditarInicioOS,
     auditarReinicioOS,
+    auditarReinicioColaboradorFinalizado,
     auditarPausaOS,
     auditarParadaOS,
     auditarFinalizacaoOS,
@@ -1692,9 +1693,9 @@ export default function OrdensServico() {
         });
       if (tempoError) throw tempoError;
 
-      // Auditoria
+      // Auditoria específica para colaborador finalizado
       if (colaboracao.colaborador) {
-        await auditarReinicioOS(os, [{ nome: colaboracao.colaborador.nome }]);
+        await auditarReinicioColaboradorFinalizado(os, colaboracao.colaborador);
       }
 
       toast({ title: 'Colaborador reiniciado com sucesso!', description: `OS ${os.numero_os} retomada para este colaborador.` });
@@ -2035,7 +2036,7 @@ export default function OrdensServico() {
                       : undefined;
                     return (
                       <FormItem className="flex flex-col">
-                        <FormLabel>Data Conclusão</FormLabel>
+                        <FormLabel>Data Prevista</FormLabel>
                         <div className="flex items-center gap-2">
                           <Popover>
                             <PopoverTrigger asChild>

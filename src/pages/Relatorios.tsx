@@ -114,6 +114,12 @@ export default function Relatorios() {
       description: 'Débitos de horas por OS e colaborador',
       icon: AlertTriangle,
     },
+    {
+      id: 'atraso_os',
+      title: 'Atraso de OS',
+      description: 'Análise de atraso baseado na data prevista',
+      icon: Clock,
+    },
   ];
 
   useEffect(() => {
@@ -493,6 +499,10 @@ export default function Relatorios() {
         case 'emissao_os':
           console.log('Gerando relatório de emissão de OS...');
           await generateEmissaoOSReport(start, end);
+          break;
+        case 'atraso_os':
+          console.log('Gerando relatório de atraso de OS...');
+          await generateAtrasoOSReport(start, end);
           break;
         default:
           console.log('Tipo de relatório não reconhecido:', selectedReport);
@@ -913,9 +923,10 @@ export default function Relatorios() {
         descricao: os.descricao,
         status: os.status,
         data_abertura: os.data_abertura,
+        data_sistema_abertura: new Date().toISOString().split('T')[0], // Data do sistema no dia da abertura
+        data_prevista: (os as any).data_conclusao || (os as any).data_previsao, // Data prevista para conclusão
+        data_os_finalizada: os.data_fim, // Data quando a OS inteira foi finalizada
         data_atual: (os as any).data_atual,
-        data_conclusao: (os as any).data_conclusao,
-        data_fim: os.data_fim,
         valor_total: os.valor_total,
         desconto_tipo: os.desconto_tipo,
         desconto_valor: os.desconto_valor,
@@ -984,7 +995,7 @@ export default function Relatorios() {
           };
         });
 
-        osData = [...osData, ...osExcluidasData];
+        osData = [...osData, ...osExcluidasData] as any[];
       }
 
 
@@ -1019,6 +1030,88 @@ export default function Relatorios() {
     }
   };
 
+  const generateAtrasoOSReport = async (start, end) => {
+    try {
+      console.log('Iniciando geração do relatório de atraso de OS...');
+      console.log('Período:', { start, end });
+
+      // Buscar OS com data prevista
+      const { data: ordens, error } = await supabase
+        .from('ordens_servico')
+        .select(`
+          *,
+          clientes (
+            nome,
+            cpf_cnpj
+          )
+        `)
+        .gte('data_abertura', start)
+        .lte('data_abertura', end)
+        .not('data_conclusao', 'is', null) // Apenas OS com data prevista
+        .order('data_abertura', { ascending: false });
+
+      if (error) throw error;
+
+      const atrasoData = (ordens || []).map((os: any) => {
+        const dataPrevista = new Date(os.data_conclusao);
+        const dataAtual = new Date();
+        const dataFinalizacao = os.data_fim ? new Date(os.data_fim) : null;
+        
+        // Calcular dias de atraso
+        let diasAtraso = 0;
+        let statusAtraso = '';
+        
+        if (os.status === 'finalizada' && dataFinalizacao) {
+          // OS finalizada - comparar data de finalização com data prevista
+          diasAtraso = Math.ceil((dataFinalizacao.getTime() - dataPrevista.getTime()) / (1000 * 60 * 60 * 24));
+          statusAtraso = diasAtraso > 0 ? 'Atrasada' : diasAtraso < 0 ? 'Antecipada' : 'No prazo';
+        } else {
+          // OS não finalizada - comparar data atual com data prevista
+          diasAtraso = Math.ceil((dataAtual.getTime() - dataPrevista.getTime()) / (1000 * 60 * 60 * 24));
+          statusAtraso = diasAtraso > 0 ? 'Em atraso' : diasAtraso < 0 ? 'No prazo' : 'No prazo';
+        }
+
+        return {
+          os_numero: os.numero_os,
+          cliente: os.clientes?.nome || 'N/A',
+          data_abertura: os.data_abertura,
+          data_prevista: os.data_conclusao,
+          data_finalizacao: os.data_fim,
+          status: os.status,
+          dias_atraso: diasAtraso,
+          status_atraso: statusAtraso,
+          valor_total: os.valor_total || 0,
+          tempo_previsto: os.tempo_execucao_previsto || 0,
+          tempo_real: os.tempo_execucao_real || 0
+        };
+      });
+
+      // Filtrar apenas OS com atraso se solicitado
+      const osComAtraso = atrasoData.filter(os => os.dias_atraso > 0);
+      const totalAtraso = osComAtraso.reduce((sum, os) => sum + os.dias_atraso, 0);
+      const mediaAtraso = osComAtraso.length > 0 ? totalAtraso / osComAtraso.length : 0;
+
+      setReportData({
+        type: 'atraso_os',
+        data: atrasoData,
+        period: { start, end },
+        filters: { cliente: clienteFilter },
+        estatisticas: {
+          total_os: atrasoData.length,
+          os_com_atraso: osComAtraso.length,
+          total_dias_atraso: totalAtraso,
+          media_atraso: Math.round(mediaAtraso * 10) / 10,
+          percentual_atraso: atrasoData.length > 0 ? Math.round((osComAtraso.length / atrasoData.length) * 100) : 0
+        }
+      });
+
+      console.log('Relatório de atraso de OS gerado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao gerar relatório de atraso de OS:', error);
+      alert('Erro ao gerar relatório: ' + error.message);
+    }
+  };
+
   // Função para obter título do relatório
   const getReportTitle = (type) => {
     switch (type) {
@@ -1032,6 +1125,8 @@ export default function Relatorios() {
         return 'RELATÓRIO DE CONTROLE DE TEMPO';
       case 'emissao_os':
         return 'RELATÓRIO DE EMISSÃO DE ORDENS DE SERVIÇO';
+      case 'atraso_os':
+        return 'RELATÓRIO DE ATRASO DE ORDENS DE SERVIÇO';
       default:
         return 'RELATÓRIO';
     }
@@ -1420,7 +1515,9 @@ export default function Relatorios() {
                     <div><strong>Status:</strong> ${os.status.replace(/_/g, ' ').replace(/\\b\\w/g, (l) => l.toUpperCase())}</div>
                     <div><strong>Fábrica:</strong> ${os.fabrica || 'N/A'}</div>
                     <div><strong>Data de Abertura:</strong> ${formatDate(os.data_abertura)}</div>
-                    ${os.data_fim ? `<div><strong>Data de Finalização:</strong> ${formatDate(os.data_fim)}</div>` : ''}
+                    <div><strong>Data do Sistema (Abertura):</strong> ${formatDate(os.data_sistema_abertura)}</div>
+                    ${os.data_prevista ? `<div><strong>Data Prevista:</strong> ${formatDate(os.data_prevista)}</div>` : ''}
+                    ${os.data_os_finalizada ? `<div><strong>Data de OS Finalizada:</strong> ${formatDate(os.data_os_finalizada)}</div>` : ''}
                     <div><strong>Tempo Previsto:</strong> ${os.tempo_execucao_previsto || 0}h</div>
                     <div><strong>Tempo Real:</strong> ${os.tempo_execucao_real || 0}h</div>
                   </div>
@@ -1641,7 +1738,9 @@ export default function Relatorios() {
                     <div><strong>Status:</strong> ${os.status.replace(/_/g, ' ').replace(/\\b\\w/g, (l) => l.toUpperCase())}</div>
                     <div><strong>Fábrica:</strong> ${os.fabrica || 'N/A'}</div>
                     <div><strong>Data de Abertura:</strong> ${formatDate(os.data_abertura)}</div>
-                    ${os.data_fim ? `<div><strong>Data de Finalização:</strong> ${formatDate(os.data_fim)}</div>` : ''}
+                    <div><strong>Data do Sistema (Abertura):</strong> ${formatDate(os.data_sistema_abertura)}</div>
+                    ${os.data_prevista ? `<div><strong>Data Prevista:</strong> ${formatDate(os.data_prevista)}</div>` : ''}
+                    ${os.data_os_finalizada ? `<div><strong>Data de OS Finalizada:</strong> ${formatDate(os.data_os_finalizada)}</div>` : ''}
                     <div><strong>Tempo Previsto:</strong> ${os.tempo_execucao_previsto || 0}h</div>
                     <div><strong>Tempo Real:</strong> ${os.tempo_execucao_real || 0}h</div>
                   </div>
@@ -1800,8 +1899,14 @@ export default function Relatorios() {
         yPosition += 6;
         doc.text(`Data de Abertura: ${formatDate(os.data_abertura)}`, 20, yPosition);
         yPosition += 6;
-        if (os.data_fim) {
-          doc.text(`Data de Finalização: ${formatDate(os.data_fim)}`, 20, yPosition);
+        doc.text(`Data do Sistema (Abertura): ${formatDate(os.data_sistema_abertura)}`, 20, yPosition);
+        yPosition += 6;
+        if (os.data_prevista) {
+          doc.text(`Data Prevista: ${formatDate(os.data_prevista)}`, 20, yPosition);
+          yPosition += 6;
+        }
+        if (os.data_os_finalizada) {
+          doc.text(`Data de OS Finalizada: ${formatDate(os.data_os_finalizada)}`, 20, yPosition);
           yPosition += 6;
         }
         doc.text(`Tempo Previsto: ${os.tempo_execucao_previsto || 0}h`, 20, yPosition);
@@ -1985,12 +2090,27 @@ export default function Relatorios() {
           <th>OS</th>
           <th>Fábrica</th>
           <th>Cliente</th>
-          <th>Data</th>
+          <th>Data Abertura</th>
+          <th>Data Sistema</th>
+          <th>Data Prevista</th>
+          <th>Data OS Finalizada</th>
           <th>Status</th>
           <th>Valor Total</th>
           <th>Desconto</th>
           <th>Total Final</th>
           <th>Justificativas</th>
+        `;
+      case 'atraso_os':
+        return `
+          <th>OS</th>
+          <th>Cliente</th>
+          <th>Data Abertura</th>
+          <th>Data Prevista</th>
+          <th>Data Finalização</th>
+          <th>Dias de Atraso</th>
+          <th>Status Atraso</th>
+          <th>Status OS</th>
+          <th>Valor Total</th>
         `;
       default:
         return '';
@@ -2083,6 +2203,9 @@ export default function Relatorios() {
             <td>${os.fabrica || 'N/A'}</td>
             <td>${os.cliente?.nome || 'N/A'}</td>
             <td>${formatDate(os.data_abertura)}</td>
+            <td>${formatDate(os.data_sistema_abertura)}</td>
+            <td>${os.data_prevista ? formatDate(os.data_prevista) : '-'}</td>
+            <td>${os.data_os_finalizada ? formatDate(os.data_os_finalizada) : '-'}</td>
             <td>${os.status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</td>
             <td>${formatCurrency(os.valor_total)}</td>
             <td>${os.desconto_valor ? formatCurrency(os.desconto_valor) : '-'}</td>
@@ -2091,6 +2214,26 @@ export default function Relatorios() {
               ? os.justificativas.map(j => `${j.tipo === 'pausa' ? 'Pausa' : 'Parada'}: ${j.justificativa}`).join('; ')
               : '-'
             }</td>
+          </tr>
+        `
+          )
+          .join('');
+      case 'atraso_os':
+        return reportData.data
+          .map(
+            (os, index) => `
+          <tr>
+            <td style="font-weight: bold;">${os.os_numero}</td>
+            <td>${os.cliente}</td>
+            <td>${formatDate(os.data_abertura)}</td>
+            <td>${formatDate(os.data_prevista)}</td>
+            <td>${os.data_finalizacao ? formatDate(os.data_finalizacao) : '-'}</td>
+            <td style="color: ${os.dias_atraso > 0 ? 'red' : os.dias_atraso < 0 ? 'green' : 'black'}; font-weight: bold;">${os.dias_atraso > 0 ? '+' : ''}${os.dias_atraso} dias</td>
+            <td style="color: ${os.status_atraso === 'Atrasada' || os.status_atraso === 'Em atraso' ? 'red' : os.status_atraso === 'Antecipada' ? 'green' : 'black'};">
+              ${os.status_atraso}
+            </td>
+            <td>${os.status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</td>
+            <td>${formatCurrency(os.valor_total)}</td>
           </tr>
         `
           )
@@ -2164,12 +2307,29 @@ export default function Relatorios() {
             <TableHead>OS</TableHead>
             <TableHead>Fábrica</TableHead>
             <TableHead>Cliente</TableHead>
-            <TableHead>Data</TableHead>
+            <TableHead>Data Abertura</TableHead>
+            <TableHead>Data Sistema</TableHead>
+            <TableHead>Data Prevista</TableHead>
+            <TableHead>Data OS Finalizada</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Valor Total</TableHead>
             <TableHead>Desconto</TableHead>
             <TableHead>Total Final</TableHead>
             <TableHead>Justificativas</TableHead>
+          </>
+        );
+      case 'atraso_os':
+        return (
+          <>
+            <TableHead>OS</TableHead>
+            <TableHead>Cliente</TableHead>
+            <TableHead>Data Abertura</TableHead>
+            <TableHead>Data Prevista</TableHead>
+            <TableHead>Data Finalização</TableHead>
+            <TableHead>Dias de Atraso</TableHead>
+            <TableHead>Status Atraso</TableHead>
+            <TableHead>Status OS</TableHead>
+            <TableHead>Valor Total</TableHead>
           </>
         );
       default:
@@ -2271,6 +2431,9 @@ export default function Relatorios() {
             <TableCell>{os.fabrica || 'N/A'}</TableCell>
             <TableCell>{os.cliente?.nome || 'N/A'}</TableCell>
             <TableCell>{formatDate(os.data_abertura)}</TableCell>
+            <TableCell>{formatDate(os.data_sistema_abertura)}</TableCell>
+            <TableCell>{os.data_prevista ? formatDate(os.data_prevista) : '-'}</TableCell>
+            <TableCell>{os.data_os_finalizada ? formatDate(os.data_os_finalizada) : '-'}</TableCell>
             <TableCell>
               <Badge className={`status-${os.status.replace('_', '-')}`}>
                 {os.status
@@ -2309,6 +2472,37 @@ export default function Relatorios() {
                 <span className="text-muted-foreground text-sm">-</span>
               )}
             </TableCell>
+          </TableRow>
+        ));
+      case 'atraso_os':
+        return reportData.data.map((os, index) => (
+          <TableRow key={index} className="cursor-pointer hover:bg-gray-50">
+            <TableCell className="font-medium">{os.os_numero}</TableCell>
+            <TableCell>{os.cliente}</TableCell>
+            <TableCell>{formatDate(os.data_abertura)}</TableCell>
+            <TableCell>{formatDate(os.data_prevista)}</TableCell>
+            <TableCell>{os.data_finalizacao ? formatDate(os.data_finalizacao) : '-'}</TableCell>
+            <TableCell>
+              <Badge 
+                variant={os.dias_atraso > 0 ? 'destructive' : os.dias_atraso < 0 ? 'default' : 'secondary'}
+                className="font-bold"
+              >
+                {os.dias_atraso > 0 ? '+' : ''}{os.dias_atraso} dias
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <Badge 
+                variant={os.status_atraso === 'Atrasada' || os.status_atraso === 'Em atraso' ? 'destructive' : os.status_atraso === 'Antecipada' ? 'default' : 'secondary'}
+              >
+                {os.status_atraso}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <Badge className={`status-${os.status.replace('_', '-')}`}>
+                {os.status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+              </Badge>
+            </TableCell>
+            <TableCell>{formatCurrency(os.valor_total)}</TableCell>
           </TableRow>
         ));
       default:
@@ -2458,7 +2652,7 @@ export default function Relatorios() {
                     <Checkbox
                       id="incluir-excluidas"
                       checked={incluirExcluidas}
-                      onCheckedChange={setIncluirExcluidas}
+                      onCheckedChange={(checked) => setIncluirExcluidas(!!checked)}
                     />
                     <Label htmlFor="incluir-excluidas" className="text-sm font-medium">
                       Incluir OS Excluídas

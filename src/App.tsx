@@ -16,6 +16,7 @@ import Clientes from './pages/Clientes';
 import Produtos from './pages/Produtos';
 import Colaboradores from './pages/Colaboradores';
 import Relatorios from './pages/Relatorios';
+import Orcamentos from './pages/Orcamentos';
 import Configuracoes from './pages/Configuracoes';
 import NotFound from './pages/NotFound';
 import ResetPassword from './pages/ResetPassword';
@@ -56,6 +57,7 @@ function App() {
                             element={<Colaboradores />}
                           />
                           <Route path="/relatorios" element={<Relatorios />} />
+                          <Route path="/orcamentos" element={<Orcamentos />} />
                           <Route
                             path="/configuracoes"
                             element={<Configuracoes />}

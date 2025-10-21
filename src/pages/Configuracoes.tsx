@@ -20,8 +20,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Shield, AlertTriangle, Users, Settings, Paintbrush, Database, Download, Archive } from 'lucide-react';
+import { Loader2, Shield, AlertTriangle, Users, Settings, Paintbrush, Database, Download, Archive, FileText, Calendar, Search } from 'lucide-react';
 import { Dialog } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -32,6 +33,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useTheme } from '@/components/ThemeProvider';
+import { AjusteOSDialog } from '@/components/AjusteOSDialog';
+import NiveisAcessoReorganizado from '@/components/NiveisAcessoReorganizado';
 import React from 'react';
 
 function OsEmClienteSection() {
@@ -296,25 +299,14 @@ export default function Configuracoes() {
   const [niveis, setNiveis] = useState<
     Array<{ id: string; nome: string; descricao: string; ativo: boolean }>
   >([]);
-  const [permissoes, setPermissoes] = useState<
-    Array<{
-      id: string;
-      nome: string;
-      descricao: string;
-      modulo: string;
-      acao: string;
-    }>
-  >([]);
-  const [showNivelModal, setShowNivelModal] = useState(false);
-  const [editingNivel, setEditingNivel] = useState(null);
-  const [nivelForm, setNivelForm] = useState({
-    nome: '',
-    descricao: '',
-    ativo: true,
-  });
-  const [selectedNivelPermissoes, setSelectedNivelPermissoes] = useState<
-    string[]
-  >([]);
+
+  // Estados para Ajuste de OS
+  const [osFinalizadas, setOsFinalizadas] = useState<any[]>([]);
+  const [dataInicioAjuste, setDataInicioAjuste] = useState<string>('');
+  const [dataFimAjuste, setDataFimAjuste] = useState<string>('');
+  const [osSelecionada, setOsSelecionada] = useState<any>(null);
+  const [showAjusteDialog, setShowAjusteDialog] = useState(false);
+  const [loadingAjuste, setLoadingAjuste] = useState(false);
 
   // Estados para auditoria
   const [auditoria, setAuditoria] = useState([]);
@@ -339,45 +331,17 @@ export default function Configuracoes() {
   const [nextOsNumber, setNextOsNumber] = useState<string>('');
   const [savingNextOs, setSavingNextOs] = useState<boolean>(false);
 
+  // =============================
+  // Numeração da Próxima Orçamento
+  // =============================
+  const [nextOrcamentoNumber, setNextOrcamentoNumber] = useState<string>('');
+  const [savingNextOrcamento, setSavingNextOrcamento] = useState<boolean>(false);
+
   useEffect(() => {
     fetchConfiguracoes();
     fetchUsuarios();
-    fetchNiveis();
-    fetchPermissoes();
   }, []);
 
-  // Funções para níveis de acesso
-  async function fetchNiveis() {
-    const { data, error } = await supabase
-      .from('niveis_acesso')
-      .select('*')
-      .order('nome');
-    if (error) {
-      toast({
-        title: 'Erro ao buscar níveis',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      setNiveis(data || []);
-    }
-  }
-
-  async function fetchPermissoes() {
-    const { data, error } = await supabase
-      .from('permissoes')
-      .select('*')
-      .order('modulo, acao');
-    if (error) {
-      toast({
-        title: 'Erro ao buscar permissões',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } else {
-      setPermissoes(data || []);
-    }
-  }
 
   // Função para buscar auditoria
   async function fetchAuditoria() {
@@ -637,110 +601,6 @@ export default function Configuracoes() {
     return data?.map((item) => item.permissao_id) || [];
   }
 
-  function handleEditNivel(nivel) {
-    setEditingNivel(nivel);
-    setNivelForm({
-      nome: nivel.nome,
-      descricao: nivel.descricao,
-      ativo: nivel.ativo,
-    });
-    
-    // Buscar permissões e abrir modal
-    fetchNivelPermissoes(nivel.id).then((permissoes) => {
-      setSelectedNivelPermissoes(permissoes);
-      setShowNivelModal(true);
-    });
-  }
-
-  function handleCloseNivelModal() {
-    setShowNivelModal(false);
-    setEditingNivel(null);
-    setNivelForm({ nome: '', descricao: '', ativo: true });
-    setSelectedNivelPermissoes([]);
-  }
-
-  async function handleSubmitNivel(e) {
-    e.preventDefault();
-
-    try {
-      let nivelId;
-
-      if (editingNivel) {
-        // Atualizar nível
-        const { error } = await supabase
-          .from('niveis_acesso')
-          .update(nivelForm)
-          .eq('id', editingNivel.id);
-
-        if (error) throw error;
-        nivelId = editingNivel.id;
-      } else {
-        // Criar novo nível
-        const { data, error } = await supabase
-          .from('niveis_acesso')
-          .insert([nivelForm])
-          .select()
-          .single();
-
-        if (error) throw error;
-        nivelId = data.id;
-      }
-
-      // Atualizar permissões do nível
-      if (nivelId) {
-        // Remover todas as permissões atuais
-        await supabase
-          .from('nivel_permissoes')
-          .delete()
-          .eq('nivel_id', nivelId);
-
-        // Adicionar as permissões selecionadas
-        if (selectedNivelPermissoes.length > 0) {
-          const nivelPermissoes = selectedNivelPermissoes.map(
-            (permissaoId) => ({
-              nivel_id: nivelId,
-              permissao_id: permissaoId,
-            })
-          );
-
-          await supabase.from('nivel_permissoes').insert(nivelPermissoes);
-        }
-      }
-
-      toast({ title: 'Nível salvo com sucesso!' });
-      await fetchNiveis();
-      handleCloseNivelModal();
-    } catch (error) {
-      toast({
-        title: 'Erro ao salvar nível',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  }
-
-  async function handleDeleteNivel(id) {
-    if (
-      window.confirm(
-        'Tem certeza que deseja excluir este nível? Isso pode afetar usuários associados.'
-      )
-    ) {
-      const { error } = await supabase
-        .from('niveis_acesso')
-        .delete()
-        .eq('id', id);
-      if (error) {
-        toast({
-          title: 'Erro ao excluir nível',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } else {
-        toast({ title: 'Nível excluído com sucesso!' });
-        await fetchNiveis();
-      }
-    }
-  }
 
   // Função para reenviar email de reset de senha
   async function handleResendEmail(user) {
@@ -1134,6 +994,9 @@ export default function Configuracoes() {
       // Carregar numeração da próxima OS (se existir)
       setNextOsNumber(configMap.proxima_os || '');
 
+      // Carregar numeração da próxima Orçamento (se existir)
+      setNextOrcamentoNumber(configMap.proxima_orcamento || '');
+
       // Não sobrescrever o valor manual de "Próxima OS" automaticamente.
       // Mantemos apenas o que está salvo em configuracoes.proxima_os.
     }
@@ -1443,6 +1306,69 @@ export default function Configuracoes() {
     }
   };
 
+  // Funções para Ajuste de OS
+  const buscarOsFinalizadas = async () => {
+    if (!dataInicioAjuste || !dataFimAjuste) {
+      toast({
+        title: 'Datas obrigatórias',
+        description: 'Selecione a data de início e fim para buscar OS finalizadas.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setLoadingAjuste(true);
+    try {
+      // Converter datas para formato ISO
+      const dataInicioISO = new Date(dataInicioAjuste + 'T00:00:00.000Z').toISOString();
+      const dataFimISO = new Date(dataFimAjuste + 'T23:59:59.999Z').toISOString();
+
+      const { data, error } = await supabase
+        .from('ordens_servico')
+        .select(`
+          *,
+          clientes (
+            nome,
+            cpf_cnpj
+          ),
+          os_colaboradores (
+            id,
+            colaborador_id,
+            horas_trabalhadas,
+            colaboradores (
+              nome
+            )
+          )
+        `)
+        .eq('status', 'finalizada')
+        .gte('data_abertura', dataInicioISO)
+        .lte('data_abertura', dataFimISO)
+        .order('data_abertura', { ascending: false });
+
+      if (error) {
+        console.error('Erro na consulta:', error);
+        throw error;
+      }
+      
+      console.log('OS encontradas:', data?.length || 0);
+      setOsFinalizadas(data || []);
+    } catch (error) {
+      console.error('Erro ao buscar OS finalizadas:', error);
+      toast({
+        title: 'Erro ao buscar OS',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingAjuste(false);
+    }
+  };
+
+  const abrirAjusteOS = (os: any) => {
+    setOsSelecionada(os);
+    setShowAjusteDialog(true);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -1453,7 +1379,7 @@ export default function Configuracoes() {
       </div>
 
       <Tabs defaultValue="system" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="system" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Sistema
@@ -1473,6 +1399,10 @@ export default function Configuracoes() {
           <TabsTrigger value="audit-os" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             Auditoria OS
+          </TabsTrigger>
+          <TabsTrigger value="ajuste-os" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Ajuste de OS
           </TabsTrigger>
           <TabsTrigger value="os-em-cliente" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
@@ -1712,6 +1642,46 @@ export default function Configuracoes() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Numeração da Próxima Orçamento */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div className="col-span-2">
+                    <Label htmlFor="proxima_orcamento">Numeração da Próxima Orçamento</Label>
+                    <Input
+                      id="proxima_orcamento"
+                      placeholder="ORC0001/2025"
+                      value={nextOrcamentoNumber}
+                      onChange={(e) => setNextOrcamentoNumber(e.target.value)}
+                      disabled={!isAdmin()}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ex.: ORC0001/2025 → a próxima criada será ORC0002/2025.
+                    </p>
+                  </div>
+                  <div className="flex md:justify-end">
+                    <Button
+                      onClick={async () => {
+                        if (!isAdmin()) return;
+                        try {
+                          setSavingNextOrcamento(true);
+                          const { error } = await supabase
+                            .from('configuracoes')
+                            .upsert({ chave: 'proxima_orcamento', valor: String(nextOrcamentoNumber || '') }, { onConflict: 'chave' });
+                          if (error) throw error;
+                          toast({ title: 'Numeração da próxima Orçamento salva' });
+                        } catch (e) {
+                          toast({ title: 'Erro ao salvar', description: String((e as any)?.message || e), variant: 'destructive' });
+                        } finally {
+                          setSavingNextOrcamento(false);
+                        }
+                      }}
+                      disabled={savingNextOrcamento || !isAdmin()}
+                    >
+                      {savingNextOrcamento ? 'Salvando...' : 'Salvar Próxima Orçamento'}
+                    </Button>
+                  </div>
+                </div>
+
                 <FormField
                   control={form.control}
                   name="tempo_tolerancia_pausa"
@@ -2121,71 +2091,8 @@ export default function Configuracoes() {
               </CardContent>
             </Card>
 
-            {/* Seção de Níveis de Acesso */}
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Níveis de Acesso</CardTitle>
-                <CardDescription>
-                  Gerencie os níveis de acesso e suas permissões no sistema.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-4 flex justify-between">
-                  <Button onClick={() => setShowNivelModal(true)}>
-                    + Novo Nível
-                  </Button>
-                </div>
-
-                {/* Tabela de níveis */}
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border text-sm">
-                    <thead>
-                      <tr className="bg-muted">
-                        <th className="px-3 py-2 text-left">Nome</th>
-                        <th className="px-3 py-2 text-left">Descrição</th>
-                        <th className="px-3 py-2 text-left">Ativo</th>
-                        <th className="px-3 py-2 text-left">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {niveis.map((nivel) => (
-                        <tr key={nivel.id} className="border-b">
-                          <td className="px-3 py-2">{nivel.nome}</td>
-                          <td className="px-3 py-2">{nivel.descricao}</td>
-                          <td className="px-3 py-2">{nivel.ativo ? 'Sim' : 'Não'}</td>
-                          <td className="flex gap-2 px-3 py-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditNivel(nivel)}
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDeleteNivel(nivel.id)}
-                            >
-                              Excluir
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                      {niveis.length === 0 && (
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className="py-4 text-center text-muted-foreground"
-                          >
-                            Nenhum nível cadastrado.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Seção de Níveis de Acesso Reorganizada */}
+            <NiveisAcessoReorganizado />
 
             {/* Modal de cadastro/edição de usuário */}
             {showUserModal && (
@@ -2314,103 +2221,6 @@ export default function Configuracoes() {
               </div>
             )}
 
-            {/* Modal de cadastro/edição de nível */}
-            {showNivelModal && (
-              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
-                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-card p-6 shadow-lg">
-                  <h2 className="mb-4 text-lg font-bold">
-                    {editingNivel ? 'Editar Nível' : 'Novo Nível'}
-                  </h2>
-                  <form onSubmit={handleSubmitNivel} className="space-y-4">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium">Nome</label>
-                      <Input
-                        value={nivelForm.nome}
-                        onChange={(e) =>
-                          setNivelForm((f) => ({ ...f, nome: e.target.value }))
-                        }
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium">
-                        Descrição
-                      </label>
-                      <Textarea
-                        className="h-20"
-                        value={nivelForm.descricao}
-                        onChange={(e) =>
-                          setNivelForm((f) => ({ ...f, descricao: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="nivel_ativo"
-                        checked={nivelForm.ativo}
-                        onChange={(e) =>
-                          setNivelForm((f) => ({ ...f, ativo: e.target.checked }))
-                        }
-                      />
-                      <label htmlFor="nivel_ativo" className="text-sm">
-                        Ativo
-                      </label>
-                    </div>
-
-                    {/* Seção de permissões */}
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Permissões
-                      </label>
-                      <div className="grid max-h-60 grid-cols-2 gap-4 overflow-y-auto rounded border p-3">
-                        {permissoes.map((permissao) => (
-                          <div key={permissao.id} className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              id={`perm_${permissao.id}`}
-                              checked={selectedNivelPermissoes.includes(permissao.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedNivelPermissoes((prev) => [
-                                    ...prev,
-                                    permissao.id,
-                                  ]);
-                                } else {
-                                  setSelectedNivelPermissoes((prev) =>
-                                    prev.filter((id) => id !== permissao.id)
-                                  );
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`perm_${permissao.id}`}
-                              className="text-sm"
-                            >
-                              <div className="font-medium">{permissao.nome}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {permissao.descricao}
-                              </div>
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCloseNivelModal}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button type="submit">Salvar</Button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
           </PermissionGuard>
         </TabsContent>
 
@@ -2895,6 +2705,101 @@ export default function Configuracoes() {
           </PermissionGuard>
         </TabsContent>
         {/* Nova seção: OS em Cliente / Retornar à Produção */}
+        <TabsContent value="ajuste-os" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Ajuste de OS
+              </CardTitle>
+              <CardDescription>
+                Filtre OS finalizadas por período e ajuste horas dos colaboradores.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Filtros */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="data-inicio-ajuste">Data de Início</Label>
+                  <Input
+                    id="data-inicio-ajuste"
+                    type="date"
+                    value={dataInicioAjuste}
+                    onChange={(e) => setDataInicioAjuste(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="data-fim-ajuste">Data de Fim</Label>
+                  <Input
+                    id="data-fim-ajuste"
+                    type="date"
+                    value={dataFimAjuste}
+                    onChange={(e) => setDataFimAjuste(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button 
+                    onClick={buscarOsFinalizadas} 
+                    disabled={loadingAjuste}
+                    className="w-full"
+                  >
+                    <Search className="h-4 w-4 mr-2" />
+                    {loadingAjuste ? 'Buscando...' : 'Buscar OS'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Lista de OS */}
+              {osFinalizadas.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">OS Finalizadas ({osFinalizadas.length})</h3>
+                  <div className="grid gap-4">
+                    {osFinalizadas.map((os) => (
+                      <Card key={os.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">OS {os.numero_os}</Badge>
+                                <span className="text-sm text-muted-foreground">
+                                  {new Date(os.data_abertura).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+                              <div className="text-sm">
+                                <strong>Cliente:</strong> {os.clientes?.nome || 'N/A'}
+                              </div>
+                              <div className="text-sm">
+                                <strong>Colaboradores:</strong> {os.os_colaboradores?.length || 0}
+                              </div>
+                            </div>
+                            <Button 
+                              onClick={() => abrirAjusteOS(os)}
+                              size="sm"
+                              className="flex items-center gap-2"
+                            >
+                              <Calendar className="h-4 w-4" />
+                              Ajustar Horas
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {osFinalizadas.length === 0 && !loadingAjuste && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Nenhuma OS finalizada encontrada no período selecionado.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="os-em-cliente" className="space-y-6">
           <Card>
             <CardHeader>
@@ -2909,6 +2814,13 @@ export default function Configuracoes() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog de Ajuste de OS */}
+      <AjusteOSDialog
+        open={showAjusteDialog}
+        onOpenChange={setShowAjusteDialog}
+        os={osSelecionada}
+      />
     </div>
   );
 }

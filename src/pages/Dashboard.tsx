@@ -46,6 +46,9 @@ interface DashboardStats {
   totalColaboradores: number;
   metaHoraMedia: number;
   horasTrabalhadasMes: number;
+  orcamentosMes: number;
+  orcamentosAprovadosMes: number;
+  orcamentosTransformadosMes: number;
 }
 
 export default function Dashboard() {
@@ -59,6 +62,9 @@ export default function Dashboard() {
     totalColaboradores: 0,
     metaHoraMedia: 0,
     horasTrabalhadasMes: 0,
+    orcamentosMes: 0,
+    orcamentosAprovadosMes: 0,
+    orcamentosTransformadosMes: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -105,6 +111,21 @@ export default function Dashboard() {
             colaboradores.length
           : 0;
 
+        // Estatísticas de orçamentos (mês atual)
+        const now = new Date();
+        const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString();
+        const end = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)).toISOString();
+
+        const { data: orcamentosMesData } = await supabase
+          .from('orcamentos')
+          .select('id, status')
+          .gte('data_abertura', start)
+          .lte('data_abertura', end);
+
+        const orcamentosMes = orcamentosMesData?.length || 0;
+        const orcamentosAprovadosMes = (orcamentosMesData || []).filter(o => o.status === 'aprovado').length;
+        const orcamentosTransformadosMes = (orcamentosMesData || []).filter(o => o.status === 'transformado').length;
+
         setStats({
           totalOS,
           osAbertas,
@@ -114,6 +135,9 @@ export default function Dashboard() {
           totalColaboradores: colaboradores?.length || 0,
           metaHoraMedia,
           horasTrabalhadasMes,
+          orcamentosMes,
+          orcamentosAprovadosMes,
+          orcamentosTransformadosMes,
         });
       }
     } catch (error) {
@@ -297,6 +321,42 @@ export default function Dashboard() {
               {stats.osFinalizadas}
             </div>
             <Badge className="status-finalizada">Concluídas</Badge>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Orçamentos - Visão do Mês */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+        <Card className="card-modern transition-all duration-200 hover:shadow-medium">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Orçamentos no mês</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{stats.orcamentosMes}</div>
+            <p className="text-xs text-muted-foreground">Criados neste mês</p>
+          </CardContent>
+        </Card>
+
+        <Card className="card-modern transition-all duration-200 hover:shadow-medium">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Orçamentos Aprovados</CardTitle>
+            <CheckCircle className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{stats.orcamentosAprovadosMes}</div>
+            <p className="text-xs text-muted-foreground">no mês atual</p>
+          </CardContent>
+        </Card>
+
+        <Card className="card-modern transition-all duration-200 hover:shadow-medium">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Transformados em OS</CardTitle>
+            <TrendingUp className="h-4 w-4 text-info" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-info">{stats.orcamentosTransformadosMes}</div>
+            <p className="text-xs text-muted-foreground">no mês atual</p>
           </CardContent>
         </Card>
       </div>

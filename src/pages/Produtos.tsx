@@ -216,7 +216,11 @@ export default function Produtos() {
       });
       setSheetOpen(false);
       fetchProdutos();
-      navigate('/produtos');
+      
+      // Usar setTimeout para garantir que a navegação aconteça após a renderização
+      setTimeout(() => {
+        navigate('/produtos');
+      }, 100);
     }
     setIsSaving(false);
   };

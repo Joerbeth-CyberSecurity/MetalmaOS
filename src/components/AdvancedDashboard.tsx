@@ -66,6 +66,9 @@ interface DashboardStats {
   receitaMes: number;
   ticketMedio: number;
   eficienciaMedia: number;
+  orcamentosMes: number;
+  orcamentosAprovadosMes: number;
+  orcamentosTransformadosMes: number;
 }
 
 interface ChartData {
@@ -96,6 +99,9 @@ export default function AdvancedDashboard() {
     receitaMes: 0,
     ticketMedio: 0,
     eficienciaMedia: 0,
+    orcamentosMes: 0,
+    orcamentosAprovadosMes: 0,
+    orcamentosTransformadosMes: 0,
   });
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState<ChartData[]>([]);
@@ -183,6 +189,19 @@ export default function AdvancedDashboard() {
             }, 0) / osComTempo.length
           : 0;
 
+        // Estatísticas de orçamentos (mês atual)
+        const now = new Date();
+        const start = startOfMonth(now).toISOString();
+        const end = endOfMonth(now).toISOString();
+        const { data: orcamentosMesData } = await supabase
+          .from('orcamentos')
+          .select('id, status, data_abertura')
+          .gte('data_abertura', start)
+          .lte('data_abertura', end);
+        const orcamentosMes = orcamentosMesData?.length || 0;
+        const orcamentosAprovadosMes = (orcamentosMesData || []).filter(o => o.status === 'aprovado').length;
+        const orcamentosTransformadosMes = (orcamentosMesData || []).filter(o => o.status === 'transformado').length;
+
         setStats({
           totalOS,
           osAbertas,
@@ -196,6 +215,9 @@ export default function AdvancedDashboard() {
           receitaMes,
           ticketMedio,
           eficienciaMedia,
+          orcamentosMes,
+          orcamentosAprovadosMes,
+          orcamentosTransformadosMes,
         });
       }
     } catch (error) {
@@ -419,6 +441,40 @@ export default function AdvancedDashboard() {
             <p className="text-xs text-muted-foreground">
               Tempo real vs previsto
             </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Orçamentos - Visão do Mês */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="card-modern">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Orçamentos no mês</CardTitle>
+            <BarChart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">{stats.orcamentosMes}</div>
+            <p className="text-xs text-muted-foreground">Criados neste mês</p>
+          </CardContent>
+        </Card>
+        <Card className="card-modern">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Aprovados</CardTitle>
+            <CheckCircle className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{stats.orcamentosAprovadosMes}</div>
+            <p className="text-xs text-muted-foreground">no mês atual</p>
+          </CardContent>
+        </Card>
+        <Card className="card-modern">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Transformados em OS</CardTitle>
+            <TrendingUp className="h-4 w-4 text-info" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-info">{stats.orcamentosTransformadosMes}</div>
+            <p className="text-xs text-muted-foreground">no mês atual</p>
           </CardContent>
         </Card>
       </div>

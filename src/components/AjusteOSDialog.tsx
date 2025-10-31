@@ -24,6 +24,10 @@ interface ColaboradorAjuste {
   horas_ajustadas: number;
   diferenca: number;
   justificativa: string;
+  horas_trabalho: number;
+  horas_retrabalho: number;
+  horas_parada_material: number;
+  horas_pausa: number;
 }
 
 export function AjusteOSDialog({ open, onOpenChange, os }: AjusteOSDialogProps) {
@@ -35,6 +39,9 @@ export function AjusteOSDialog({ open, onOpenChange, os }: AjusteOSDialogProps) 
 
   useEffect(() => {
     if (open && os) {
+      console.log('AjusteOSDialog - OS recebida:', os);
+      console.log('AjusteOSDialog - Cliente da OS:', os.cliente);
+      console.log('AjusteOSDialog - Clientes da OS:', os.clientes);
       loadColaboradores();
     }
   }, [open, os]);
@@ -61,14 +68,62 @@ export function AjusteOSDialog({ open, onOpenChange, os }: AjusteOSDialogProps) 
 
       if (error) throw error;
 
-      const colaboradoresAjuste: ColaboradorAjuste[] = (colaboradoresData || []).map((colab: any) => ({
-        id: colab.id,
-        nome: colab.colaboradores?.nome || 'N/A',
-        horas_originais: colab.horas_trabalhadas || 0,
-        horas_ajustadas: colab.horas_trabalhadas || 0,
-        diferenca: 0,
-        justificativa: ''
-      }));
+      // Para cada colaborador, buscar todas as horas (trabalho, retrabalho, paradas, pausas)
+      const colaboradoresAjuste: ColaboradorAjuste[] = await Promise.all(
+        (colaboradoresData || []).map(async (colab: any) => {
+          // Buscar horas de trabalho
+          const { data: tempoTrabalho } = await supabase
+            .from('os_tempo')
+            .select('horas_calculadas')
+            .eq('os_id', os.id)
+            .eq('colaborador_id', colab.colaborador_id)
+            .eq('tipo', 'trabalho')
+            .not('horas_calculadas', 'is', null);
+
+          // Buscar horas de retrabalho
+          const { data: retrabalhos } = await supabase
+            .from('retrabalhos')
+            .select('horas_abatidas')
+            .eq('os_id', os.id)
+            .eq('colaborador_id', colab.colaborador_id);
+
+          // Buscar horas de parada por falta de material
+          const { data: paradasMaterial } = await supabase
+            .from('os_tempo')
+            .select('horas_calculadas')
+            .eq('os_id', os.id)
+            .eq('colaborador_id', colab.colaborador_id)
+            .eq('tipo', 'parada_material')
+            .not('horas_calculadas', 'is', null);
+
+          // Buscar horas de pausa
+          const { data: pausas } = await supabase
+            .from('os_tempo')
+            .select('horas_calculadas')
+            .eq('os_id', os.id)
+            .eq('colaborador_id', colab.colaborador_id)
+            .eq('tipo', 'pausa')
+            .not('horas_calculadas', 'is', null);
+
+          const horasTrabalho = tempoTrabalho?.reduce((sum, item) => sum + (item.horas_calculadas || 0), 0) || 0;
+          const horasRetrabalho = retrabalhos?.reduce((sum, item) => sum + (item.horas_abatidas || 0), 0) || 0;
+          const horasParadaMaterial = paradasMaterial?.reduce((sum, item) => sum + (item.horas_calculadas || 0), 0) || 0;
+          const horasPausa = pausas?.reduce((sum, item) => sum + (item.horas_calculadas || 0), 0) || 0;
+
+          return {
+            id: colab.id,
+            nome: colab.colaboradores?.nome || 'N/A',
+            horas_originais: colab.horas_trabalhadas || 0,
+            horas_ajustadas: colab.horas_trabalhadas || 0,
+            diferenca: 0,
+            justificativa: '',
+            horas_trabalho: horasTrabalho,
+            horas_retrabalho: horasRetrabalho,
+            horas_parada_material: horasParadaMaterial,
+            horas_pausa: horasPausa
+          };
+        })
+      );
 
       setColaboradores(colaboradoresAjuste);
     } catch (error) {
@@ -196,25 +251,46 @@ export function AjusteOSDialog({ open, onOpenChange, os }: AjusteOSDialogProps) 
             <CardHeader>
               <CardTitle className="text-lg">Informações da OS</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium">Cliente</Label>
-                  <p className="text-sm text-muted-foreground">{os.cliente?.nome || 'N/A'}</p>
+                  <p className="text-sm text-muted-foreground">{os.cliente?.nome || os.clientes?.nome || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Status</Label>
+                  <Badge variant="outline" className="capitalize">{os.status?.replace('_', ' ')}</Badge>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Data de Abertura</Label>
                   <p className="text-sm text-muted-foreground">{formatDate(os.data_abertura)}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Status</Label>
-                  <Badge variant="outline">{os.status}</Badge>
-                </div>
-                <div>
                   <Label className="text-sm font-medium">Valor Total</Label>
                   <p className="text-sm font-medium">{formatCurrency(os.valor_total || 0)}</p>
                 </div>
               </div>
+              
+              {/* Informações detalhadas do cliente */}
+              {(os.cliente || os.clientes) && (
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-medium mb-2">Dados do Cliente</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">CPF/CNPJ:</span> {os.cliente?.cpf_cnpj || os.clientes?.cpf_cnpj || 'N/A'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Telefone:</span> {os.cliente?.telefone || os.clientes?.telefone || 'N/A'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Email:</span> {os.cliente?.email || os.clientes?.email || 'N/A'}
+                    </div>
+                    <div>
+                      <span className="font-medium">Cidade/UF:</span> {os.cliente?.cidade || os.clientes?.cidade || 'N/A'} / {os.cliente?.estado || os.clientes?.estado || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -245,9 +321,29 @@ export function AjusteOSDialog({ open, onOpenChange, os }: AjusteOSDialogProps) 
                         )}
                       </div>
 
+                      {/* Resumo das horas por tipo */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
+                        <div className="text-center">
+                          <div className="text-xs text-muted-foreground">Trabalho</div>
+                          <div className="font-medium text-green-600">{colab.horas_trabalho.toFixed(2)}h</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-muted-foreground">Retrabalho</div>
+                          <div className="font-medium text-red-600">{colab.horas_retrabalho.toFixed(2)}h</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-muted-foreground">Parada Material</div>
+                          <div className="font-medium text-orange-600">{colab.horas_parada_material.toFixed(2)}h</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-muted-foreground">Pausas</div>
+                          <div className="font-medium text-blue-600">{colab.horas_pausa.toFixed(2)}h</div>
+                        </div>
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor={`horas-${colab.id}`}>Horas Trabalhadas</Label>
+                          <Label htmlFor={`horas-${colab.id}`}>Horas Trabalhadas (Ajuste Manual)</Label>
                           <Input
                             id={`horas-${colab.id}`}
                             type="number"
@@ -258,7 +354,8 @@ export function AjusteOSDialog({ open, onOpenChange, os }: AjusteOSDialogProps) 
                             className="mt-1"
                           />
                           <p className="text-xs text-muted-foreground mt-1">
-                            Original: {colab.horas_originais.toFixed(2)}h
+                            Original: {colab.horas_originais.toFixed(2)}h | 
+                            Total Calculado: {(colab.horas_trabalho + colab.horas_retrabalho + colab.horas_parada_material + colab.horas_pausa).toFixed(2)}h
                           </p>
                         </div>
 

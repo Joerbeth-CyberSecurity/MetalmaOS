@@ -23,10 +23,15 @@ import {
   MoreHorizontal,
   Play,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  X,
+  Printer
 } from 'lucide-react';
 import { OrcamentoForm } from '@/components/OrcamentoForm';
 import { TransformarOrcamentoDialog } from '@/components/TransformarOrcamentoDialog';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Orcamento {
   id: string;
@@ -38,6 +43,9 @@ interface Orcamento {
   valor_final: number;
   status: string;
   data_abertura: string;
+  data_prevista?: string;
+  tempo_execucao_previsto?: string;
+  meta_por_hora?: number;
   data_aprovacao?: string;
   data_vencimento?: string;
   observacoes?: string;
@@ -70,6 +78,13 @@ export default function Orcamentos() {
   const [orcamentoToTransform, setOrcamentoToTransform] = useState<Orcamento | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [orcamentoToCancel, setOrcamentoToCancel] = useState<Orcamento | null>(null);
+  const [motivoCancelamento, setMotivoCancelamento] = useState('');
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [orcamentoToExport, setOrcamentoToExport] = useState<Orcamento | null>(null);
+  const [orcamentoToPrint, setOrcamentoToPrint] = useState<Orcamento | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -218,6 +233,556 @@ export default function Orcamentos() {
     }
   };
 
+  const handleAprovarOrcamento = async (orcamento: Orcamento) => {
+    try {
+      const { error } = await supabase
+        .from('orcamentos')
+        .update({
+          status: 'aprovado',
+          data_aprovacao: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orcamento.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Orçamento aprovado com sucesso!',
+        description: `Orçamento ${orcamento.numero_orcamento} foi aprovado.`
+      });
+
+      fetchOrcamentos();
+    } catch (error) {
+      console.error('Erro ao aprovar orçamento:', error);
+      toast({
+        title: 'Erro ao aprovar orçamento',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleCancelarOrcamento = (orcamento: Orcamento) => {
+    setOrcamentoToCancel(orcamento);
+    setMotivoCancelamento('');
+    setShowCancelDialog(true);
+  };
+
+  const handleConfirmarCancelamento = async () => {
+    if (!orcamentoToCancel || !motivoCancelamento.trim()) {
+      toast({
+        title: 'Motivo obrigatório',
+        description: 'Por favor, informe o motivo do cancelamento.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('orcamentos')
+        .update({
+          // Usa 'rejeitado' para compatibilidade com a constraint atual; mantém observação indicando cancelamento
+          status: 'rejeitado',
+          observacoes: `CANCELADO: ${motivoCancelamento}`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orcamentoToCancel.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Orçamento cancelado com sucesso!',
+        description: `Orçamento ${orcamentoToCancel.numero_orcamento} foi cancelado.`
+      });
+
+      setShowCancelDialog(false);
+      setOrcamentoToCancel(null);
+      setMotivoCancelamento('');
+      fetchOrcamentos();
+    } catch (error) {
+      console.error('Erro ao cancelar orçamento:', error);
+      toast({
+        title: 'Erro ao cancelar orçamento',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleExportarPDF = (orcamento: Orcamento) => {
+    setOrcamentoToExport(orcamento);
+    setShowExportDialog(true);
+  };
+
+  const handleConfirmarExportacao = async (incluirAjuste: boolean) => {
+    if (!orcamentoToExport) return;
+    
+    try {
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 15;
+
+      // Logo (tentar carregar a logo)
+      try {
+        // Criar um elemento img temporário para carregar a logo
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = '/src/assets/logo2.png';
+        
+        // Aguardar o carregamento da imagem
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          setTimeout(reject, 3000); // timeout de 3 segundos
+        });
+        
+        doc.addImage(img, 'PNG', pageWidth / 2 - 25, y, 50, 18);
+      } catch (error) {
+        console.log('Logo não carregada, continuando sem ela');
+      }
+      
+      y += 30;
+
+      // Título e informações
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('METALMA INOX & CIA', pageWidth / 2, y, { align: 'center' });
+      y += 8;
+      
+      doc.setFontSize(16);
+      doc.text('ORÇAMENTO', pageWidth / 2, y, { align: 'center' });
+      y += 6;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      doc.text(`Nº ${orcamentoToExport.numero_orcamento}`, pageWidth / 2, y, { align: 'center' });
+      y += 15;
+
+      // Linha separadora
+      doc.setLineWidth(0.5);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 10;
+
+      // Dados do Orçamento
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Dados do Orçamento', 15, y);
+      y += 8;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      const dadosOrcamento = [
+        [`Número:`, orcamentoToExport.numero_orcamento],
+        [`Status:`, orcamentoToExport.status],
+        [`Data de Abertura:`, new Date(orcamentoToExport.data_abertura).toLocaleDateString('pt-BR')],
+        [`Data Prevista:`, orcamentoToExport.data_prevista ? new Date(orcamentoToExport.data_prevista).toLocaleDateString('pt-BR') : 'N/A'],
+        [`Tempo Previsto:`, orcamentoToExport.tempo_execucao_previsto || 'N/A'],
+        [`Meta por Hora:`, `R$ ${orcamentoToExport.meta_por_hora ? orcamentoToExport.meta_por_hora.toFixed(2).replace('.', ',') : '0,00'}`]
+      ];
+
+      dadosOrcamento.forEach(([label, value]) => {
+        doc.text(label, 15, y);
+        doc.text(value, 60, y);
+        y += 5;
+      });
+      y += 5;
+
+      // Dados do Cliente
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Dados do Cliente', 15, y);
+      y += 8;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Nome: ${orcamentoToExport.clientes?.nome || 'N/A'}`, 15, y);
+      y += 5;
+      doc.text(`CPF/CNPJ: ${orcamentoToExport.clientes?.cpf_cnpj || 'N/A'}`, 15, y);
+      y += 10;
+
+      // Descrição do Orçamento
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Descrição do Orçamento', 15, y);
+      y += 8;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      const descricaoLines = doc.splitTextToSize(orcamentoToExport.descricao, pageWidth - 30);
+      doc.text(descricaoLines, 15, y);
+      y += descricaoLines.length * 5 + 10;
+
+      // Produtos Incluídos
+      if (orcamentoToExport.orcamento_produtos && orcamentoToExport.orcamento_produtos.length > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('Produtos Incluídos', 15, y);
+        y += 8;
+
+        const tableData = orcamentoToExport.orcamento_produtos.map(produto => [
+          produto.produtos?.nome || 'N/A',
+          produto.quantidade.toString(),
+          produto.produtos?.unidade || 'UN',
+          `R$ ${produto.preco_unitario.toFixed(2).replace('.', ',')}`,
+          `R$ ${produto.subtotal.toFixed(2).replace('.', ',')}`
+        ]);
+
+        autoTable(doc, {
+          startY: y,
+          head: [['Produto', 'Qtd.', 'Unidade', 'Valor Unit.', 'Subtotal']],
+          body: tableData,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [240, 240, 240], textColor: 0 },
+          margin: { left: 15, right: 15 },
+        });
+
+        y = (doc as any).lastAutoTable.finalY + 10;
+      }
+
+      // Resumo Financeiro
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Resumo Financeiro', 15, y);
+      y += 8;
+
+      if (incluirAjuste && orcamentoToExport.percentual_aplicado > 0) {
+        // Com ajuste: mostrar valor total, percentual e valor final
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Valor Total: R$ ${orcamentoToExport.valor_total.toFixed(2).replace('.', ',')}`, 15, y);
+        y += 5;
+        doc.text(`Percentual Aplicado: +${orcamentoToExport.percentual_aplicado}%`, 15, y);
+        y += 5;
+      }
+
+      // Sempre mostrar o valor final
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(46, 125, 50); // Verde
+      doc.text(`Valor Final: R$ ${orcamentoToExport.valor_final.toFixed(2).replace('.', ',')}`, 15, y);
+      doc.setTextColor(0, 0, 0); // Voltar ao preto
+      y += 15;
+
+      // Observações
+      if (orcamentoToExport.observacoes) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('Observações', 15, y);
+        y += 8;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        const observacoesLines = doc.splitTextToSize(orcamentoToExport.observacoes, pageWidth - 30);
+        doc.text(observacoesLines, 15, y);
+        y += observacoesLines.length * 5 + 15;
+      }
+
+      // Assinatura do Cliente (apenas se não incluir ajuste)
+      if (!incluirAjuste) {
+        doc.setLineWidth(0.5);
+        doc.line(15, y, pageWidth - 15, y);
+        y += 10;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text('Assinatura do Cliente:', pageWidth / 2, y, { align: 'center' });
+        y += 15;
+
+        // Assinatura e Data lado a lado
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text('Assinatura:', 50, y);
+        doc.text('Data:', pageWidth - 100, y);
+        y += 5;
+
+        // Linhas para assinatura e data
+        doc.setLineWidth(0.3);
+        doc.line(50, y, 120, y); // Linha da assinatura
+        doc.line(pageWidth - 100, y, pageWidth - 50, y); // Linha da data
+        y += 20;
+      }
+
+      // Rodapé
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Metalma Inox & Cia - Sistema de Controle de Orçamentos', pageWidth / 2, y, { align: 'center' });
+      y += 4;
+      doc.text(`Relatório gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, pageWidth / 2, y, { align: 'center' });
+
+      // Salvar o PDF
+      const nomeArquivo = `orcamento_${orcamentoToExport.numero_orcamento}_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(nomeArquivo);
+      
+      toast({
+        title: 'PDF exportado com sucesso!',
+        description: `Orçamento ${orcamentoToExport.numero_orcamento} foi exportado${incluirAjuste ? ' com ajuste' : ' sem ajuste'}.`
+      });
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      toast({
+        title: 'Erro ao exportar PDF',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleImprimir = (orcamento: Orcamento) => {
+    // Perguntar antes de imprimir, como no fluxo de Exportar
+    setOrcamentoToPrint(orcamento);
+    setShowPrintDialog(true);
+  };
+
+  const handleConfirmarImpressao = async (orcamento: Orcamento, incluirAjuste: boolean) => {
+    if (!orcamento) return;
+    
+    try {
+      // Usar logo diretamente como URL
+      const logoUrl = '/src/assets/logo2.png';
+
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Orçamento ${orcamento.numero_orcamento}</title>
+            <style>
+              @page { size: A4; margin: 12mm; }
+              body { 
+                font-family: Arial, sans-serif; 
+                margin: 0; 
+                padding: 0; 
+                background: white; 
+                color: black; 
+              }
+              .relatorio-impressao { 
+                width: 190mm; 
+                margin: 0 auto; 
+                padding: 12mm 0;
+              }
+              .relatorio-cabecalho { 
+                text-align: center; 
+                margin-bottom: 30px; 
+                border-bottom: 2px solid #333; 
+                padding-bottom: 20px; 
+              }
+              .relatorio-logo { 
+                width: 120px; 
+                height: auto; 
+                margin: 0 auto 15px auto; 
+                display: block; 
+              }
+              .relatorio-empresa { 
+                font-size: 18px; 
+                font-weight: bold; 
+                margin: 0 0 5px 0; 
+                color: #333; 
+              }
+              .relatorio-titulo { 
+                font-size: 16px; 
+                font-weight: bold; 
+                margin: 0 0 10px 0; 
+                color: #333; 
+                text-transform: uppercase; 
+              }
+              .relatorio-info { 
+                font-size: 11px; 
+                color: #666; 
+                margin: 0; 
+              }
+              .relatorio-secao { 
+                margin: 20px 0; 
+              }
+              .relatorio-secao h3 { 
+                font-size: 14px; 
+                font-weight: bold; 
+                margin: 0 0 10px 0; 
+                color: #333; 
+                border-bottom: 1px solid #ccc; 
+                padding-bottom: 5px; 
+              }
+              .relatorio-grid { 
+                display: grid; 
+                grid-template-columns: 1fr 1fr; 
+                gap: 20px; 
+                margin: 15px 0; 
+              }
+              .relatorio-tabela { 
+                margin: 20px 0; 
+              }
+              .relatorio-tabela table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin: 0; 
+              }
+              .relatorio-tabela th, .relatorio-tabela td { 
+                border: 1px solid #333; 
+                padding: 8px; 
+                text-align: left; 
+                font-size: 11px; 
+              }
+              .relatorio-tabela th { 
+                background-color: #f0f0f0; 
+                font-weight: bold; 
+                color: #333; 
+              }
+              .relatorio-resumo { 
+                background-color: #f9f9f9; 
+                padding: 15px; 
+                border: 1px solid #ccc; 
+                margin: 20px 0; 
+              }
+              .relatorio-resumo .total-final { 
+                border-top: 2px solid #333; 
+                padding-top: 10px; 
+                margin-top: 10px; 
+                font-weight: bold; 
+                font-size: 14px; 
+              }
+              .relatorio-rodape { 
+                text-align: center; 
+                margin-top: 30px; 
+                padding-top: 20px; 
+                border-top: 1px solid #ccc; 
+                font-size: 10px; 
+                color: #666; 
+              }
+              .valor-verde { color: #2e7d32; font-weight: bold; }
+              @media print {
+                body { margin: 0; padding: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="relatorio-impressao">
+              <div class="relatorio-cabecalho">
+                <img src="${logoUrl}" alt="Logo Metalma" class="relatorio-logo" />
+                <div class="relatorio-empresa">METALMA INOX & CIA</div>
+                <div class="relatorio-titulo">ORÇAMENTO</div>
+                <div class="relatorio-info">Nº ${orcamento.numero_orcamento}</div>
+            </div>
+              
+              <div class="relatorio-secao">
+                <h3>Dados do Orçamento</h3>
+                <div class="relatorio-grid">
+                  <div><strong>Número:</strong> ${orcamento.numero_orcamento}</div>
+                  <div><strong>Status:</strong> ${orcamento.status}</div>
+                  <div><strong>Data de Abertura:</strong> ${new Date(orcamento.data_abertura).toLocaleDateString('pt-BR')}</div>
+                  <div><strong>Data Prevista:</strong> ${orcamento.data_prevista ? new Date(orcamento.data_prevista).toLocaleDateString('pt-BR') : 'N/A'}</div>
+                  <div><strong>Tempo Previsto:</strong> ${orcamento.tempo_execucao_previsto || 'N/A'}</div>
+                  <div><strong>Meta por Hora:</strong> R$ ${orcamento.meta_por_hora ? orcamento.meta_por_hora.toFixed(2).replace('.', ',') : '0,00'}</div>
+                </div>
+              </div>
+              
+              <div class="relatorio-secao">
+                <h3>Dados do Cliente</h3>
+                <div class="relatorio-grid">
+                  <div><strong>Nome:</strong> ${orcamento.clientes?.nome || 'N/A'}</div>
+                  <div><strong>CPF/CNPJ:</strong> ${orcamento.clientes?.cpf_cnpj || 'N/A'}</div>
+                </div>
+              </div>
+              
+              <div class="relatorio-secao">
+                <h3>Descrição do Orçamento</h3>
+                <p>${orcamento.descricao}</p>
+              </div>
+              
+              ${orcamento.orcamento_produtos && orcamento.orcamento_produtos.length > 0 ? `
+              <div class="relatorio-secao">
+                <h3>Produtos Incluídos</h3>
+                <div class="relatorio-tabela">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Produto</th>
+                        <th>Qtd.</th>
+                        <th>Unidade</th>
+                        <th>Valor Unit.</th>
+                        <th>Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${orcamento.orcamento_produtos.map(produto => `
+                        <tr>
+                          <td>${produto.produtos?.nome || 'N/A'}</td>
+                          <td>${produto.quantidade}</td>
+                          <td>${produto.produtos?.unidade || 'UN'}</td>
+                          <td>R$ ${produto.preco_unitario.toFixed(2).replace('.', ',')}</td>
+                          <td>R$ ${produto.subtotal.toFixed(2).replace('.', ',')}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              ` : ''}
+              
+              <div class="relatorio-resumo">
+                <h3>Resumo Financeiro</h3>
+                ${incluirAjuste && orcamento.percentual_aplicado > 0 ? `
+                  <div><strong>Valor Total:</strong> R$ ${orcamento.valor_total.toFixed(2).replace('.', ',')}</div>
+                  <div><strong>Percentual Aplicado:</strong> +${orcamento.percentual_aplicado}%</div>
+                ` : ''}
+                <div class="total-final valor-verde"><strong>Valor Final:</strong> R$ ${orcamento.valor_final.toFixed(2).replace('.', ',')}</div>
+              </div>
+              
+              ${orcamento.observacoes ? `
+              <div class="relatorio-secao">
+                <h3>Observações</h3>
+                <p>${orcamento.observacoes}</p>
+              </div>
+              ` : ''}
+
+              ${!incluirAjuste ? `
+              <div class="relatorio-secao" style="margin-top: 30px;">
+                <h3>Autorização do Cliente</h3>
+                <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:20px;">
+                  <div style="width:45%; text-align:center;">
+                    <div style="border-top:1px solid #333; height:1px; margin-bottom:6px;"></div>
+                    <div style="font-size:11px; color:#666;">Assinatura</div>
+                  </div>
+                  <div style="width:30%; text-align:center;">
+                    <div style="border-top:1px solid #333; height:1px; margin-bottom:6px;"></div>
+                    <div style="font-size:11px; color:#666;">Data</div>
+                  </div>
+                </div>
+              </div>
+              ` : ''}
+              
+              <div class="relatorio-rodape">
+                <div>Metalma Inox & Cia - Sistema de Controle de Orçamentos</div>
+                <div>Relatório gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
+              </div>
+            </div>
+          </body>
+        </html>
+        `);
+        
+        printWindow.document.close();
+        printWindow.focus();
+        
+        // Aguardar carregamento da imagem antes de imprimir
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      }
+      
+      toast({
+        title: 'Impressão iniciada!',
+        description: `Orçamento ${orcamento.numero_orcamento} será impresso${incluirAjuste ? ' com ajuste' : ' sem ajuste'}.`
+      });
+    } catch (error) {
+      console.error('Erro ao imprimir:', error);
+      toast({
+        title: 'Erro ao imprimir',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -234,6 +799,7 @@ export default function Orcamentos() {
       'aberto': 'secondary',
       'aprovado': 'default',
       'rejeitado': 'destructive',
+      'cancelado': 'destructive',
       'transformado': 'outline'
     } as const;
 
@@ -300,6 +866,7 @@ export default function Orcamentos() {
                   <SelectItem value="aberto">Aberto</SelectItem>
                   <SelectItem value="aprovado">Aprovado</SelectItem>
                   <SelectItem value="rejeitado">Rejeitado</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
                   <SelectItem value="transformado">Transformado</SelectItem>
                 </SelectContent>
               </Select>
@@ -373,52 +940,65 @@ export default function Orcamentos() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Aprovar */}
                         {orcamento.status === 'aberto' && (
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <DollarSign className="h-4 w-4 mr-1" />
-                                Aplicar %
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Aplicar Percentual</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div>
-                                  <Label>Percentual (%)</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Ex: 10.5"
-                                    id="percentual"
-                                  />
-                                </div>
-                                <Button
-                                  onClick={() => {
-                                    const percentual = parseFloat((document.getElementById('percentual') as HTMLInputElement)?.value || '0');
-                                    if (percentual > 0) {
-                                      handleAplicarPercentual(orcamento, percentual);
-                                    }
-                                  }}
-                                  className="w-full"
-                                >
-                                  Aplicar Percentual
-                                </Button>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleAprovarOrcamento(orcamento)}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Aprovar
+                          </Button>
                         )}
+                        
+                        {/* Editar */}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditOrcamento(orcamento)}
+                          disabled={['cancelado','rejeitado','transformado'].includes(orcamento.status)}
                         >
                           <Edit className="h-4 w-4 mr-1" />
                           Editar
                         </Button>
+                        
+                        {/* Cancelar */}
+                        {orcamento.status === 'aberto' && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleCancelarOrcamento(orcamento)}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Cancelar
+                          </Button>
+                        )}
+                        
+                        {/* Exportar PDF */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleExportarPDF(orcamento)}
+                          disabled={orcamento.status === 'cancelado'}
+                        >
+                          <FileText className="h-4 w-4 mr-1" />
+                          Exportar
+                        </Button>
+                        
+                        {/* Imprimir */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleImprimir(orcamento)}
+                          disabled={orcamento.status === 'cancelado'}
+                        >
+                          <Printer className="h-4 w-4 mr-1" />
+                          Imprimir
+                        </Button>
+                        
+                        {/* Transformar em OS */}
                         {orcamento.status === 'aprovado' && (
                           <Button
                             variant="default"
@@ -429,14 +1009,6 @@ export default function Orcamentos() {
                             Transformar em OS
                           </Button>
                         )}
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteOrcamento(orcamento)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Excluir
-                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -470,6 +1042,59 @@ export default function Orcamentos() {
         onOpenChange={setShowTransformDialog}
         orcamento={orcamentoToTransform}
         onSuccess={fetchOrcamentos}
+      />
+
+      {/* Dialog de Cancelamento */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar Orçamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="motivo">Motivo do Cancelamento *</Label>
+              <Textarea
+                id="motivo"
+                placeholder="Informe o motivo do cancelamento..."
+                value={motivoCancelamento}
+                onChange={(e) => setMotivoCancelamento(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmarCancelamento}>
+                Confirmar Cancelamento
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Confirmação para Exportar */}
+      <ConfirmationDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        title="Exportar PDF"
+        description="Deseja exportar o PDF com o percentual de ajuste aplicado?"
+        onConfirm={() => handleConfirmarExportacao(true)}
+        onCancel={() => handleConfirmarExportacao(false)}
+        confirmText="Sim"
+        cancelText="Não"
+      />
+
+      {/* Dialog de Confirmação para Imprimir */}
+      <ConfirmationDialog
+        open={showPrintDialog}
+        onOpenChange={setShowPrintDialog}
+        title="Imprimir Orçamento"
+        description="Deseja imprimir com o percentual de ajuste aplicado?"
+        onConfirm={() => handleConfirmarImpressao(orcamentoToPrint!, true)}
+        onCancel={() => handleConfirmarImpressao(orcamentoToPrint!, false)}
+        confirmText="Sim"
+        cancelText="Não"
       />
     </div>
   );

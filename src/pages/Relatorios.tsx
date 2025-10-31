@@ -53,6 +53,7 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import logo from '../assets/logo2.png';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import OSReportDetail from '../components/OSReportDetail';
@@ -76,6 +77,8 @@ export default function Relatorios() {
   const [justificativaFilter, setJustificativaFilter] = useState('todos');
   const [incluirExcluidas, setIncluirExcluidas] = useState(false);
   const [statusRelatorio, setStatusRelatorio] = useState('todos');
+  const [showPrintOrcDialog, setShowPrintOrcDialog] = useState(false);
+  const [orcamentoToPrint, setOrcamentoToPrint] = useState<any | null>(null);
 
   const reportTypes = [
     {
@@ -106,6 +109,12 @@ export default function Relatorios() {
       id: 'emissao_os',
       title: 'Emissão de OS',
       description: 'Relatório detalhado de ordens de serviço',
+      icon: FileText,
+    },
+    {
+      id: 'emissao_orcamentos',
+      title: 'Emissão de Orçamentos',
+      description: 'Relatório detalhado de orçamentos',
       icon: FileText,
     },
     {
@@ -500,6 +509,10 @@ export default function Relatorios() {
           console.log('Gerando relatório de emissão de OS...');
           await generateEmissaoOSReport(start, end);
           break;
+        case 'emissao_orcamentos':
+          console.log('Gerando relatório de emissão de Orçamentos...');
+          await generateEmissaoOrcamentosReport(start, end);
+          break;
         case 'atraso_os':
           console.log('Gerando relatório de atraso de OS...');
           await generateAtrasoOSReport(start, end);
@@ -663,6 +676,54 @@ export default function Relatorios() {
       setReportData({ type: 'retrabalhos', data: rows, period: { start, end } });
     } catch (error) {
       console.error('Erro ao gerar relatório de retrabalhos:', error);
+    }
+  };
+
+  const generateEmissaoOrcamentosReport = async (start, end) => {
+    try {
+      const query = supabase
+        .from('orcamentos')
+        .select(`
+          id,
+          numero_orcamento,
+          descricao,
+          status,
+          data_abertura,
+          data_prevista,
+          valor_total,
+          percentual_aplicado,
+          valor_final,
+          clientes (nome)
+        `)
+        .gte('data_abertura', start)
+        .lte('data_abertura', end)
+        .order('data_abertura', { ascending: false });
+
+      if (osNumberFilter) {
+        query.ilike('numero_orcamento', `%${osNumberFilter}%`);
+      }
+      if (statusRelatorio && statusRelatorio !== 'todos') {
+        query.eq('status', statusRelatorio);
+      }
+      if (clienteFilter && clienteFilter !== 'todos') {
+        query.eq('cliente_id', clienteFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      setReportData({
+        type: 'emissao_orcamentos',
+        data: data || [],
+        period: { start, end },
+        filters: {
+          numero_orcamento: osNumberFilter,
+          status: statusRelatorio,
+          cliente: clienteFilter,
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório de emissão de orçamentos:', error);
     }
   };
 
@@ -1371,6 +1432,154 @@ export default function Relatorios() {
       default:
         // Tenta extrair células de renderTableRows() (fallback simples)
         return rows.map((r: any) => Object.values(r).map((v) => String(v ?? '-')));
+    }
+  };
+
+  const handlePrintOrcamento = async (orc: any, incluirAjuste: boolean) => {
+    if (!orc) return;
+    try {
+      const { data: full, error } = await supabase
+        .from('orcamentos')
+        .select(`
+          *,
+          clientes (nome, cpf_cnpj),
+          orcamento_produtos (*, produtos (nome, descricao, unidade))
+        `)
+        .eq('id', orc.id)
+        .single();
+      if (error) throw error;
+
+      const o = full || orc;
+      const logoUrl = logo;
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Orçamento ${o.numero_orcamento}</title>
+          <style>
+            @page { size: A4; margin: 12mm; }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: white; color: black; }
+            .relatorio-impressao { width: 190mm; margin: 0 auto; padding: 12mm 0; }
+            .relatorio-cabecalho { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+            .relatorio-logo { width: 120px; height: auto; margin: 0 auto 15px auto; display: block; }
+            .relatorio-empresa { font-size: 18px; font-weight: bold; margin: 0 0 5px 0; color: #333; }
+            .relatorio-titulo { font-size: 16px; font-weight: bold; margin: 0 0 10px 0; color: #333; text-transform: uppercase; }
+            .relatorio-info { font-size: 11px; color: #666; margin: 0; }
+            .relatorio-secao { margin: 20px 0; }
+            .relatorio-secao h3 { font-size: 14px; font-weight: bold; margin: 0 0 10px 0; color: #333; }
+            .relatorio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 15px 0; }
+            .relatorio-tabela { margin: 20px 0; }
+            .relatorio-tabela table { width: 100%; border-collapse: collapse; margin: 0; }
+            .relatorio-tabela th, .relatorio-tabela td { border: 1px solid #333; padding: 8px; text-align: left; font-size: 11px; }
+            .relatorio-tabela th { background-color: #f0f0f0; font-weight: bold; color: #333; }
+            .relatorio-resumo { background-color: #f9f9f9; padding: 15px; border: 1px solid #ccc; margin: 20px 0; }
+            .valor-verde { color: #2e7d32; font-weight: bold; }
+            .relatorio-rodape { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 10px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="relatorio-impressao">
+            <div class="relatorio-cabecalho">
+              <img src="${logoUrl}" alt="Logo Metalma" class="relatorio-logo" />
+              <div class="relatorio-empresa">METALMA INOX & CIA</div>
+              <div class="relatorio-titulo">ORÇAMENTO</div>
+              <div class="relatorio-info">Nº ${o.numero_orcamento}</div>
+            </div>
+
+            <div class="relatorio-secao">
+              <h3>Dados do Orçamento</h3>
+              <div class="relatorio-grid">
+                <div><strong>Número:</strong> ${o.numero_orcamento}</div>
+                <div><strong>Status:</strong> ${(o.status || '').replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</div>
+                <div><strong>Data de Abertura:</strong> ${o.data_abertura ? new Date(o.data_abertura).toLocaleDateString('pt-BR') : '-'}</div>
+                <div><strong>Data Prevista:</strong> ${o.data_prevista ? new Date(o.data_prevista).toLocaleDateString('pt-BR') : '-'}</div>
+              </div>
+            </div>
+
+            <div class="relatorio-secao">
+              <h3>Dados do Cliente</h3>
+              <div class="relatorio-grid">
+                <div><strong>Nome:</strong> ${o.clientes?.nome || 'N/A'}</div>
+                <div><strong>CPF/CNPJ:</strong> ${o.clientes?.cpf_cnpj || 'N/A'}</div>
+              </div>
+            </div>
+
+            <div class="relatorio-secao">
+              <h3>Descrição do Orçamento</h3>
+              <div>${o.descricao || '-'}</div>
+            </div>
+
+            ${o.orcamento_produtos && o.orcamento_produtos.length > 0 ? `
+            <div class="relatorio-secao">
+              <h3>Produtos Incluídos</h3>
+              <div class="relatorio-tabela">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Qtd.</th>
+                      <th>Unidade</th>
+                      <th>Valor Unit.</th>
+                      <th>Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${o.orcamento_produtos.map((p: any) => `
+                      <tr>
+                        <td>${p.produtos?.nome || 'N/A'}</td>
+                        <td>${p.quantidade}</td>
+                        <td>${p.produtos?.unidade || 'UN'}</td>
+                        <td>${formatCurrency(p.preco_unitario)}</td>
+                        <td>${formatCurrency(p.subtotal)}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            ` : ''}
+
+            <div class="relatorio-resumo">
+              <h3>Resumo Financeiro</h3>
+              ${incluirAjuste && (o.percentual_aplicado || 0) > 0 ? `
+                <div><strong>Valor Total:</strong> ${formatCurrency(o.valor_total || 0)}</div>
+                <div><strong>Percentual Aplicado:</strong> +${o.percentual_aplicado}%</div>
+              ` : ''}
+              <div class="valor-verde"><strong>Valor Final:</strong> ${formatCurrency(o.valor_final || o.valor_total || 0)}</div>
+            </div>
+
+            ${!incluirAjuste ? `
+            <div class="relatorio-secao" style="margin-top: 30px;">
+              <h3>Autorização do Cliente</h3>
+              <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:20px;">
+                <div style="width:45%; text-align:center;">
+                  <div style="border-top:1px solid #333; height:1px; margin-bottom:6px;"></div>
+                  <div style="font-size:11px; color:#666;">Assinatura</div>
+                </div>
+                <div style="width:30%; text-align:center;">
+                  <div style="border-top:1px solid #333; height:1px; margin-bottom:6px;"></div>
+                  <div style="font-size:11px; color:#666;">Data</div>
+                </div>
+              </div>
+            </div>
+            ` : ''}
+
+            <div class="relatorio-rodape">
+              Metalma Inox & Cia - Sistema de Controle de OS
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      };
+    } catch (e) {
+      console.error('Erro ao imprimir orçamento:', e);
     }
   };
 
@@ -2100,6 +2309,17 @@ export default function Relatorios() {
           <th>Total Final</th>
           <th>Justificativas</th>
         `;
+      case 'emissao_orcamentos':
+        return `
+          <th>Orçamento</th>
+          <th>Cliente</th>
+          <th>Data Abertura</th>
+          <th>Data Prevista</th>
+          <th>Status</th>
+          <th>Percentual</th>
+          <th>Valor Total</th>
+          <th>Valor Final</th>
+        `;
       case 'atraso_os':
         return `
           <th>OS</th>
@@ -2218,6 +2438,23 @@ export default function Relatorios() {
         `
           )
           .join('');
+      case 'emissao_orcamentos':
+        return reportData.data
+          .map(
+            (orc, index) => `
+          <tr>
+            <td style="font-weight: bold;">${orc.numero_orcamento}</td>
+            <td>${orc.cliente?.nome || 'N/A'}</td>
+            <td>${formatDate(orc.data_abertura)}</td>
+            <td>${orc.data_prevista ? formatDate(orc.data_prevista) : '-'}</td>
+            <td>${(orc.status || '').replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</td>
+            <td>${orc.percentual_aplicado ? `+${orc.percentual_aplicado}%` : '-'}</td>
+            <td>${formatCurrency(orc.valor_total || 0)}</td>
+            <td>${formatCurrency(orc.valor_final || orc.valor_total || 0)}</td>
+          </tr>
+        `
+          )
+          .join('');
       case 'atraso_os':
         return reportData.data
           .map(
@@ -2316,6 +2553,20 @@ export default function Relatorios() {
             <TableHead>Desconto</TableHead>
             <TableHead>Total Final</TableHead>
             <TableHead>Justificativas</TableHead>
+          </>
+        );
+      case 'emissao_orcamentos':
+        return (
+          <>
+            <TableHead>Orçamento</TableHead>
+            <TableHead>Cliente</TableHead>
+            <TableHead>Data Abertura</TableHead>
+            <TableHead>Data Prevista</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Percentual</TableHead>
+            <TableHead>Valor Total</TableHead>
+            <TableHead>Valor Final</TableHead>
+            <TableHead>Ações</TableHead>
           </>
         );
       case 'atraso_os':
@@ -2474,6 +2725,28 @@ export default function Relatorios() {
             </TableCell>
           </TableRow>
         ));
+      case 'emissao_orcamentos':
+        return reportData.data.map((orc, index) => (
+          <TableRow key={index}>
+            <TableCell className="font-medium">{orc.numero_orcamento}</TableCell>
+            <TableCell>{orc.cliente?.nome || 'N/A'}</TableCell>
+            <TableCell>{formatDate(orc.data_abertura)}</TableCell>
+            <TableCell>{orc.data_prevista ? formatDate(orc.data_prevista) : '-'}</TableCell>
+            <TableCell>
+              <Badge className={`status-${(orc.status || '').replace('_', '-')}`}>{(orc.status || '')
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, (l) => l.toUpperCase())}</Badge>
+            </TableCell>
+            <TableCell>{orc.percentual_aplicado ? `+${orc.percentual_aplicado}%` : '-'}</TableCell>
+            <TableCell>{formatCurrency(orc.valor_total || 0)}</TableCell>
+            <TableCell className="font-medium">{formatCurrency(orc.valor_final || orc.valor_total || 0)}</TableCell>
+            <TableCell>
+              <Button variant="outline" size="sm" onClick={() => { setOrcamentoToPrint(orc); setShowPrintOrcDialog(true); }}>
+                <Printer className="mr-1 h-4 w-4" /> Imprimir
+              </Button>
+            </TableCell>
+          </TableRow>
+        ));
       case 'atraso_os':
         return reportData.data.map((os, index) => (
           <TableRow key={index} className="cursor-pointer hover:bg-gray-50">
@@ -2593,28 +2866,15 @@ export default function Relatorios() {
               </Select>
             </div>
 
-            {selectedReport === 'emissao_os' && (
+            {(selectedReport === 'emissao_os' || selectedReport === 'emissao_orcamentos') && (
               <>
                 <div className="space-y-2">
-                  <Label>Número da OS</Label>
+                  <Label>{selectedReport === 'emissao_os' ? 'Número da OS' : 'Número do Orçamento'}</Label>
                   <Input
-                    placeholder="Ex: OS0001/2024"
+                    placeholder={selectedReport === 'emissao_os' ? 'Ex: OS0001/2024' : 'Ex: ORC0001/2025'}
                     value={osNumberFilter}
                     onChange={(e) => setOsNumberFilter(e.target.value)}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label>Fábrica</Label>
-                  <Select value={fabricaFilter} onValueChange={setFabricaFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas as fábricas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todas">Todas</SelectItem>
-                      <SelectItem value="Metalma">Metalma</SelectItem>
-                      <SelectItem value="Galpão">Galpão</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
@@ -2624,44 +2884,73 @@ export default function Relatorios() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos</SelectItem>
-                      <SelectItem value="aberta">Aberta</SelectItem>
-                      <SelectItem value="em_andamento">Em andamento</SelectItem>
-                      <SelectItem value="finalizada">Finalizada</SelectItem>
-                      <SelectItem value="cancelada">Cancelada</SelectItem>
-                      <SelectItem value="pausada">Pausada</SelectItem>
-                      <SelectItem value="falta_material">Falta de material</SelectItem>
-                      <SelectItem value="em_cliente">Em cliente</SelectItem>
+                      {selectedReport === 'emissao_os' ? (
+                        <>
+                          <SelectItem value="aberta">Aberta</SelectItem>
+                          <SelectItem value="em_andamento">Em andamento</SelectItem>
+                          <SelectItem value="finalizada">Finalizada</SelectItem>
+                          <SelectItem value="cancelada">Cancelada</SelectItem>
+                          <SelectItem value="pausada">Pausada</SelectItem>
+                          <SelectItem value="falta_material">Falta de material</SelectItem>
+                          <SelectItem value="em_cliente">Em cliente</SelectItem>
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="aberto">Aberto</SelectItem>
+                          <SelectItem value="aprovado">Aprovado</SelectItem>
+                          <SelectItem value="rejeitado">Rejeitado</SelectItem>
+                          <SelectItem value="cancelado">Cancelado</SelectItem>
+                          <SelectItem value="transformado">Transformado</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Justificativa</Label>
-                  <Select value={justificativaFilter} onValueChange={setJustificativaFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas as OS" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todas as OS</SelectItem>
-                      <SelectItem value="com">Com Justificativa</SelectItem>
-                      <SelectItem value="sem">Sem Justificativa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="incluir-excluidas"
-                      checked={incluirExcluidas}
-                      onCheckedChange={(checked) => setIncluirExcluidas(!!checked)}
-                    />
-                    <Label htmlFor="incluir-excluidas" className="text-sm font-medium">
-                      Incluir OS Excluídas
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Inclui no relatório as OS que foram excluídas do sistema com seus motivos
-                  </p>
-                </div>
+                {selectedReport === 'emissao_os' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Fábrica</Label>
+                      <Select value={fabricaFilter} onValueChange={setFabricaFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todas as fábricas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas</SelectItem>
+                          <SelectItem value="Metalma">Metalma</SelectItem>
+                          <SelectItem value="Galpão">Galpão</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Justificativa</Label>
+                      <Select value={justificativaFilter} onValueChange={setJustificativaFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todas as OS" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todas as OS</SelectItem>
+                          <SelectItem value="com">Com Justificativa</SelectItem>
+                          <SelectItem value="sem">Sem Justificativa</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="incluir-excluidas"
+                          checked={incluirExcluidas}
+                          onCheckedChange={(checked) => setIncluirExcluidas(!!checked)}
+                        />
+                        <Label htmlFor="incluir-excluidas" className="text-sm font-medium">
+                          Incluir OS Excluídas
+                        </Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Inclui no relatório as OS que foram excluídas do sistema com seus motivos
+                      </p>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -2798,6 +3087,18 @@ export default function Relatorios() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog de Confirmação para Imprimir Orçamento (padronizado) */}
+      <ConfirmationDialog
+        open={showPrintOrcDialog}
+        onOpenChange={setShowPrintOrcDialog}
+        title="Imprimir Orçamento"
+        description="Deseja imprimir com o percentual de ajuste aplicado?"
+        onConfirm={() => { if (orcamentoToPrint) handlePrintOrcamento(orcamentoToPrint, true); setShowPrintOrcDialog(false); }}
+        onCancel={() => { if (orcamentoToPrint) handlePrintOrcamento(orcamentoToPrint, false); setShowPrintOrcDialog(false); }}
+        confirmText="Sim"
+        cancelText="Não"
+      />
 
       {/* Relatório Detalhado de OS */}
       {selectedOSDetail && (

@@ -274,8 +274,11 @@ export default function Clientes() {
       });
       setSheetOpen(false);
       fetchClientes(); // Re-fetch data para atualizar a tabela
-      // Garantir retorno à listagem de clientes (evita tela em branco caso o usuário venha de outra rota)
-      navigate('/clientes');
+      
+      // Usar setTimeout para garantir que a navegação aconteça após a renderização
+      setTimeout(() => {
+        navigate('/clientes');
+      }, 100);
     }
     setIsSaving(false);
   };

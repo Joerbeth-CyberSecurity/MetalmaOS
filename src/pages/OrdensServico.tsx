@@ -895,7 +895,11 @@ export default function OrdensServico() {
         toast({ title: 'OS salva com sucesso!' });
         setDialogOpen(false);
         fetchOrdensServico();
-        navigate('/ordens-servico');
+        
+        // Usar setTimeout para garantir que a navegação aconteça após a renderização
+        setTimeout(() => {
+          navigate('/ordens-servico');
+        }, 100);
       }
     } catch (error) {
       console.error('Erro ao salvar OS:', error);

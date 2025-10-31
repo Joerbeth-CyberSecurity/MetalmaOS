@@ -41,12 +41,19 @@ export function OrcamentoForm({
     cliente_id: '',
     descricao: '',
     status: 'aberto',
+    data_abertura: '',
+    data_prevista: '',
+    tempo_execucao_previsto: '',
+    meta_por_hora: 0,
     data_vencimento: '',
     observacoes: '',
     percentual_aplicado: 0
   });
   const [produtosForm, setProdutosForm] = useState<ProdutoForm[]>([]);
   const [loading, setLoading] = useState(false);
+  const [expSegSex, setExpSegSex] = useState<number>(8);
+  const [expSab, setExpSab] = useState<number>(4);
+  const [expDom, setExpDom] = useState<number>(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -58,19 +65,28 @@ export function OrcamentoForm({
           cliente_id: orcamento.cliente_id || '',
           descricao: orcamento.descricao || '',
           status: orcamento.status || 'aberto',
+          data_abertura: orcamento.data_abertura ? orcamento.data_abertura.split('T')[0] : '',
+          data_prevista: orcamento.data_prevista ? orcamento.data_prevista.split('T')[0] : '',
+          tempo_execucao_previsto: orcamento.tempo_execucao_previsto || '00:00:00',
+          meta_por_hora: orcamento.meta_por_hora || 0,
           data_vencimento: orcamento.data_vencimento ? orcamento.data_vencimento.split('T')[0] : '',
           observacoes: orcamento.observacoes || '',
           percentual_aplicado: orcamento.percentual_aplicado || 0
         });
         setProdutosForm(orcamento.orcamento_produtos || []);
       } else {
-        // Novo orçamento
+        // Novo orçamento - buscar próxima numeração
+        fetchProximaNumeration();
         setFormData({
           numero_orcamento: '',
           cliente_id: '',
           descricao: '',
           status: 'aberto',
-          data_vencimento: '',
+          data_abertura: new Date().toISOString().split('T')[0],
+          data_prevista: new Date().toISOString().split('T')[0],
+          tempo_execucao_previsto: '08:00:00',
+          meta_por_hora: 0,
+          data_vencimento: new Date().toISOString().split('T')[0], // Data atual
           observacoes: '',
           percentual_aplicado: 0
         });
@@ -78,6 +94,126 @@ export function OrcamentoForm({
       }
     }
   }, [open, orcamento]);
+
+  // Carregar configurações de expediente
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('configuracoes')
+          .select('chave, valor')
+          .in('chave', [
+            'expediente_horas_segsex',
+            'expediente_horas_sabado',
+            'expediente_horas_domingo',
+          ]);
+        const map = Object.fromEntries((data || []).map((r: any) => [r.chave, r.valor]));
+        setExpSegSex(isNaN(parseFloat(map.expediente_horas_segsex)) ? 8 : parseFloat(map.expediente_horas_segsex));
+        setExpSab(isNaN(parseFloat(map.expediente_horas_sabado)) ? 4 : parseFloat(map.expediente_horas_sabado));
+        setExpDom(isNaN(parseFloat(map.expediente_horas_domingo)) ? 0 : parseFloat(map.expediente_horas_domingo));
+      } catch {}
+    })();
+  }, []);
+
+  // Calcular tempo de execução automaticamente quando datas mudarem
+  useEffect(() => {
+    if (formData.data_abertura && formData.data_prevista) {
+      const horas = calcularHorasUteis(formData.data_abertura, formData.data_prevista);
+      
+      if (!isNaN(horas) && horas >= 0) {
+        const tempoFormatado = formatarHoras(horas);
+        setFormData(prev => ({
+          ...prev,
+          tempo_execucao_previsto: tempoFormatado
+        }));
+      }
+    }
+  }, [formData.data_abertura, formData.data_prevista, expSegSex, expSab, expDom]);
+
+  const fetchProximaNumeration = async () => {
+    try {
+      const { data: config } = await supabase
+        .from('configuracoes')
+        .select('valor')
+        .eq('chave', 'proxima_orcamento')
+        .single();
+      
+      if (config?.valor) {
+        setFormData(prev => ({
+          ...prev,
+          numero_orcamento: config.valor
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar próxima numeração:', error);
+    }
+  };
+
+  const updateProximaNumeration = async (numeroAtual: string) => {
+    try {
+      // Função para incrementar numeração (similar à de OS)
+      const incrementOrcamentoNotation = (input: string): string => {
+        if (!input) return '';
+        const m = input.match(/^(\D*?)(\d+)(.*)$/);
+        if (!m) return input;
+        const prefixo = m[1] || '';
+        const numStr = m[2] || '0';
+        const sufixo = m[3] || '';
+        const next = String(parseInt(numStr, 10) + 1).padStart(numStr.length, '0');
+        return `${prefixo}${next}${sufixo}`;
+      };
+
+      const proximoNumero = incrementOrcamentoNotation(numeroAtual);
+      
+      await supabase
+        .from('configuracoes')
+        .upsert({ chave: 'proxima_orcamento', valor: proximoNumero }, { onConflict: 'chave' });
+    } catch (error) {
+      console.error('Erro ao atualizar próxima numeração:', error);
+    }
+  };
+
+  // Função para calcular horas úteis entre duas datas (corrigida para funcionar com qualquer quantidade de dias)
+  const calcularHorasUteis = (dataInicio: string, dataFim: string): number => {
+    if (!dataInicio || !dataFim) return 0;
+    
+    const inicio = new Date(dataInicio + 'T00:00:00');
+    const fim = new Date(dataFim + 'T00:00:00');
+    
+    if (inicio >= fim) return 0;
+    
+    let horas = 0;
+    const dataAtual = new Date(inicio);
+    
+    // Loop até a data fim (inclusive)
+    while (dataAtual <= fim) {
+      const diaSemana = dataAtual.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
+      
+      if (diaSemana >= 1 && diaSemana <= 5) {
+        // Segunda a sexta
+        horas += expSegSex;
+      } else if (diaSemana === 6) {
+        // Sábado
+        horas += expSab;
+      } else if (diaSemana === 0) {
+        // Domingo
+        horas += expDom;
+      }
+      
+      dataAtual.setDate(dataAtual.getDate() + 1);
+    }
+    
+    return horas;
+  };
+
+  // Função para formatar horas no formato HH:MM:SS
+  const formatarHoras = (horas: number): string => {
+    const horasInt = Math.floor(horas);
+    const minutos = Math.floor((horas - horasInt) * 60);
+    const segundos = Math.floor(((horas - horasInt) * 60 - minutos) * 60);
+    
+    return `${horasInt.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
+  };
 
   const addProduto = () => {
     setProdutosForm([...produtosForm, {
@@ -144,6 +280,10 @@ export function OrcamentoForm({
             cliente_id: formData.cliente_id,
             descricao: formData.descricao,
             status: formData.status,
+            data_abertura: formData.data_abertura ? new Date(formData.data_abertura).toISOString() : null,
+            data_prevista: formData.data_prevista ? new Date(formData.data_prevista).toISOString() : null,
+            tempo_execucao_previsto: formData.tempo_execucao_previsto,
+            meta_por_hora: formData.meta_por_hora,
             data_vencimento: formData.data_vencimento ? new Date(formData.data_vencimento).toISOString() : null,
             observacoes: formData.observacoes,
             valor_total: valorTotal,
@@ -189,7 +329,11 @@ export function OrcamentoForm({
             numero_orcamento: formData.numero_orcamento,
             cliente_id: formData.cliente_id,
             descricao: formData.descricao,
-            status: formData.status,
+            status: 'aberto', // Sempre "aberto" para novos orçamentos
+            data_abertura: formData.data_abertura ? new Date(formData.data_abertura).toISOString() : new Date().toISOString(),
+            data_prevista: formData.data_prevista ? new Date(formData.data_prevista).toISOString() : null,
+            tempo_execucao_previsto: formData.tempo_execucao_previsto,
+            meta_por_hora: formData.meta_por_hora,
             data_vencimento: formData.data_vencimento ? new Date(formData.data_vencimento).toISOString() : null,
             observacoes: formData.observacoes,
             valor_total: valorTotal,
@@ -222,6 +366,9 @@ export function OrcamentoForm({
           title: 'Orçamento criado com sucesso!',
           description: `Orçamento ${formData.numero_orcamento} foi criado.`
         });
+
+        // Atualizar próxima numeração após criar orçamento
+        await updateProximaNumeration(formData.numero_orcamento);
       }
 
       onSuccess();
@@ -270,7 +417,12 @@ export function OrcamentoForm({
                     onChange={(e) => setFormData({ ...formData, numero_orcamento: e.target.value })}
                     placeholder="Ex: ORC0001/2024"
                     required
+                    disabled
+                    className="bg-muted cursor-not-allowed"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Número gerado automaticamente pela configuração do sistema (não editável)
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="cliente_id">Cliente</Label>
@@ -295,6 +447,7 @@ export function OrcamentoForm({
                   <Select
                     value={formData.status}
                     onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    disabled={!orcamento} // Só permite editar status se estiver editando
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -306,14 +459,74 @@ export function OrcamentoForm({
                       <SelectItem value="transformado">Transformado</SelectItem>
                     </SelectContent>
                   </Select>
+                  {!orcamento && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Status será "Aberto" para novos orçamentos
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <Label htmlFor="data_vencimento">Data de Vencimento</Label>
+                  <Label htmlFor="data_vencimento">Data do Dia</Label>
                   <Input
                     id="data_vencimento"
                     type="date"
                     value={formData.data_vencimento}
                     onChange={(e) => setFormData({ ...formData, data_vencimento: e.target.value })}
+                    disabled
+                    className="bg-muted cursor-not-allowed"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Data atual do sistema (não editável)
+                  </p>
+                </div>
+              </div>
+              
+              {/* Campos de Data e Tempo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="data_abertura">Data de Abertura</Label>
+                  <Input
+                    id="data_abertura"
+                    type="date"
+                    value={formData.data_abertura}
+                    onChange={(e) => setFormData({ ...formData, data_abertura: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="data_prevista">Data Prevista</Label>
+                  <Input
+                    id="data_prevista"
+                    type="date"
+                    value={formData.data_prevista}
+                    onChange={(e) => setFormData({ ...formData, data_prevista: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tempo_execucao_previsto">Tempo de Execução Previsto (HH:MM:SS)</Label>
+                  <Input
+                    id="tempo_execucao_previsto"
+                    type="text"
+                    value={formData.tempo_execucao_previsto}
+                    onChange={(e) => setFormData({ ...formData, tempo_execucao_previsto: e.target.value })}
+                    placeholder="00:00:00"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Calculado automaticamente baseado nas datas de abertura e prevista
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="meta_por_hora">Meta por Hora (R$)</Label>
+                  <Input
+                    id="meta_por_hora"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.meta_por_hora}
+                    onChange={(e) => setFormData({ ...formData, meta_por_hora: parseFloat(e.target.value) || 0 })}
+                    placeholder="0.00"
                   />
                 </div>
               </div>

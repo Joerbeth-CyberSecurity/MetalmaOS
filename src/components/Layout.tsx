@@ -9,6 +9,7 @@ import { DarkModeToggle } from '@/components/ui/DarkModeToggle';
 import { MobileNavigation } from '@/components/MobileNavigation';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { usePausasExcedidas } from '@/hooks/usePausasExcedidas';
+import { ChromeCompatibilityWrapper } from '@/components/ChromeCompatibilityWrapper';
 
 interface LayoutProps {
   children: ReactNode;
@@ -63,7 +64,11 @@ export function Layout({ children }: LayoutProps) {
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto p-2 sm:p-4 lg:p-6 pb-20 lg:pb-6">{children}</main>
+          <main className="flex-1 overflow-auto p-2 sm:p-4 lg:p-6 pb-20 lg:pb-6">
+            <ChromeCompatibilityWrapper>
+              {children}
+            </ChromeCompatibilityWrapper>
+          </main>
         </div>
       </div>
       

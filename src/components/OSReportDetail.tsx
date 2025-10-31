@@ -41,6 +41,12 @@ const formatHoursToTime = (hours: number): string => {
 export default function OSReportDetail({ osData, onPrint, onExportPDF }: OSReportDetailProps) {
   if (!osData) return null;
 
+  // Debug: verificar estrutura dos dados
+  console.log('OSReportDetail - osData:', osData);
+  console.log('OSReportDetail - cliente:', osData.cliente);
+  console.log('OSReportDetail - cliente nome:', osData.cliente?.nome);
+  console.log('OSReportDetail - clientes:', osData.clientes);
+
   const totalProdutos = osData.produtos.reduce(
     (total: number, produto: any) => total + (produto.subtotal || 0),
     0
@@ -82,8 +88,10 @@ export default function OSReportDetail({ osData, onPrint, onExportPDF }: OSRepor
               </div>
               <div><span className="font-medium">Fábrica:</span> {osData.fabrica || 'N/A'}</div>
               <div><span className="font-medium">Data de Abertura:</span> {formatDateTime(osData.data_abertura)}</div>
+              <div><span className="font-medium">Data do Sistema (Abertura):</span> {formatDateTime(osData.data_sistema_abertura || osData.data_abertura)}</div>
+              <div><span className="font-medium">Data Prevista:</span> {formatDate(osData.data_prevista || osData.data_conclusao)}</div>
               {osData.data_fim && (
-                <div><span className="font-medium">Data de Finalização:</span> {formatDateTime(osData.data_fim)}</div>
+                <div><span className="font-medium">Data de OS Finalizada:</span> {formatDateTime(osData.data_fim)}</div>
               )}
               <div><span className="font-medium">Tempo Previsto:</span> {formatHoursToTime(osData.tempo_execucao_previsto || 0)}</div>
               <div><span className="font-medium">Tempo Real:</span> {formatHoursToTime(osData.tempo_execucao_real || 0)}</div>
@@ -93,13 +101,13 @@ export default function OSReportDetail({ osData, onPrint, onExportPDF }: OSRepor
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-3">Dados do Cliente</h3>
             <div className="space-y-2 text-sm">
-              <div><span className="font-medium">Nome:</span> {osData.cliente?.nome || 'N/A'}</div>
-              <div><span className="font-medium">CPF/CNPJ:</span> {osData.cliente?.cpf_cnpj || 'N/A'}</div>
-              <div><span className="font-medium">Telefone:</span> {osData.cliente?.telefone || 'N/A'}</div>
-              <div><span className="font-medium">Email:</span> {osData.cliente?.email || 'N/A'}</div>
-              <div><span className="font-medium">Endereço:</span> {osData.cliente?.endereco || 'N/A'}</div>
-              <div><span className="font-medium">Cidade/UF:</span> {osData.cliente?.cidade || 'N/A'} / {osData.cliente?.estado || 'N/A'}</div>
-              <div><span className="font-medium">CEP:</span> {osData.cliente?.cep || 'N/A'}</div>
+              <div><span className="font-medium">Nome:</span> {osData.cliente?.nome || osData.clientes?.nome || 'N/A'}</div>
+              <div><span className="font-medium">CPF/CNPJ:</span> {osData.cliente?.cpf_cnpj || osData.clientes?.cpf_cnpj || 'N/A'}</div>
+              <div><span className="font-medium">Telefone:</span> {osData.cliente?.telefone || osData.clientes?.telefone || 'N/A'}</div>
+              <div><span className="font-medium">Email:</span> {osData.cliente?.email || osData.clientes?.email || 'N/A'}</div>
+              <div><span className="font-medium">Endereço:</span> {osData.cliente?.endereco || osData.clientes?.endereco || 'N/A'}</div>
+              <div><span className="font-medium">Cidade/UF:</span> {osData.cliente?.cidade || osData.clientes?.cidade || 'N/A'} / {osData.cliente?.estado || osData.clientes?.estado || 'N/A'}</div>
+              <div><span className="font-medium">CEP:</span> {osData.cliente?.cep || osData.clientes?.cep || 'N/A'}</div>
             </div>
           </div>
         </div>

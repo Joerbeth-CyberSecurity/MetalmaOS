@@ -1329,7 +1329,13 @@ export default function Configuracoes() {
           *,
           clientes (
             nome,
-            cpf_cnpj
+            cpf_cnpj,
+            telefone,
+            email,
+            endereco,
+            cidade,
+            estado,
+            cep
           ),
           os_colaboradores (
             id,

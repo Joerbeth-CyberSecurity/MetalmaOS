@@ -325,6 +325,15 @@ export default function Configuracoes() {
   const [filtroTipoAcaoOS, setFiltroTipoAcaoOS] = useState('');
   const [filtroNumeroOS, setFiltroNumeroOS] = useState('');
 
+  // Estados para auditoria de Orçamentos
+  const [auditoriaOrcamento, setAuditoriaOrcamento] = useState([]);
+  const [loadingAuditoriaOrcamento, setLoadingAuditoriaOrcamento] = useState(false);
+  const [filtroUsuarioOrcamento, setFiltroUsuarioOrcamento] = useState('');
+  const [filtroDataInicioOrcamento, setFiltroDataInicioOrcamento] = useState('');
+  const [filtroDataFimOrcamento, setFiltroDataFimOrcamento] = useState('');
+  const [filtroTipoAcaoOrcamento, setFiltroTipoAcaoOrcamento] = useState('');
+  const [filtroNumeroOrcamento, setFiltroNumeroOrcamento] = useState('');
+
   // =============================
   // Numeração da Próxima OS
   // =============================
@@ -517,6 +526,97 @@ export default function Configuracoes() {
     setAuditoriaOS([]);
   }
 
+  // Função para buscar auditoria de Orçamentos
+  async function fetchAuditoriaOrcamento() {
+    setLoadingAuditoriaOrcamento(true);
+    try {
+      console.log('Iniciando busca de auditoria de Orçamentos...');
+      
+      let query = supabase
+        .from('auditoria_orcamento')
+        .select(`
+          id,
+          user_id,
+          nome_usuario,
+          email_usuario,
+          acao,
+          orcamento_id,
+          numero_orcamento,
+          dados_anteriores,
+          dados_novos,
+          detalhes,
+          data_acao,
+          created_at
+        `)
+        .order('data_acao', { ascending: false })
+        .limit(100);
+
+      // Aplicar filtros
+      if (filtroUsuarioOrcamento) {
+        query = query.or(
+          `nome_usuario.ilike.%${filtroUsuarioOrcamento}%,email_usuario.ilike.%${filtroUsuarioOrcamento}%`
+        );
+      }
+
+      if (filtroDataInicioOrcamento) {
+        query = query.gte('data_acao', filtroDataInicioOrcamento + 'T00:00:00');
+      }
+
+      if (filtroDataFimOrcamento) {
+        query = query.lte('data_acao', filtroDataFimOrcamento + 'T23:59:59');
+      }
+
+      if (filtroTipoAcaoOrcamento) {
+        query = query.eq('acao', filtroTipoAcaoOrcamento);
+      }
+
+      if (filtroNumeroOrcamento) {
+        query = query.ilike('numero_orcamento', `%${filtroNumeroOrcamento}%`);
+      }
+
+      console.log('Executando query de auditoria de Orçamentos...');
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Erro na query de auditoria de Orçamentos:', error);
+        toast({
+          title: 'Erro ao buscar auditoria de Orçamentos',
+          description: error.message,
+          variant: 'destructive',
+        });
+        setAuditoriaOrcamento([]);
+      } else {
+        console.log('Dados de auditoria de Orçamentos encontrados:', data);
+        console.log('Total de registros:', data?.length || 0);
+        setAuditoriaOrcamento(data || []);
+        
+        if (!data || data.length === 0) {
+          console.log('Nenhum registro de auditoria de Orçamentos encontrado');
+        }
+      }
+    } catch (error) {
+      console.error('Erro geral na auditoria de Orçamentos:', error);
+      toast({
+        title: 'Erro ao buscar auditoria de Orçamentos',
+        description: 'Erro interno do sistema',
+        variant: 'destructive',
+      });
+      setAuditoriaOrcamento([]);
+    } finally {
+      setLoadingAuditoriaOrcamento(false);
+    }
+  }
+
+  // Função para limpar filtros de auditoria de Orçamentos
+  function limparFiltrosOrcamento() {
+    setFiltroUsuarioOrcamento('');
+    setFiltroDataInicioOrcamento('');
+    setFiltroDataFimOrcamento('');
+    setFiltroTipoAcaoOrcamento('');
+    setFiltroNumeroOrcamento('');
+    setAuditoriaOrcamento([]);
+  }
+
   // Função para exportar auditoria de OS
   function exportarAuditoriaOS() {
     const csvContent = [
@@ -540,6 +640,36 @@ export default function Configuracoes() {
     link.setAttribute(
       'download',
       `auditoria_os_${new Date().toISOString().split('T')[0]}.csv`
+    );
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Função para exportar auditoria de Orçamentos
+  function exportarAuditoriaOrcamento() {
+    const csvContent = [
+      ['Usuário', 'Email', 'Ação', 'Número Orçamento', 'Data/Hora', 'Detalhes'],
+      ...auditoriaOrcamento.map((item) => [
+        item.nome_usuario,
+        item.email_usuario,
+        item.acao,
+        item.numero_orcamento || 'N/A',
+        new Date(item.data_acao).toLocaleString('pt-BR'),
+        item.detalhes || '',
+      ]),
+    ]
+      .map((row) => row.join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute(
+      'download',
+      `auditoria_orcamento_${new Date().toISOString().split('T')[0]}.csv`
     );
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
@@ -1405,6 +1535,10 @@ export default function Configuracoes() {
           <TabsTrigger value="audit-os" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             Auditoria OS
+          </TabsTrigger>
+          <TabsTrigger value="audit-orcamento" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Auditoria Orçamento
           </TabsTrigger>
           <TabsTrigger value="ajuste-os" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -2710,6 +2844,172 @@ export default function Configuracoes() {
             </Card>
           </PermissionGuard>
         </TabsContent>
+
+        {/* Aba Auditoria Orçamento */}
+        <TabsContent value="audit-orcamento" className="space-y-6">
+          <PermissionGuard permission="auditoria_visualizar">
+            <Card>
+              <CardHeader>
+                <CardTitle>Auditoria de Orçamentos</CardTitle>
+                <CardDescription>
+                  Monitore todas as ações realizadas pelos usuários nos Orçamentos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Filtros para auditoria de Orçamentos */}
+                <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg bg-muted/30 p-4 md:grid-cols-5">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Usuário</label>
+                    <Input
+                      placeholder="Nome ou email"
+                      value={filtroUsuarioOrcamento}
+                      onChange={(e) => setFiltroUsuarioOrcamento(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Data Início
+                    </label>
+                    <Input
+                      type="date"
+                      value={filtroDataInicioOrcamento}
+                      onChange={(e) => setFiltroDataInicioOrcamento(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Data Fim</label>
+                    <Input
+                      type="date"
+                      value={filtroDataFimOrcamento}
+                      onChange={(e) => setFiltroDataFimOrcamento(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Tipo de Ação
+                    </label>
+                    <select
+                      className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
+                      value={filtroTipoAcaoOrcamento}
+                      onChange={(e) => setFiltroTipoAcaoOrcamento(e.target.value)}
+                    >
+                      <option value="">Todas</option>
+                      <option value="EXCLUSAO_ORCAMENTO">Exclusão</option>
+                      <option value="CRIACAO_ORCAMENTO">Criação</option>
+                      <option value="EDICAO_ORCAMENTO">Edição</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">
+                      Número do Orçamento
+                    </label>
+                    <Input
+                      placeholder="Ex: ORC0001/2025"
+                      value={filtroNumeroOrcamento}
+                      onChange={(e) => setFiltroNumeroOrcamento(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Botões de ação */}
+                <div className="mb-4 flex justify-between">
+                  <div className="flex gap-2">
+                    <Button onClick={fetchAuditoriaOrcamento} disabled={loadingAuditoriaOrcamento}>
+                      {loadingAuditoriaOrcamento && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Buscar
+                    </Button>
+                    <Button variant="outline" onClick={limparFiltrosOrcamento}>
+                      Limpar Filtros
+                    </Button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={exportarAuditoriaOrcamento}
+                      disabled={auditoriaOrcamento.length === 0}
+                    >
+                      Exportar CSV
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Tabela de auditoria de Orçamentos */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border text-sm">
+                    <thead>
+                      <tr className="bg-muted">
+                        <th className="px-3 py-2 text-left">Usuário</th>
+                        <th className="px-3 py-2 text-left">Email</th>
+                        <th className="px-3 py-2 text-left">Ação</th>
+                        <th className="px-3 py-2 text-left">Número Orçamento</th>
+                        <th className="px-3 py-2 text-left">Data/Hora</th>
+                        <th className="px-3 py-2 text-left">Detalhes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingAuditoriaOrcamento ? (
+                        <tr>
+                          <td colSpan={6} className="py-4 text-center">
+                            <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                          </td>
+                        </tr>
+                      ) : auditoriaOrcamento.length > 0 ? (
+                        auditoriaOrcamento.map((item) => (
+                          <tr key={item.id} className="border-b">
+                            <td className="px-3 py-2 font-medium">
+                              {item.nome_usuario}
+                            </td>
+                            <td className="px-3 py-2">{item.email_usuario}</td>
+                            <td className="px-3 py-2">
+                              <span
+                                className={`rounded px-2 py-1 text-xs ${
+                                  item.acao === 'CRIACAO_ORCAMENTO'
+                                    ? 'bg-green-100 text-green-800'
+                                    : item.acao === 'EXCLUSAO_ORCAMENTO'
+                                    ? 'bg-red-100 text-red-800'
+                                    : item.acao === 'EDICAO_ORCAMENTO'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}
+                              >
+                                {item.acao === 'CRIACAO_ORCAMENTO' && 'Criação'}
+                                {item.acao === 'EDICAO_ORCAMENTO' && 'Edição'}
+                                {item.acao === 'EXCLUSAO_ORCAMENTO' && 'Exclusão'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 font-mono">
+                              {item.numero_orcamento || 'N/A'}
+                            </td>
+                            <td className="px-3 py-2">
+                              {item.data_acao 
+                                ? new Date(item.data_acao).toLocaleString('pt-BR')
+                                : 'Data não disponível'
+                              }
+                            </td>
+                            <td className="max-w-xs truncate px-3 py-2 text-xs text-muted-foreground">
+                              {item.detalhes}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="py-4 text-center text-muted-foreground"
+                          >
+                            Nenhum registro de auditoria de Orçamentos encontrado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </PermissionGuard>
+        </TabsContent>
+
         {/* Nova seção: OS em Cliente / Retornar à Produção */}
         <TabsContent value="ajuste-os" className="space-y-6">
           <Card>

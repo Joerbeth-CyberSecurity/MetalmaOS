@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -28,13 +39,13 @@ interface OrcamentoFormProps {
   onSuccess: () => void;
 }
 
-export function OrcamentoForm({ 
-  open, 
-  onOpenChange, 
-  orcamento, 
-  clientes, 
-  produtos, 
-  onSuccess 
+export function OrcamentoForm({
+  open,
+  onOpenChange,
+  orcamento,
+  clientes,
+  produtos,
+  onSuccess,
 }: OrcamentoFormProps) {
   const [formData, setFormData] = useState({
     numero_orcamento: '',
@@ -45,9 +56,9 @@ export function OrcamentoForm({
     data_prevista: '',
     tempo_execucao_previsto: '',
     meta_por_hora: 0,
-    data_vencimento: '',
+    data_criacao: '',
     observacoes: '',
-    percentual_aplicado: 0
+    percentual_aplicado: 0,
   });
   const [produtosForm, setProdutosForm] = useState<ProdutoForm[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,13 +76,20 @@ export function OrcamentoForm({
           cliente_id: orcamento.cliente_id || '',
           descricao: orcamento.descricao || '',
           status: orcamento.status || 'aberto',
-          data_abertura: orcamento.data_abertura ? orcamento.data_abertura.split('T')[0] : '',
-          data_prevista: orcamento.data_prevista ? orcamento.data_prevista.split('T')[0] : '',
-          tempo_execucao_previsto: orcamento.tempo_execucao_previsto || '00:00:00',
+          data_abertura: orcamento.data_abertura
+            ? orcamento.data_abertura.split('T')[0]
+            : '',
+          data_prevista: orcamento.data_prevista
+            ? orcamento.data_prevista.split('T')[0]
+            : '',
+          tempo_execucao_previsto:
+            orcamento.tempo_execucao_previsto || '00:00:00',
           meta_por_hora: orcamento.meta_por_hora || 0,
-          data_vencimento: orcamento.data_vencimento ? orcamento.data_vencimento.split('T')[0] : '',
+          data_criacao: orcamento.data_criacao
+            ? orcamento.data_criacao.split('T')[0]
+            : '',
           observacoes: orcamento.observacoes || '',
-          percentual_aplicado: orcamento.percentual_aplicado || 0
+          percentual_aplicado: orcamento.percentual_aplicado || 0,
         });
         setProdutosForm(orcamento.orcamento_produtos || []);
       } else {
@@ -86,9 +104,9 @@ export function OrcamentoForm({
           data_prevista: new Date().toISOString().split('T')[0],
           tempo_execucao_previsto: '08:00:00',
           meta_por_hora: 0,
-          data_vencimento: new Date().toISOString().split('T')[0], // Data atual
+          data_criacao: new Date().toISOString().split('T')[0], // Data atual
           observacoes: '',
-          percentual_aplicado: 0
+          percentual_aplicado: 0,
         });
         setProdutosForm([]);
       }
@@ -107,10 +125,24 @@ export function OrcamentoForm({
             'expediente_horas_sabado',
             'expediente_horas_domingo',
           ]);
-        const map = Object.fromEntries((data || []).map((r: any) => [r.chave, r.valor]));
-        setExpSegSex(isNaN(parseFloat(map.expediente_horas_segsex)) ? 8 : parseFloat(map.expediente_horas_segsex));
-        setExpSab(isNaN(parseFloat(map.expediente_horas_sabado)) ? 4 : parseFloat(map.expediente_horas_sabado));
-        setExpDom(isNaN(parseFloat(map.expediente_horas_domingo)) ? 0 : parseFloat(map.expediente_horas_domingo));
+        const map = Object.fromEntries(
+          (data || []).map((r: any) => [r.chave, r.valor])
+        );
+        setExpSegSex(
+          isNaN(parseFloat(map.expediente_horas_segsex))
+            ? 8
+            : parseFloat(map.expediente_horas_segsex)
+        );
+        setExpSab(
+          isNaN(parseFloat(map.expediente_horas_sabado))
+            ? 4
+            : parseFloat(map.expediente_horas_sabado)
+        );
+        setExpDom(
+          isNaN(parseFloat(map.expediente_horas_domingo))
+            ? 0
+            : parseFloat(map.expediente_horas_domingo)
+        );
       } catch {}
     })();
   }, []);
@@ -118,17 +150,26 @@ export function OrcamentoForm({
   // Calcular tempo de execução automaticamente quando datas mudarem
   useEffect(() => {
     if (formData.data_abertura && formData.data_prevista) {
-      const horas = calcularHorasUteis(formData.data_abertura, formData.data_prevista);
-      
+      const horas = calcularHorasUteis(
+        formData.data_abertura,
+        formData.data_prevista
+      );
+
       if (!isNaN(horas) && horas >= 0) {
         const tempoFormatado = formatarHoras(horas);
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          tempo_execucao_previsto: tempoFormatado
+          tempo_execucao_previsto: tempoFormatado,
         }));
       }
     }
-  }, [formData.data_abertura, formData.data_prevista, expSegSex, expSab, expDom]);
+  }, [
+    formData.data_abertura,
+    formData.data_prevista,
+    expSegSex,
+    expSab,
+    expDom,
+  ]);
 
   const fetchProximaNumeration = async () => {
     try {
@@ -137,11 +178,11 @@ export function OrcamentoForm({
         .select('valor')
         .eq('chave', 'proxima_orcamento')
         .single();
-      
+
       if (config?.valor) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          numero_orcamento: config.valor
+          numero_orcamento: config.valor,
         }));
       }
     } catch (error) {
@@ -159,15 +200,21 @@ export function OrcamentoForm({
         const prefixo = m[1] || '';
         const numStr = m[2] || '0';
         const sufixo = m[3] || '';
-        const next = String(parseInt(numStr, 10) + 1).padStart(numStr.length, '0');
+        const next = String(parseInt(numStr, 10) + 1).padStart(
+          numStr.length,
+          '0'
+        );
         return `${prefixo}${next}${sufixo}`;
       };
 
       const proximoNumero = incrementOrcamentoNotation(numeroAtual);
-      
+
       await supabase
         .from('configuracoes')
-        .upsert({ chave: 'proxima_orcamento', valor: proximoNumero }, { onConflict: 'chave' });
+        .upsert(
+          { chave: 'proxima_orcamento', valor: proximoNumero },
+          { onConflict: 'chave' }
+        );
     } catch (error) {
       console.error('Erro ao atualizar próxima numeração:', error);
     }
@@ -176,19 +223,19 @@ export function OrcamentoForm({
   // Função para calcular horas úteis entre duas datas (corrigida para funcionar com qualquer quantidade de dias)
   const calcularHorasUteis = (dataInicio: string, dataFim: string): number => {
     if (!dataInicio || !dataFim) return 0;
-    
+
     const inicio = new Date(dataInicio + 'T00:00:00');
     const fim = new Date(dataFim + 'T00:00:00');
-    
+
     if (inicio >= fim) return 0;
-    
+
     let horas = 0;
     const dataAtual = new Date(inicio);
-    
+
     // Loop até a data fim (inclusive)
     while (dataAtual <= fim) {
       const diaSemana = dataAtual.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
-      
+
       if (diaSemana >= 1 && diaSemana <= 5) {
         // Segunda a sexta
         horas += expSegSex;
@@ -199,10 +246,10 @@ export function OrcamentoForm({
         // Domingo
         horas += expDom;
       }
-      
+
       dataAtual.setDate(dataAtual.getDate() + 1);
     }
-    
+
     return horas;
   };
 
@@ -211,37 +258,46 @@ export function OrcamentoForm({
     const horasInt = Math.floor(horas);
     const minutos = Math.floor((horas - horasInt) * 60);
     const segundos = Math.floor(((horas - horasInt) * 60 - minutos) * 60);
-    
+
     return `${horasInt.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`;
   };
 
   const addProduto = () => {
-    setProdutosForm([...produtosForm, {
-      produto_id: '',
-      quantidade: 0,
-      preco_unitario: 0,
-      subtotal: 0
-    }]);
+    setProdutosForm([
+      ...produtosForm,
+      {
+        produto_id: '',
+        quantidade: 0,
+        preco_unitario: 0,
+        subtotal: 0,
+      },
+    ]);
   };
 
   const removeProduto = (index: number) => {
     setProdutosForm(produtosForm.filter((_, i) => i !== index));
   };
 
-  const updateProduto = (index: number, field: keyof ProdutoForm, value: any) => {
+  const updateProduto = (
+    index: number,
+    field: keyof ProdutoForm,
+    value: any
+  ) => {
     const newProdutos = [...produtosForm];
     newProdutos[index] = { ...newProdutos[index], [field]: value };
-    
+
     if (field === 'produto_id') {
-      const produto = produtos.find(p => p.id === value);
+      const produto = produtos.find((p) => p.id === value);
       if (produto) {
         newProdutos[index].preco_unitario = produto.preco_unitario;
-        newProdutos[index].subtotal = newProdutos[index].quantidade * produto.preco_unitario;
+        newProdutos[index].subtotal =
+          newProdutos[index].quantidade * produto.preco_unitario;
       }
     } else if (field === 'quantidade' || field === 'preco_unitario') {
-      newProdutos[index].subtotal = newProdutos[index].quantidade * newProdutos[index].preco_unitario;
+      newProdutos[index].subtotal =
+        newProdutos[index].quantidade * newProdutos[index].preco_unitario;
     }
-    
+
     setProdutosForm(newProdutos);
   };
 
@@ -256,12 +312,17 @@ export function OrcamentoForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.cliente_id || !formData.descricao || produtosForm.length === 0) {
+
+    if (
+      !formData.cliente_id ||
+      !formData.descricao ||
+      produtosForm.length === 0
+    ) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Preencha cliente, descrição e adicione pelo menos um produto.',
-        variant: 'destructive'
+        description:
+          'Preencha cliente, descrição e adicione pelo menos um produto.',
+        variant: 'destructive',
       });
       return;
     }
@@ -280,16 +341,22 @@ export function OrcamentoForm({
             cliente_id: formData.cliente_id,
             descricao: formData.descricao,
             status: formData.status,
-            data_abertura: formData.data_abertura ? new Date(formData.data_abertura).toISOString() : null,
-            data_prevista: formData.data_prevista ? new Date(formData.data_prevista).toISOString() : null,
+            data_abertura: formData.data_abertura
+              ? new Date(formData.data_abertura + 'T12:00:00').toISOString()
+              : null,
+            data_prevista: formData.data_prevista
+              ? new Date(formData.data_prevista + 'T12:00:00').toISOString()
+              : null,
             tempo_execucao_previsto: formData.tempo_execucao_previsto,
             meta_por_hora: formData.meta_por_hora,
-            data_vencimento: formData.data_vencimento ? new Date(formData.data_vencimento).toISOString() : null,
+            data_criacao: formData.data_criacao
+              ? new Date(formData.data_criacao).toISOString()
+              : null,
             observacoes: formData.observacoes,
             valor_total: valorTotal,
             percentual_aplicado: formData.percentual_aplicado,
             valor_final: valorFinal,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', orcamento.id);
 
@@ -301,12 +368,12 @@ export function OrcamentoForm({
           .delete()
           .eq('orcamento_id', orcamento.id);
 
-        const produtosToSave = produtosForm.map(produto => ({
+        const produtosToSave = produtosForm.map((produto) => ({
           orcamento_id: orcamento.id,
           produto_id: produto.produto_id,
           quantidade: produto.quantidade,
           preco_unitario: produto.preco_unitario,
-          subtotal: produto.subtotal
+          subtotal: produto.subtotal,
         }));
 
         if (produtosToSave.length > 0) {
@@ -319,7 +386,7 @@ export function OrcamentoForm({
 
         toast({
           title: 'Orçamento atualizado com sucesso!',
-          description: `Orçamento ${formData.numero_orcamento} foi atualizado.`
+          description: `Orçamento ${formData.numero_orcamento} foi atualizado.`,
         });
       } else {
         // Criar novo orçamento
@@ -330,15 +397,21 @@ export function OrcamentoForm({
             cliente_id: formData.cliente_id,
             descricao: formData.descricao,
             status: 'aberto', // Sempre "aberto" para novos orçamentos
-            data_abertura: formData.data_abertura ? new Date(formData.data_abertura).toISOString() : new Date().toISOString(),
-            data_prevista: formData.data_prevista ? new Date(formData.data_prevista).toISOString() : null,
+            data_abertura: formData.data_abertura
+              ? new Date(formData.data_abertura + 'T12:00:00').toISOString()
+              : new Date().toISOString(),
+            data_prevista: formData.data_prevista
+              ? new Date(formData.data_prevista + 'T12:00:00').toISOString()
+              : null,
             tempo_execucao_previsto: formData.tempo_execucao_previsto,
             meta_por_hora: formData.meta_por_hora,
-            data_vencimento: formData.data_vencimento ? new Date(formData.data_vencimento).toISOString() : null,
+            data_criacao: formData.data_criacao
+              ? new Date(formData.data_criacao).toISOString()
+              : null,
             observacoes: formData.observacoes,
             valor_total: valorTotal,
             percentual_aplicado: formData.percentual_aplicado,
-            valor_final: valorFinal
+            valor_final: valorFinal,
           })
           .select()
           .single();
@@ -346,12 +419,12 @@ export function OrcamentoForm({
         if (orcamentoError) throw orcamentoError;
 
         // Inserir produtos
-        const produtosToSave = produtosForm.map(produto => ({
+        const produtosToSave = produtosForm.map((produto) => ({
           orcamento_id: newOrcamento.id,
           produto_id: produto.produto_id,
           quantidade: produto.quantidade,
           preco_unitario: produto.preco_unitario,
-          subtotal: produto.subtotal
+          subtotal: produto.subtotal,
         }));
 
         if (produtosToSave.length > 0) {
@@ -364,7 +437,7 @@ export function OrcamentoForm({
 
         toast({
           title: 'Orçamento criado com sucesso!',
-          description: `Orçamento ${formData.numero_orcamento} foi criado.`
+          description: `Orçamento ${formData.numero_orcamento} foi criado.`,
         });
 
         // Atualizar próxima numeração após criar orçamento
@@ -377,8 +450,9 @@ export function OrcamentoForm({
       console.error('Erro ao salvar orçamento:', error);
       toast({
         title: 'Erro ao salvar orçamento',
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
-        variant: 'destructive'
+        description:
+          error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -388,13 +462,13 @@ export function OrcamentoForm({
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(value);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {orcamento ? 'Editar Orçamento' : 'Novo Orçamento'}
@@ -408,27 +482,35 @@ export function OrcamentoForm({
               <CardTitle>Informações Básicas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="numero_orcamento">Número do Orçamento</Label>
                   <Input
                     id="numero_orcamento"
                     value={formData.numero_orcamento}
-                    onChange={(e) => setFormData({ ...formData, numero_orcamento: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        numero_orcamento: e.target.value,
+                      })
+                    }
                     placeholder="Ex: ORC0001/2024"
                     required
                     disabled
-                    className="bg-muted cursor-not-allowed"
+                    className="cursor-not-allowed bg-muted"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Número gerado automaticamente pela configuração do sistema (não editável)
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Número gerado automaticamente pela configuração do sistema
+                    (não editável)
                   </p>
                 </div>
                 <div>
                   <Label htmlFor="cliente_id">Cliente</Label>
                   <Select
                     value={formData.cliente_id}
-                    onValueChange={(value) => setFormData({ ...formData, cliente_id: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, cliente_id: value })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o cliente" />
@@ -446,7 +528,9 @@ export function OrcamentoForm({
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, status: value })
+                    }
                     disabled={!orcamento} // Só permite editar status se estiver editando
                   >
                     <SelectTrigger>
@@ -460,36 +544,43 @@ export function OrcamentoForm({
                     </SelectContent>
                   </Select>
                   {!orcamento && (
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Status será "Aberto" para novos orçamentos
                     </p>
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="data_vencimento">Data do Dia</Label>
+                  <Label htmlFor="data_criacao">Data de Criação</Label>
                   <Input
-                    id="data_vencimento"
+                    id="data_criacao"
                     type="date"
-                    value={formData.data_vencimento}
-                    onChange={(e) => setFormData({ ...formData, data_vencimento: e.target.value })}
+                    value={formData.data_criacao}
+                    onChange={(e) =>
+                      setFormData({ ...formData, data_criacao: e.target.value })
+                    }
                     disabled
-                    className="bg-muted cursor-not-allowed"
+                    className="cursor-not-allowed bg-muted"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Data atual do sistema (não editável)
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Data de criação do orçamento (gerada automaticamente)
                   </p>
                 </div>
               </div>
-              
+
               {/* Campos de Data e Tempo */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <Label htmlFor="data_abertura">Data de Abertura</Label>
                   <Input
                     id="data_abertura"
                     type="date"
                     value={formData.data_abertura}
-                    onChange={(e) => setFormData({ ...formData, data_abertura: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        data_abertura: e.target.value,
+                      })
+                    }
                     required
                   />
                 </div>
@@ -499,22 +590,35 @@ export function OrcamentoForm({
                     id="data_prevista"
                     type="date"
                     value={formData.data_prevista}
-                    onChange={(e) => setFormData({ ...formData, data_prevista: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        data_prevista: e.target.value,
+                      })
+                    }
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="tempo_execucao_previsto">Tempo de Execução Previsto (HH:MM:SS)</Label>
+                  <Label htmlFor="tempo_execucao_previsto">
+                    Tempo de Execução Previsto (HH:MM:SS)
+                  </Label>
                   <Input
                     id="tempo_execucao_previsto"
                     type="text"
                     value={formData.tempo_execucao_previsto}
-                    onChange={(e) => setFormData({ ...formData, tempo_execucao_previsto: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        tempo_execucao_previsto: e.target.value,
+                      })
+                    }
                     placeholder="00:00:00"
                     required
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Calculado automaticamente baseado nas datas de abertura e prevista
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Calculado automaticamente baseado nas datas de abertura e
+                    prevista
                   </p>
                 </div>
                 <div>
@@ -525,7 +629,12 @@ export function OrcamentoForm({
                     step="0.01"
                     min="0"
                     value={formData.meta_por_hora}
-                    onChange={(e) => setFormData({ ...formData, meta_por_hora: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        meta_por_hora: parseFloat(e.target.value) || 0,
+                      })
+                    }
                     placeholder="0.00"
                   />
                 </div>
@@ -535,7 +644,9 @@ export function OrcamentoForm({
                 <Textarea
                   id="descricao"
                   value={formData.descricao}
-                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, descricao: e.target.value })
+                  }
                   placeholder="Descreva o orçamento..."
                   required
                 />
@@ -545,7 +656,9 @@ export function OrcamentoForm({
                 <Textarea
                   id="observacoes"
                   value={formData.observacoes}
-                  onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, observacoes: e.target.value })
+                  }
                   placeholder="Observações adicionais..."
                 />
               </div>
@@ -558,7 +671,7 @@ export function OrcamentoForm({
               <CardTitle className="flex items-center justify-between">
                 <span>Produtos</span>
                 <Button type="button" onClick={addProduto} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="mr-2 h-4 w-4" />
                   Adicionar Produto
                 </Button>
               </CardTitle>
@@ -566,7 +679,7 @@ export function OrcamentoForm({
             <CardContent>
               <div className="space-y-4">
                 {produtosForm.map((produto, index) => (
-                  <div key={index} className="border rounded-lg p-4 space-y-3">
+                  <div key={index} className="space-y-3 rounded-lg border p-4">
                     <div className="flex items-center justify-between">
                       <h4 className="font-medium">Produto {index + 1}</h4>
                       <Button
@@ -578,12 +691,14 @@ export function OrcamentoForm({
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                       <div>
                         <Label>Produto</Label>
                         <Select
                           value={produto.produto_id}
-                          onValueChange={(value) => updateProduto(index, 'produto_id', value)}
+                          onValueChange={(value) =>
+                            updateProduto(index, 'produto_id', value)
+                          }
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione o produto" />
@@ -604,7 +719,13 @@ export function OrcamentoForm({
                           step="0.01"
                           min="0"
                           value={produto.quantidade}
-                          onChange={(e) => updateProduto(index, 'quantidade', parseFloat(e.target.value) || 0)}
+                          onChange={(e) =>
+                            updateProduto(
+                              index,
+                              'quantidade',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
                         />
                       </div>
                       <div>
@@ -614,7 +735,13 @@ export function OrcamentoForm({
                           step="0.01"
                           min="0"
                           value={produto.preco_unitario}
-                          onChange={(e) => updateProduto(index, 'preco_unitario', parseFloat(e.target.value) || 0)}
+                          onChange={(e) =>
+                            updateProduto(
+                              index,
+                              'preco_unitario',
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
                         />
                       </div>
                       <div>
@@ -630,9 +757,11 @@ export function OrcamentoForm({
                 ))}
 
                 {produtosForm.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="py-8 text-center text-muted-foreground">
                     <p>Nenhum produto adicionado.</p>
-                    <p className="text-sm">Clique em "Adicionar Produto" para começar.</p>
+                    <p className="text-sm">
+                      Clique em "Adicionar Produto" para começar.
+                    </p>
                   </div>
                 )}
               </div>
@@ -646,33 +775,46 @@ export function OrcamentoForm({
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <Label htmlFor="percentual_aplicado">Percentual de Ajuste (%)</Label>
+                    <Label htmlFor="percentual_aplicado">
+                      Percentual de Ajuste (%)
+                    </Label>
                     <Input
                       id="percentual_aplicado"
                       type="number"
                       step="0.01"
                       min="0"
                       value={formData.percentual_aplicado}
-                      onChange={(e) => setFormData({ ...formData, percentual_aplicado: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          percentual_aplicado: parseFloat(e.target.value) || 0,
+                        })
+                      }
                       placeholder="Ex: 10.5"
                     />
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Valor Total:</span>
-                      <span className="font-medium">{formatCurrency(calcularValorTotal())}</span>
+                      <span className="font-medium">
+                        {formatCurrency(calcularValorTotal())}
+                      </span>
                     </div>
                     {formData.percentual_aplicado > 0 && (
                       <div className="flex justify-between">
                         <span>Percentual Aplicado:</span>
-                        <span className="font-medium">+{formData.percentual_aplicado}%</span>
+                        <span className="font-medium">
+                          +{formData.percentual_aplicado}%
+                        </span>
                       </div>
                     )}
-                    <div className="flex justify-between font-bold text-lg border-t pt-2">
+                    <div className="flex justify-between border-t pt-2 text-lg font-bold">
                       <span>Valor Final:</span>
-                      <span className="text-green-600">{formatCurrency(calcularValorFinal())}</span>
+                      <span className="text-green-600">
+                        {formatCurrency(calcularValorFinal())}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -682,13 +824,17 @@ export function OrcamentoForm({
 
           {/* Botões */}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              <X className="h-4 w-4 mr-2" />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="mr-2 h-4 w-4" />
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
-              <Save className="h-4 w-4 mr-2" />
-              {loading ? 'Salvando...' : (orcamento ? 'Atualizar' : 'Criar')}
+              <Save className="mr-2 h-4 w-4" />
+              {loading ? 'Salvando...' : orcamento ? 'Atualizar' : 'Criar'}
             </Button>
           </div>
         </form>

@@ -903,18 +903,44 @@ export default function OrdensServico() {
       }
     } catch (error) {
       console.error('Erro ao salvar OS:', error);
-      let msg =
-        'Erro ao salvar OS. Verifique os campos obrigatórios e tente novamente.';
+      
+      // Mensagens amigáveis baseadas no tipo de erro
+      let mensagemErro = 'Não foi possível salvar a Ordem de Serviço.';
+      let descricaoErro = 'Por favor, verifique os campos e tente novamente.';
+      
+      // Verificar se é erro de campo obrigatório
       if (error && typeof error === 'object') {
-        if ('message' in error && error.message) {
-          msg += `\n${error.message}`;
-        } else if ('toString' in error) {
-          msg += `\n${error.toString()}`;
+        const errorObj = error as any;
+        
+        // Erro de cliente não selecionado
+        if (errorObj.message?.includes('cliente_id') || errorObj.message?.includes('null value')) {
+          mensagemErro = 'Cliente não selecionado';
+          descricaoErro = 'Por favor, selecione um cliente antes de salvar a OS.';
+        }
+        // Erro de descrição vazia
+        else if (errorObj.message?.includes('descricao')) {
+          mensagemErro = 'Descrição obrigatória';
+          descricaoErro = 'Por favor, preencha a descrição dos serviços.';
+        }
+        // Erro de produtos
+        else if (errorObj.message?.includes('produto')) {
+          mensagemErro = 'Erro nos produtos';
+          descricaoErro = 'Verifique se todos os produtos foram adicionados corretamente.';
+        }
+        // Outros erros de validação
+        else if (errorObj.code === '23502') { // NOT NULL violation
+          mensagemErro = 'Campos obrigatórios não preenchidos';
+          descricaoErro = 'Verifique se todos os campos obrigatórios foram preenchidos.';
+        }
+        else if (errorObj.code === '23503') { // FOREIGN KEY violation
+          mensagemErro = 'Dados inválidos';
+          descricaoErro = 'Um ou mais campos contêm valores inválidos.';
         }
       }
+      
       toast({
-        title: 'Erro ao salvar OS',
-        description: msg,
+        title: mensagemErro,
+        description: descricaoErro,
         variant: 'destructive',
       });
     } finally {
@@ -1941,14 +1967,14 @@ export default function OrdensServico() {
                       <FormLabel>Fábrica</FormLabel>
                       <FormControl>
                         <select
-                          className="border rounded h-9 px-3 text-sm bg-background"
+                          className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
+                          {...field}
                           value={field.value || 'Metalma'}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          onBlur={field.onBlur}
-                          name={field.name}
+                          onChange={field.onChange}
                         >
                           <option value="Metalma">Metalma</option>
                           <option value="Galpão">Galpão</option>
+                          <option value="Terceirizado">Terceirizado</option>
                         </select>
                       </FormControl>
                       <FormMessage />

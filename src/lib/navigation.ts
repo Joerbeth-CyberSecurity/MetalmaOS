@@ -6,6 +6,7 @@ import {
   BarChart3,
   Settings,
   FileText,
+  DollarSign,
 } from 'lucide-react';
 
 export type AppModule = {
@@ -66,6 +67,16 @@ export const mainModules: AppModule[] = [
     icon: FileText,
     permission: 'orcamento_visualizar',
     description: 'Gestão de orçamentos e transformação em OS.',
+  },
+];
+
+export const financeModules: AppModule[] = [
+  {
+    title: 'Orçamento vs OS',
+    url: '/financeiro/orcamento-os',
+    icon: DollarSign,
+    permission: 'relatorio_visualizar',
+    description: 'Comparação financeira entre orçamentos e ordens de serviço.',
   },
 ];
 

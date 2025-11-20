@@ -43,6 +43,7 @@ import {
   DollarSign,
   Shield,
   Activity,
+  Package,
 } from 'lucide-react';
 import {
   format,
@@ -128,6 +129,12 @@ export default function Relatorios() {
       title: 'Atraso de OS',
       description: 'Análise de atraso baseado na data prevista',
       icon: Clock,
+    },
+    {
+      id: 'materiais_orcamento_os',
+      title: 'Materiais: Orçamento vs OS',
+      description: 'Comparação de produtos entre orçamento e ordem de serviço',
+      icon: Package,
     },
   ];
 
@@ -516,6 +523,10 @@ export default function Relatorios() {
         case 'atraso_os':
           console.log('Gerando relatório de atraso de OS...');
           await generateAtrasoOSReport(start, end);
+          break;
+        case 'materiais_orcamento_os':
+          console.log('Gerando relatório de materiais Orçamento vs OS...');
+          await generateMateriaisOrcamentoOSReport(start, end);
           break;
         default:
           console.log('Tipo de relatório não reconhecido:', selectedReport);
@@ -1173,6 +1184,230 @@ export default function Relatorios() {
     }
   };
 
+  const generateMateriaisOrcamentoOSReport = async (start, end) => {
+    try {
+      console.log('Iniciando geração do relatório de materiais Orçamento vs OS...');
+      console.log('Período:', { start, end });
+
+      // Buscar OS que foram transformadas de orçamentos
+      const { data: ordens, error: osError } = await supabase
+        .from('ordens_servico')
+        .select(`
+          id,
+          numero_os,
+          data_abertura,
+          orcamento_id,
+          orcamentos (
+            id,
+            numero_orcamento,
+            data_abertura,
+            clientes (
+              nome
+            ),
+            orcamento_produtos (
+              id,
+              produto_id,
+              quantidade,
+              preco_unitario,
+              subtotal,
+              produtos (
+                nome,
+                descricao,
+                unidade
+              )
+            )
+          ),
+          os_produtos (
+            id,
+            produto_id,
+            quantidade,
+            preco_unitario,
+            subtotal,
+            produtos (
+              nome,
+              descricao,
+              unidade
+            )
+          )
+        `)
+        .not('orcamento_id', 'is', null)
+        .gte('data_abertura', start)
+        .lte('data_abertura', end)
+        .order('data_abertura', { ascending: false });
+
+      if (osError) throw osError;
+
+      if (!ordens || ordens.length === 0) {
+        setReportData({
+          type: 'materiais_orcamento_os',
+          data: [],
+          period: { start, end },
+          filters: { cliente: clienteFilter },
+          estatisticas: {
+            total_comparacoes: 0,
+            total_produtos_orcamento: 0,
+            total_produtos_os: 0,
+            valor_total_orcamento: 0,
+            valor_total_os: 0,
+            diferenca_total: 0,
+          },
+        });
+        console.log('Nenhuma OS encontrada com orçamento relacionado');
+        return;
+      }
+
+      const materiaisData = (ordens || [])
+        .filter((os: any) => os && os.orcamentos && os.orcamentos.orcamento_produtos && Array.isArray(os.orcamentos.orcamento_produtos))
+        .map((os: any) => {
+          const produtosOrcamento = Array.isArray(os.orcamentos?.orcamento_produtos) ? os.orcamentos.orcamento_produtos : [];
+          const produtosOS = Array.isArray(os.os_produtos) ? os.os_produtos : [];
+
+          // Criar mapas para facilitar comparação
+          const produtosOrcMap = new Map();
+          produtosOrcamento.forEach((prod: any) => {
+            produtosOrcMap.set(prod.produto_id, {
+              nome: prod.produtos?.nome || 'N/A',
+              quantidade: parseFloat(prod.quantidade) || 0,
+              preco_unitario: parseFloat(prod.preco_unitario) || 0,
+              subtotal: parseFloat(prod.subtotal) || 0,
+              unidade: prod.produtos?.unidade || 'UN',
+            });
+          });
+
+          const produtosOSMap = new Map();
+          produtosOS.forEach((prod: any) => {
+            produtosOSMap.set(prod.produto_id, {
+              nome: prod.produtos?.nome || 'N/A',
+              quantidade: parseFloat(prod.quantidade) || 0,
+              preco_unitario: parseFloat(prod.preco_unitario) || 0,
+              subtotal: parseFloat(prod.subtotal) || 0,
+              unidade: prod.produtos?.unidade || 'UN',
+            });
+          });
+
+          // Comparar produtos
+          const comparacoes = [];
+          const produtosUnicos = new Set([
+            ...Array.from(produtosOrcMap.keys()),
+            ...Array.from(produtosOSMap.keys()),
+          ]);
+
+          produtosUnicos.forEach((produtoId) => {
+            const prodOrc = produtosOrcMap.get(produtoId);
+            const prodOS = produtosOSMap.get(produtoId);
+
+            const qtdOrc = prodOrc?.quantidade || 0;
+            const qtdOS = prodOS?.quantidade || 0;
+            const diferencaQtd = qtdOS - qtdOrc;
+            const percentualQtd = qtdOrc > 0 ? (diferencaQtd / qtdOrc) * 100 : 0;
+
+            const valorOrc = prodOrc?.subtotal || 0;
+            const valorOS = prodOS?.subtotal || 0;
+            const diferencaValor = valorOS - valorOrc;
+            const percentualValor = valorOrc > 0 ? (diferencaValor / valorOrc) * 100 : 0;
+
+            comparacoes.push({
+              produto_id: produtoId,
+              produto_nome: prodOrc?.nome || prodOS?.nome || 'N/A',
+              unidade: prodOrc?.unidade || prodOS?.unidade || 'UN',
+              quantidade_orcamento: qtdOrc,
+              quantidade_os: qtdOS,
+              diferenca_quantidade: diferencaQtd,
+              percentual_quantidade: percentualQtd,
+              valor_orcamento: valorOrc,
+              valor_os: valorOS,
+              diferenca_valor: diferencaValor,
+              percentual_valor: percentualValor,
+            });
+          });
+
+          return {
+            orcamento_numero: os.orcamentos?.numero_orcamento || 'N/A',
+            os_numero: os.numero_os || 'N/A',
+            cliente: os.orcamentos?.clientes?.nome || 'N/A',
+            data_abertura_orcamento: os.orcamentos?.data_abertura || '',
+            data_abertura_os: os.data_abertura || '',
+            produtos: comparacoes || [],
+            total_produtos_orcamento: produtosOrcamento.length || 0,
+            total_produtos_os: produtosOS.length || 0,
+            valor_total_orcamento: produtosOrcamento.reduce(
+              (sum: number, p: any) => sum + (parseFloat(p?.subtotal) || 0),
+              0
+            ),
+            valor_total_os: produtosOS.reduce(
+              (sum: number, p: any) => sum + (parseFloat(p?.subtotal) || 0),
+              0
+            ),
+          };
+        })
+        .filter((item: any) => item && typeof item === 'object' && item.hasOwnProperty('total_produtos_orcamento'));
+
+      // Calcular estatísticas gerais - garantir que materiaisData é um array válido
+      const materiaisDataValido = Array.isArray(materiaisData) ? materiaisData : [];
+      
+      console.log('materiaisDataValido:', materiaisDataValido);
+      console.log('Total de itens:', materiaisDataValido.length);
+      
+      const totalComparacoes = materiaisDataValido.length;
+      const totalProdutosOrcamento = materiaisDataValido.reduce(
+        (sum: number, item: any) => {
+          const valor = item?.total_produtos_orcamento || 0;
+          return sum + valor;
+        },
+        0
+      );
+      const totalProdutosOS = materiaisDataValido.reduce(
+        (sum: number, item: any) => {
+          const valor = item?.total_produtos_os || 0;
+          return sum + valor;
+        },
+        0
+      );
+      const valorTotalOrcamento = materiaisDataValido.reduce(
+        (sum: number, item: any) => {
+          const valor = item?.valor_total_orcamento || 0;
+          return sum + valor;
+        },
+        0
+      );
+      const valorTotalOS = materiaisDataValido.reduce(
+        (sum: number, item: any) => {
+          const valor = item?.valor_total_os || 0;
+          return sum + valor;
+        },
+        0
+      );
+
+      console.log('Estatísticas calculadas:', {
+        totalComparacoes,
+        totalProdutosOrcamento,
+        totalProdutosOS,
+        valorTotalOrcamento,
+        valorTotalOS
+      });
+
+      setReportData({
+        type: 'materiais_orcamento_os',
+        data: materiaisDataValido,
+        period: { start, end },
+        filters: { cliente: clienteFilter },
+        estatisticas: {
+          total_comparacoes: totalComparacoes,
+          total_produtos_orcamento: totalProdutosOrcamento,
+          total_produtos_os: totalProdutosOS,
+          valor_total_orcamento: valorTotalOrcamento,
+          valor_total_os: valorTotalOS,
+          diferenca_total: valorTotalOS - valorTotalOrcamento,
+        },
+      });
+
+      console.log('Relatório de materiais Orçamento vs OS gerado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao gerar relatório de materiais:', error);
+      alert('Erro ao gerar relatório: ' + error.message);
+    }
+  };
+
   // Função para obter título do relatório
   const getReportTitle = (type) => {
     switch (type) {
@@ -1188,6 +1423,8 @@ export default function Relatorios() {
         return 'RELATÓRIO DE EMISSÃO DE ORDENS DE SERVIÇO';
       case 'atraso_os':
         return 'RELATÓRIO DE ATRASO DE ORDENS DE SERVIÇO';
+      case 'materiais_orcamento_os':
+        return 'RELATÓRIO DE MATERIAIS: ORÇAMENTO VS OS';
       default:
         return 'RELATÓRIO';
     }
@@ -1402,6 +1639,8 @@ export default function Relatorios() {
         return ['Colaborador', 'Horas', 'OS Concluídas', 'Eficiência', 'Média Diária'];
       case 'seguranca':
         return ['Usuário', 'Email', 'Evento', 'Data/Hora', 'IP'];
+      case 'materiais_orcamento_os':
+        return ['Orçamento', 'OS', 'Cliente', 'Produto', 'Qtd. Orçamento', 'Qtd. OS', 'Diferença Qtd.', 'Valor Orçamento', 'Valor OS', 'Diferença Valor'];
       case 'emissao_os':
       default:
         return renderTableContent().match(/<th>(.*?)<\/th>/g)?.map((h) => h.replace(/<\/?th>/g, '')) || [];
@@ -1428,6 +1667,23 @@ export default function Relatorios() {
           r.data_hora ? formatDate(r.data_hora) : '-',
           r.ip ?? '-',
         ]);
+      case 'materiais_orcamento_os':
+        // Para materiais, precisamos usar reportData.data que tem a estrutura correta
+        const materiaisData = (reportData as any)?.data || [];
+        return materiaisData.flatMap((item: any) =>
+          (item.produtos || []).map((produto: any) => [
+            item.orcamento_numero || '-',
+            item.os_numero || '-',
+            item.cliente || '-',
+            produto.produto_nome || '-',
+            `${(produto.quantidade_orcamento || 0).toFixed(2)} ${produto.unidade || ''}`,
+            `${(produto.quantidade_os || 0).toFixed(2)} ${produto.unidade || ''}`,
+            `${(produto.diferenca_quantidade || 0).toFixed(2)} (${(produto.percentual_quantidade || 0).toFixed(2)}%)`,
+            formatCurrency(produto.valor_orcamento || 0),
+            formatCurrency(produto.valor_os || 0),
+            `${formatCurrency(produto.diferenca_valor || 0)} (${(produto.percentual_valor || 0).toFixed(2)}%)`,
+          ])
+        );
       case 'emissao_os':
       default:
         // Tenta extrair células de renderTableRows() (fallback simples)
@@ -2332,6 +2588,19 @@ export default function Relatorios() {
           <th>Status OS</th>
           <th>Valor Total</th>
         `;
+      case 'materiais_orcamento_os':
+        return `
+          <th>Orçamento</th>
+          <th>OS</th>
+          <th>Cliente</th>
+          <th>Produto</th>
+          <th>Qtd. Orçamento</th>
+          <th>Qtd. OS</th>
+          <th>Diferença Qtd.</th>
+          <th>Valor Orçamento</th>
+          <th>Valor OS</th>
+          <th>Diferença Valor</th>
+        `;
       default:
         return '';
     }
@@ -2475,6 +2744,29 @@ export default function Relatorios() {
         `
           )
           .join('');
+      case 'materiais_orcamento_os':
+        return reportData.data
+          .flatMap((item: any) =>
+            item.produtos.map((produto: any) => `
+          <tr>
+            <td style="font-weight: bold;">${item.orcamento_numero}</td>
+            <td style="font-weight: bold;">${item.os_numero}</td>
+            <td>${item.cliente}</td>
+            <td>${produto.produto_nome}</td>
+            <td>${produto.quantidade_orcamento.toFixed(2)} ${produto.unidade}</td>
+            <td>${produto.quantidade_os.toFixed(2)} ${produto.unidade}</td>
+            <td style="color: ${produto.diferenca_quantidade > 0 ? 'red' : produto.diferenca_quantidade < 0 ? 'green' : 'black'};">
+              ${produto.diferenca_quantidade > 0 ? '+' : ''}${produto.diferenca_quantidade.toFixed(2)} (${produto.percentual_quantidade.toFixed(2)}%)
+            </td>
+            <td>${formatCurrency(produto.valor_orcamento)}</td>
+            <td>${formatCurrency(produto.valor_os)}</td>
+            <td style="color: ${produto.diferenca_valor > 0 ? 'red' : produto.diferenca_valor < 0 ? 'green' : 'black'};">
+              ${produto.diferenca_valor > 0 ? '+' : ''}${formatCurrency(produto.diferenca_valor)} (${produto.percentual_valor.toFixed(2)}%)
+            </td>
+          </tr>
+        `)
+          )
+          .join('');
       default:
         return '';
     }
@@ -2581,6 +2873,21 @@ export default function Relatorios() {
             <TableHead>Status Atraso</TableHead>
             <TableHead>Status OS</TableHead>
             <TableHead>Valor Total</TableHead>
+          </>
+        );
+      case 'materiais_orcamento_os':
+        return (
+          <>
+            <TableHead>Orçamento</TableHead>
+            <TableHead>OS</TableHead>
+            <TableHead>Cliente</TableHead>
+            <TableHead>Produto</TableHead>
+            <TableHead>Qtd. Orçamento</TableHead>
+            <TableHead>Qtd. OS</TableHead>
+            <TableHead>Diferença Qtd.</TableHead>
+            <TableHead>Valor Orçamento</TableHead>
+            <TableHead>Valor OS</TableHead>
+            <TableHead>Diferença Valor</TableHead>
           </>
         );
       default:
@@ -2776,6 +3083,79 @@ export default function Relatorios() {
               </Badge>
             </TableCell>
             <TableCell>{formatCurrency(os.valor_total)}</TableCell>
+          </TableRow>
+        ));
+      case 'materiais_orcamento_os':
+        // Agrupar produtos por OS - mostrar OS uma vez e produtos abaixo
+        const processedOS = new Set<string>();
+        const allRows: any[] = [];
+        
+        reportData.data.forEach((item: any) => {
+          const osKey = `${item.os_numero}-${item.orcamento_numero}`;
+          
+          if (!processedOS.has(osKey)) {
+            processedOS.add(osKey);
+            const produtos = item.produtos || [];
+            
+            produtos.forEach((produto: any, produtoIndex: number) => {
+              allRows.push({
+                ...item,
+                produto,
+                isFirstProduct: produtoIndex === 0,
+                totalProdutos: produtos.length
+              });
+            });
+          }
+        });
+
+        return allRows.map((row, index) => (
+          <TableRow key={`${row.os_numero}-${row.orcamento_numero}-${index}`}>
+            {row.isFirstProduct ? (
+              <>
+                <TableCell className="font-medium align-top" rowSpan={row.totalProdutos}>
+                  {row.orcamento_numero}
+                </TableCell>
+                <TableCell className="font-medium align-top" rowSpan={row.totalProdutos}>
+                  {row.os_numero}
+                </TableCell>
+                <TableCell className="align-top" rowSpan={row.totalProdutos}>
+                  {row.cliente}
+                </TableCell>
+              </>
+            ) : null}
+            <TableCell>{row.produto.produto_nome}</TableCell>
+            <TableCell>{row.produto.quantidade_orcamento.toFixed(2)} {row.produto.unidade}</TableCell>
+            <TableCell>{row.produto.quantidade_os.toFixed(2)} {row.produto.unidade}</TableCell>
+            <TableCell>
+              <Badge
+                variant={
+                  row.produto.diferenca_quantidade > 0
+                    ? 'destructive'
+                    : row.produto.diferenca_quantidade < 0
+                      ? 'default'
+                      : 'secondary'
+                }
+              >
+                {row.produto.diferenca_quantidade > 0 ? '+' : ''}
+                {row.produto.diferenca_quantidade.toFixed(2)} ({row.produto.percentual_quantidade.toFixed(2)}%)
+              </Badge>
+            </TableCell>
+            <TableCell>{formatCurrency(row.produto.valor_orcamento)}</TableCell>
+            <TableCell>{formatCurrency(row.produto.valor_os)}</TableCell>
+            <TableCell>
+              <Badge
+                variant={
+                  row.produto.diferenca_valor > 0
+                    ? 'destructive'
+                    : row.produto.diferenca_valor < 0
+                      ? 'default'
+                      : 'secondary'
+                }
+              >
+                {row.produto.diferenca_valor > 0 ? '+' : ''}
+                {formatCurrency(row.produto.diferenca_valor)} ({row.produto.percentual_valor.toFixed(2)}%)
+              </Badge>
+            </TableCell>
           </TableRow>
         ));
       default:
@@ -3041,8 +3421,8 @@ export default function Relatorios() {
           </div>
 
           {/* Botões de Ação */}
-          <div className="mt-6 flex gap-2">
-            <Button onClick={generateReport} disabled={loading}>
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <Button onClick={generateReport} disabled={loading} className="flex-shrink-0">
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -3057,13 +3437,13 @@ export default function Relatorios() {
             </Button>
 
             {reportData && (
-              <Button variant="outline" onClick={handlePrint}>
+              <Button variant="outline" onClick={handlePrint} className="flex-shrink-0">
                 <Printer className="mr-2 h-4 w-4" />
                 Imprimir
               </Button>
             )}
             {!reportData && (
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground flex-shrink-0">
                 Gere um relatório primeiro para poder imprimir
               </div>
             )}
@@ -3078,12 +3458,99 @@ export default function Relatorios() {
             <CardTitle>Resultados do Relatório</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>{renderTableContentJSX()}</TableRow>
-              </TableHeader>
-              <TableBody>{renderTableRowsJSX()}</TableBody>
-            </Table>
+            {reportData.type === 'materiais_orcamento_os' ? (
+              // Renderização especial para materiais - agrupado por OS
+              <div className="space-y-6">
+                {reportData.data.map((item: any, itemIndex: number) => (
+                  <Card key={`${item.os_numero}-${item.orcamento_numero}`} className="border-l-4 border-l-primary">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg">
+                            OS: {item.os_numero} | Orçamento: {item.orcamento_numero}
+                          </CardTitle>
+                          <CardDescription className="mt-1">
+                            Cliente: {item.cliente}
+                          </CardDescription>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm text-muted-foreground">Valor Orçamento</div>
+                          <div className="font-medium">{formatCurrency(item.valor_total_orcamento)}</div>
+                          <div className="text-sm text-muted-foreground mt-1">Valor OS</div>
+                          <div className={`font-medium ${item.valor_total_os > item.valor_total_orcamento ? 'text-green-600' : item.valor_total_os < item.valor_total_orcamento ? 'text-red-600' : ''}`}>
+                            {formatCurrency(item.valor_total_os)}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Diferença: {formatCurrency(item.valor_total_os - item.valor_total_orcamento)}
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Produto</TableHead>
+                            <TableHead className="text-right">Qtd. Orçamento</TableHead>
+                            <TableHead className="text-right">Qtd. OS</TableHead>
+                            <TableHead className="text-right">Diferença Qtd.</TableHead>
+                            <TableHead className="text-right">Valor Orçamento</TableHead>
+                            <TableHead className="text-right">Valor OS</TableHead>
+                            <TableHead className="text-right">Diferença Valor</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {item.produtos.map((produto: any, produtoIndex: number) => (
+                            <TableRow key={`${item.os_numero}-${produtoIndex}`}>
+                              <TableCell className="font-medium">{produto.produto_nome}</TableCell>
+                              <TableCell className="text-right">{produto.quantidade_orcamento.toFixed(2)} {produto.unidade}</TableCell>
+                              <TableCell className="text-right">{produto.quantidade_os.toFixed(2)} {produto.unidade}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge
+                                  variant={
+                                    produto.diferenca_quantidade > 0
+                                      ? 'destructive'
+                                      : produto.diferenca_quantidade < 0
+                                        ? 'default'
+                                        : 'secondary'
+                                  }
+                                >
+                                  {produto.diferenca_quantidade > 0 ? '+' : ''}
+                                  {produto.diferenca_quantidade.toFixed(2)} ({produto.percentual_quantidade.toFixed(2)}%)
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">{formatCurrency(produto.valor_orcamento)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(produto.valor_os)}</TableCell>
+                              <TableCell className="text-right">
+                                <Badge
+                                  variant={
+                                    produto.diferenca_valor > 0
+                                      ? 'destructive'
+                                      : produto.diferenca_valor < 0
+                                        ? 'default'
+                                        : 'secondary'
+                                  }
+                                >
+                                  {produto.diferenca_valor > 0 ? '+' : ''}
+                                  {formatCurrency(produto.diferenca_valor)} ({produto.percentual_valor.toFixed(2)}%)
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>{renderTableContentJSX()}</TableRow>
+                </TableHeader>
+                <TableBody>{renderTableRowsJSX()}</TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       )}

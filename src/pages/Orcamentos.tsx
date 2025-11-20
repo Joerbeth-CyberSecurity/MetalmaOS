@@ -47,7 +47,7 @@ interface Orcamento {
   tempo_execucao_previsto?: string;
   meta_por_hora?: number;
   data_aprovacao?: string;
-  data_vencimento?: string;
+  data_criacao?: string;
   observacoes?: string;
   clientes?: {
     nome: string;
@@ -83,8 +83,10 @@ export default function Orcamentos() {
   const [motivoCancelamento, setMotivoCancelamento] = useState('');
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [orcamentoToExport, setOrcamentoToExport] = useState<Orcamento | null>(null);
   const [orcamentoToPrint, setOrcamentoToPrint] = useState<Orcamento | null>(null);
+  const [orcamentoToDelete, setOrcamentoToDelete] = useState<Orcamento | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -164,28 +166,93 @@ export default function Orcamentos() {
   };
 
   const handleEditOrcamento = (orcamento: Orcamento) => {
+    if (orcamento.status === 'transformado') {
+      toast({
+        title: 'Orçamento não pode ser editado',
+        description: 'Orçamentos transformados em OS não podem ser alterados.',
+        variant: 'destructive'
+      });
+      return;
+    }
     setEditingOrcamento(orcamento);
     setShowForm(true);
   };
 
   const handleDeleteOrcamento = async (orcamento: Orcamento) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o orçamento ${orcamento.numero_orcamento}?`)) {
+    if (orcamento.status === 'transformado') {
+      toast({
+        title: 'Orçamento não pode ser excluído',
+        description: 'Orçamentos transformados em OS não podem ser excluídos.',
+        variant: 'destructive'
+      });
       return;
     }
 
+    // Abrir dialog de confirmação
+    setOrcamentoToDelete(orcamento);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteOrcamento = async () => {
+    if (!orcamentoToDelete) return;
+
     try {
+      // Buscar usuário atual
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Buscar dados do usuário para auditoria
+      let usuarioNome = 'Sistema';
+      let usuarioEmail = '';
+      if (user) {
+        const { data: userData } = await supabase
+          .from('admins')
+          .select('nome, email')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (userData) {
+          usuarioNome = userData.nome;
+          usuarioEmail = userData.email;
+        }
+      }
+      
+      // Registrar auditoria na tabela AUDITORIA_ORCAMENTO
+      await supabase.from('auditoria_orcamento').insert({
+        user_id: user?.id,
+        nome_usuario: usuarioNome,
+        email_usuario: usuarioEmail,
+        acao: 'EXCLUSAO_ORCAMENTO',
+        orcamento_id: orcamentoToDelete.id,
+        numero_orcamento: orcamentoToDelete.numero_orcamento,
+        dados_anteriores: {
+          numero_orcamento: orcamentoToDelete.numero_orcamento,
+          cliente: orcamentoToDelete.clientes?.nome,
+          valor_total: orcamentoToDelete.valor_total,
+          valor_final: orcamentoToDelete.valor_final,
+          status: orcamentoToDelete.status,
+          data_abertura: orcamentoToDelete.data_abertura,
+          data_prevista: orcamentoToDelete.data_prevista
+        },
+        dados_novos: null,
+        detalhes: `Orçamento ${orcamentoToDelete.numero_orcamento} excluído pelo usuário`,
+        data_acao: new Date().toISOString()
+      });
+
+      // Excluir orçamento
       const { error } = await supabase
         .from('orcamentos')
         .delete()
-        .eq('id', orcamento.id);
+        .eq('id', orcamentoToDelete.id);
 
       if (error) throw error;
 
       toast({
         title: 'Orçamento excluído com sucesso!',
-        description: `Orçamento ${orcamento.numero_orcamento} foi excluído.`
+        description: `Orçamento ${orcamentoToDelete.numero_orcamento} foi excluído.`
       });
 
+      setShowDeleteDialog(false);
+      setOrcamentoToDelete(null);
       fetchOrcamentos();
     } catch (error) {
       console.error('Erro ao excluir orçamento:', error);
@@ -282,8 +349,7 @@ export default function Orcamentos() {
       const { error } = await supabase
         .from('orcamentos')
         .update({
-          // Usa 'rejeitado' para compatibilidade com a constraint atual; mantém observação indicando cancelamento
-          status: 'rejeitado',
+          status: 'cancelado',
           observacoes: `CANCELADO: ${motivoCancelamento}`,
           updated_at: new Date().toISOString()
         })
@@ -932,56 +998,44 @@ export default function Orcamentos() {
                           )}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          <strong>Data:</strong> {formatDate(orcamento.data_abertura)}
-                          {orcamento.data_vencimento && (
+                          <strong>Data de Abertura:</strong> {formatDate(orcamento.data_abertura)}
+                          {orcamento.data_prevista && (
                             <span className="ml-4">
-                              <strong>Vencimento:</strong> {formatDate(orcamento.data_vencimento)}
+                              <strong>Data Prevista:</strong> {formatDate(orcamento.data_prevista)}
                             </span>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        {/* Aprovar */}
-                        {orcamento.status === 'aberto' && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleAprovarOrcamento(orcamento)}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Aprovar
-                          </Button>
-                        )}
-                        
-                        {/* Editar */}
+                        {/* Editar - Desabilitado após transformar em OS */}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditOrcamento(orcamento)}
-                          disabled={['cancelado','rejeitado','transformado'].includes(orcamento.status)}
+                          disabled={orcamento.status === 'transformado'}
+                          title={orcamento.status === 'transformado' ? 'Orçamentos transformados não podem ser editados' : ''}
                         >
                           <Edit className="h-4 w-4 mr-1" />
                           Editar
                         </Button>
                         
-                        {/* Cancelar */}
-                        {orcamento.status === 'aberto' && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleCancelarOrcamento(orcamento)}
-                          >
-                            <X className="h-4 w-4 mr-1" />
-                            Cancelar
-                          </Button>
-                        )}
+                        {/* Excluir - Desabilitado após transformar em OS */}
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteOrcamento(orcamento)}
+                          disabled={orcamento.status === 'transformado'}
+                          title={orcamento.status === 'transformado' ? 'Orçamentos transformados não podem ser excluídos' : ''}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Excluir
+                        </Button>
                         
                         {/* Exportar PDF */}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleExportarPDF(orcamento)}
-                          disabled={orcamento.status === 'cancelado'}
                         >
                           <FileText className="h-4 w-4 mr-1" />
                           Exportar
@@ -992,23 +1046,34 @@ export default function Orcamentos() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleImprimir(orcamento)}
-                          disabled={orcamento.status === 'cancelado'}
                         >
                           <Printer className="h-4 w-4 mr-1" />
                           Imprimir
                         </Button>
                         
-                        {/* Transformar em OS */}
-                        {orcamento.status === 'aprovado' && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleTransformOrcamento(orcamento)}
-                          >
-                            <Play className="h-4 w-4 mr-1" />
-                            Transformar em OS
-                          </Button>
-                        )}
+                        {/* Transformar em OS - Sempre visível, desabilitado se já transformado */}
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleTransformOrcamento(orcamento)}
+                          disabled={orcamento.status === 'transformado'}
+                          title={orcamento.status === 'transformado' ? 'Orçamento já foi transformado em OS' : ''}
+                        >
+                          <Play className="h-4 w-4 mr-1" />
+                          Transformar em OS
+                        </Button>
+                        
+                        {/* Cancelar - Sempre visível, habilitado APENAS após transformar */}
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleCancelarOrcamento(orcamento)}
+                          disabled={orcamento.status !== 'transformado'}
+                          title={orcamento.status !== 'transformado' ? 'Disponível apenas após transformar em OS' : 'Cancelar orçamento transformado'}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Cancelar
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -1095,6 +1160,18 @@ export default function Orcamentos() {
         onCancel={() => handleConfirmarImpressao(orcamentoToPrint!, false)}
         confirmText="Sim"
         cancelText="Não"
+      />
+
+      {/* Dialog de Confirmação para Excluir */}
+      <ConfirmationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title="Excluir Orçamento"
+        description={`Tem certeza que deseja excluir o orçamento ${orcamentoToDelete?.numero_orcamento}?`}
+        onConfirm={confirmDeleteOrcamento}
+        onCancel={() => setShowDeleteDialog(false)}
+        confirmText="OK"
+        cancelText="Cancelar"
       />
     </div>
   );

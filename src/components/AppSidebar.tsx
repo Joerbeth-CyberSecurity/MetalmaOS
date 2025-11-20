@@ -16,7 +16,7 @@ import {
 import { useAuth } from '@/hooks/useAuth.jsx';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
-import { adminModules, mainModules } from '@/lib/navigation';
+import { adminModules, mainModules, financeModules } from '@/lib/navigation';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -33,6 +33,10 @@ export function AppSidebar() {
 
   // Filtrar itens baseado nas permissões
   const filteredItems = mainModules.filter(
+    (item) => item.permission === null || hasPermission(item.permission)
+  );
+
+  const filteredFinanceItems = financeModules.filter(
     (item) => item.permission === null || hasPermission(item.permission)
   );
 
@@ -100,6 +104,29 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Finance Navigation - Só mostra se tiver itens */}
+        {filteredFinanceItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-sidebar-foreground/70">
+              Financeiro
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {filteredFinanceItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url} end className={getNavCls}>
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {/* Admin Navigation - Só mostra se tiver itens */}
         {filteredAdminItems.length > 0 && (

@@ -33,7 +33,77 @@ export function TransformarOrcamentoDialog({
     meta_hora: 0
   });
   const [loading, setLoading] = useState(false);
+  const [expSegSex, setExpSegSex] = useState<number>(8);
+  const [expSab, setExpSab] = useState<number>(4);
+  const [expDom, setExpDom] = useState<number>(0);
   const { toast } = useToast();
+
+  // Carregar configurações de expediente
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('configuracoes')
+          .select('chave, valor')
+          .in('chave', [
+            'expediente_horas_segsex',
+            'expediente_horas_sabado',
+            'expediente_horas_domingo',
+          ]);
+        const map = Object.fromEntries((data || []).map((r: any) => [r.chave, r.valor]));
+        setExpSegSex(isNaN(parseFloat(map.expediente_horas_segsex)) ? 8 : parseFloat(map.expediente_horas_segsex));
+        setExpSab(isNaN(parseFloat(map.expediente_horas_sabado)) ? 4 : parseFloat(map.expediente_horas_sabado));
+        setExpDom(isNaN(parseFloat(map.expediente_horas_domingo)) ? 0 : parseFloat(map.expediente_horas_domingo));
+      } catch {}
+    })();
+  }, []);
+
+  // Calcular tempo de execução automaticamente quando datas mudarem
+  useEffect(() => {
+    if (formData.data_abertura && formData.data_conclusao) {
+      const horas = calcularHorasUteis(formData.data_abertura, formData.data_conclusao);
+      
+      if (!isNaN(horas) && horas >= 0) {
+        setFormData(prev => ({
+          ...prev,
+          tempo_execucao_previsto: horas
+        }));
+      }
+    }
+  }, [formData.data_abertura, formData.data_conclusao, expSegSex, expSab, expDom]);
+
+  // Função para calcular horas úteis entre duas datas
+  const calcularHorasUteis = (dataInicio: string, dataFim: string): number => {
+    if (!dataInicio || !dataFim) return 0;
+    
+    const inicio = new Date(dataInicio + 'T00:00:00');
+    const fim = new Date(dataFim + 'T00:00:00');
+    
+    if (inicio >= fim) return 0;
+    
+    let horas = 0;
+    const dataAtual = new Date(inicio);
+    
+    // Loop até a data fim (inclusive)
+    while (dataAtual <= fim) {
+      const diaSemana = dataAtual.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
+      
+      if (diaSemana >= 1 && diaSemana <= 5) {
+        // Segunda a sexta
+        horas += expSegSex;
+      } else if (diaSemana === 6) {
+        // Sábado
+        horas += expSab;
+      } else if (diaSemana === 0) {
+        // Domingo
+        horas += expDom;
+      }
+      
+      dataAtual.setDate(dataAtual.getDate() + 1);
+    }
+    
+    return horas;
+  };
 
   // Buscar próximo número de OS quando o dialog abrir
   useEffect(() => {
@@ -204,9 +274,10 @@ export function TransformarOrcamentoDialog({
           valor_total: orcamento.valor_final || 0,
           tempo_execucao_previsto: formData.tempo_execucao_previsto || 0,
           status: 'aberta',
-          data_abertura: new Date(formData.data_abertura).toISOString(),
-          data_previsao: formData.data_conclusao ? new Date(formData.data_conclusao).toISOString() : null,
-          observacoes: formData.observacoes || null
+          data_abertura: new Date(formData.data_abertura + 'T12:00:00').toISOString(),
+          data_previsao: formData.data_conclusao ? new Date(formData.data_conclusao + 'T12:00:00').toISOString() : null,
+          observacoes: formData.observacoes || null,
+          orcamento_id: orcamento.id
         })
         .select()
         .single();
@@ -399,6 +470,9 @@ export function TransformarOrcamentoDialog({
                       value={formData.tempo_execucao_previsto}
                       onChange={(e) => setFormData({ ...formData, tempo_execucao_previsto: parseFloat(e.target.value) || 0 })}
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Calculado automaticamente baseado nas datas de abertura e prevista
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="meta_hora">Meta por Hora</Label>

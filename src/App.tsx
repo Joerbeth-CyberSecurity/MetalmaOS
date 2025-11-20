@@ -17,6 +17,7 @@ import Produtos from './pages/Produtos';
 import Colaboradores from './pages/Colaboradores';
 import Relatorios from './pages/Relatorios';
 import Orcamentos from './pages/Orcamentos';
+import RelatorioFinanceiroOrcamentoOS from './pages/RelatorioFinanceiroOrcamentoOS';
 import Configuracoes from './pages/Configuracoes';
 import NotFound from './pages/NotFound';
 import ResetPassword from './pages/ResetPassword';
@@ -58,6 +59,10 @@ function App() {
                           />
                           <Route path="/relatorios" element={<Relatorios />} />
                           <Route path="/orcamentos" element={<Orcamentos />} />
+                          <Route
+                            path="/financeiro/orcamento-os"
+                            element={<RelatorioFinanceiroOrcamentoOS />}
+                          />
                           <Route
                             path="/configuracoes"
                             element={<Configuracoes />}

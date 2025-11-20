@@ -1515,7 +1515,7 @@ export default function Configuracoes() {
       </div>
 
       <Tabs defaultValue="system" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-1">
           <TabsTrigger value="system" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Sistema
